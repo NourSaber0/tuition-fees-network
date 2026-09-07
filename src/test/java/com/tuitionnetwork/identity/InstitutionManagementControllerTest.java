@@ -293,6 +293,31 @@ class InstitutionManagementControllerTest {
                 .andExpect(jsonPath("$.error").value("NOT_FOUND"));
     }
 
+    @Test
+    @WithMockUser(username = "finance@cibeg.com", roles = {"BACK_OFFICE"})
+    void settlements_returnsSettlementHistoryAndCibFeeBreakdown() throws Exception {
+        UUID id = UUID.randomUUID();
+        com.tuitionnetwork.identity.dto.InstitutionSettlementSummaryDto summary =
+                new com.tuitionnetwork.identity.dto.InstitutionSettlementSummaryDto(4086365L, 1, LocalDate.of(2026, 8, 30));
+        com.tuitionnetwork.identity.dto.InstitutionSettlementDto line =
+                new com.tuitionnetwork.identity.dto.InstitutionSettlementDto(
+                        "SET-SCH-001-001", LocalDate.of(2026, 8, 30), 4169760L, 83395L, 4086365L,
+                        "Completed", "TX-20260830-0001", "RECON-20260830");
+
+        when(service.settlements(id)).thenReturn(new com.tuitionnetwork.identity.dto.InstitutionSettlementsResponse(summary, List.of(line)));
+
+        mockMvc.perform(get("/api/v1/institutions/{id}/settlements", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.summary.totalSettledEGP").value(4086365))
+                .andExpect(jsonPath("$.summary.recordCount").value(1))
+                .andExpect(jsonPath("$.summary.lastSettlementDate").value("2026-08-30"))
+                .andExpect(jsonPath("$.data[0].id").value("SET-SCH-001-001"))
+                .andExpect(jsonPath("$.data[0].grossEGP").value(4169760))
+                .andExpect(jsonPath("$.data[0].cibFeeEGP").value(83395))
+                .andExpect(jsonPath("$.data[0].netEGP").value(4086365))
+                .andExpect(jsonPath("$.data[0].status").value("Completed"));
+    }
+
     // ── RBAC ──────────────────────────────────────────────────────────────
 
     @Test
