@@ -4,6 +4,7 @@ import com.tuitionnetwork.billing.domain.FeeLine;
 import com.tuitionnetwork.billing.domain.FeeType;
 import com.tuitionnetwork.billing.repository.FeeLineRepository;
 import com.tuitionnetwork.common.exceptions.PendingBusinessRuleException;
+import com.tuitionnetwork.payments.domain.CardBinClassifier;
 import com.tuitionnetwork.payments.domain.Payment;
 import com.tuitionnetwork.payments.domain.PaymentMethod;
 import com.tuitionnetwork.payments.domain.PaymentStatus;
@@ -144,14 +145,6 @@ public class PaymentSettlementService {
     }
 
     private boolean isDebitCard(String cardNumber) {
-        if (cardNumber == null) return false;
-        String clean = cardNumber.replaceAll("\\s+", "").toUpperCase();
-        return clean.contains("DEBIT") ||
-               clean.startsWith("5078") ||
-               clean.startsWith("5888") ||
-               clean.startsWith("6703") ||
-               clean.startsWith("400000") ||
-               clean.startsWith("4023") ||
-               clean.startsWith("5000");
+        return CardBinClassifier.isDebitCard(cardNumber);
     }
 }

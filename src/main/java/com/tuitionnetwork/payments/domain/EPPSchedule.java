@@ -46,6 +46,9 @@ public class EPPSchedule {
     @Column(name = "monthly_instalment", nullable = false, precision = 19, scale = 2)
     private BigDecimal monthlyInstalment;
 
+    @Column(name = "status", nullable = false)
+    private String status = "ACTIVE";
+
     public EPPSchedule() {
     }
 
@@ -132,6 +135,14 @@ public class EPPSchedule {
 
     public void setMonthlyInstalment(BigDecimal monthlyInstalment) {
         this.monthlyInstalment = monthlyInstalment;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 
     @Override
