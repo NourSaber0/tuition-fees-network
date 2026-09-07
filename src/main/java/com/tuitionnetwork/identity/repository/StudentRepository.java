@@ -12,4 +12,5 @@ import java.util.UUID;
 public interface StudentRepository extends JpaRepository<Student, UUID> {
     Optional<Student> findByNationalIdHash(String nationalIdHash);
     List<Student> findByGuardianId(UUID guardianId);
+    List<Student> findByInstitutionId(UUID institutionId);
 }

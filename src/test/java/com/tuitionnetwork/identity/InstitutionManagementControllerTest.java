@@ -8,7 +8,10 @@ import com.tuitionnetwork.identity.domain.AccountStatus;
 import com.tuitionnetwork.identity.domain.IntegrationStatus;
 import com.tuitionnetwork.identity.domain.InstitutionType;
 import com.tuitionnetwork.identity.domain.RegistrationStatus;
+import com.tuitionnetwork.identity.dto.InstitutionApplicationDto;
 import com.tuitionnetwork.identity.dto.InstitutionDetailDto;
+import com.tuitionnetwork.identity.dto.InstitutionIntegrationDto;
+import com.tuitionnetwork.identity.dto.InstitutionStudentDto;
 import com.tuitionnetwork.identity.dto.InstitutionSummaryDto;
 import com.tuitionnetwork.identity.service.InstitutionManagementService;
 import org.junit.jupiter.api.BeforeEach;
@@ -227,6 +230,65 @@ class InstitutionManagementControllerTest {
 
         mockMvc.perform(post("/api/v1/institutions/{id}/activate", id))
                 .andExpect(status().isConflict());
+    }
+
+    // ── Sub-resources: students / application / integration ────────────────
+
+    @Test
+    @WithMockUser(username = "ops@cibeg.com", roles = {"BACK_OFFICE"})
+    void students_returns200_withRoster() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(service.students(id)).thenReturn(List.of(new InstitutionStudentDto(
+                UUID.randomUUID(), "Ahmed Hassan", LocalDate.of(2010, 5, 1),
+                new java.math.BigDecimal("18000"), new java.math.BigDecimal("5000"),
+                new java.math.BigDecimal("13000"), "Partial")));
+
+        mockMvc.perform(get("/api/v1/institutions/{id}/students", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].fullName").value("Ahmed Hassan"))
+                .andExpect(jsonPath("$[0].status").value("Partial"));
+    }
+
+    @Test
+    @WithMockUser(username = "ops@cibeg.com", roles = {"BACK_OFFICE"})
+    void application_returns200() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(service.application(id)).thenReturn(new InstitutionApplicationDto(
+                id, "Cairo International School", "MOEDU-SCH-2024-0112", InstitutionType.SCHOOL,
+                "International", "Cairo", "Dr. Ahmad Fawzy", "+20 2 2516 0000", "admin@cis.edu.eg",
+                850, LocalDate.now(), RegistrationStatus.PENDING, null,
+                List.of("Commercial Registry", "Tax Card"), false));
+
+        mockMvc.perform(get("/api/v1/institutions/{id}/application", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.registrationNumber").value("MOEDU-SCH-2024-0112"))
+                .andExpect(jsonPath("$.documentsTracked").value(false))
+                .andExpect(jsonPath("$.requiredDocuments").isArray());
+    }
+
+    @Test
+    @WithMockUser(username = "ops@cibeg.com", roles = {"BACK_OFFICE"})
+    void integration_returns200() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(service.integration(id)).thenReturn(new InstitutionIntegrationDto(
+                id, IntegrationStatus.NOT_INTEGRATED, "This institution has not been enrolled...", false));
+
+        mockMvc.perform(get("/api/v1/institutions/{id}/integration", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("NOT_INTEGRATED"))
+                .andExpect(jsonPath("$.configured").value(false));
+    }
+
+    @Test
+    @WithMockUser(username = "ops@cibeg.com", roles = {"BACK_OFFICE"})
+    void students_unknownInstitution_returns404() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(service.students(id)).thenThrow(
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "Institution not found: " + id));
+
+        mockMvc.perform(get("/api/v1/institutions/{id}/students", id))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("NOT_FOUND"));
     }
 
     // ── RBAC ──────────────────────────────────────────────────────────────

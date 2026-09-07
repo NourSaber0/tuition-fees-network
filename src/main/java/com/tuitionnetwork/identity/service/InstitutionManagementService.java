@@ -4,10 +4,14 @@ import com.tuitionnetwork.common.dto.PageResponse;
 import com.tuitionnetwork.identity.domain.AccountStatus;
 import com.tuitionnetwork.identity.domain.InstitutionType;
 import com.tuitionnetwork.identity.domain.RegistrationStatus;
+import com.tuitionnetwork.identity.dto.InstitutionApplicationDto;
 import com.tuitionnetwork.identity.dto.InstitutionDetailDto;
+import com.tuitionnetwork.identity.dto.InstitutionIntegrationDto;
+import com.tuitionnetwork.identity.dto.InstitutionStudentDto;
 import com.tuitionnetwork.identity.dto.InstitutionSummaryDto;
 import com.tuitionnetwork.identity.dto.RegisterInstitutionRequest;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -44,4 +48,13 @@ public interface InstitutionManagementService {
     InstitutionDetailDto activate(UUID id);
 
     InstitutionDetailDto deactivate(UUID id);
+
+    /** Student roster with fee balances (US-12). */
+    List<InstitutionStudentDto> students(UUID id);
+
+    /** Registration review packet (US-08). */
+    InstitutionApplicationDto application(UUID id);
+
+    /** Integration channel status (US-13). */
+    InstitutionIntegrationDto integration(UUID id);
 }

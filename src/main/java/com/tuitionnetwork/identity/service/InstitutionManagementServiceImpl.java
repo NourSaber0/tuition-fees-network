@@ -1,14 +1,22 @@
 package com.tuitionnetwork.identity.service;
 
+import com.tuitionnetwork.billing.domain.FeeLine;
+import com.tuitionnetwork.billing.domain.FeeStatus;
+import com.tuitionnetwork.billing.repository.FeeLineRepository;
 import com.tuitionnetwork.common.dto.PageResponse;
 import com.tuitionnetwork.identity.domain.AccountStatus;
 import com.tuitionnetwork.identity.domain.Institution;
 import com.tuitionnetwork.identity.domain.InstitutionType;
 import com.tuitionnetwork.identity.domain.RegistrationStatus;
+import com.tuitionnetwork.identity.domain.Student;
+import com.tuitionnetwork.identity.dto.InstitutionApplicationDto;
 import com.tuitionnetwork.identity.dto.InstitutionDetailDto;
+import com.tuitionnetwork.identity.dto.InstitutionIntegrationDto;
+import com.tuitionnetwork.identity.dto.InstitutionStudentDto;
 import com.tuitionnetwork.identity.dto.InstitutionSummaryDto;
 import com.tuitionnetwork.identity.dto.RegisterInstitutionRequest;
 import com.tuitionnetwork.identity.repository.InstitutionRepository;
+import com.tuitionnetwork.identity.repository.StudentRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -17,7 +25,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
+import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -31,9 +42,15 @@ public class InstitutionManagementServiceImpl implements InstitutionManagementSe
     private static final int MAX_PAGE_SIZE = 100;
 
     private final InstitutionRepository institutionRepository;
+    private final StudentRepository studentRepository;
+    private final FeeLineRepository feeLineRepository;
 
-    public InstitutionManagementServiceImpl(InstitutionRepository institutionRepository) {
+    public InstitutionManagementServiceImpl(InstitutionRepository institutionRepository,
+                                            StudentRepository studentRepository,
+                                            FeeLineRepository feeLineRepository) {
         this.institutionRepository = institutionRepository;
+        this.studentRepository = studentRepository;
+        this.feeLineRepository = feeLineRepository;
     }
 
     @Override
@@ -143,6 +160,61 @@ public class InstitutionManagementServiceImpl implements InstitutionManagementSe
         Institution institution = require(id);
         institution.setAccountStatus(AccountStatus.INACTIVE);
         return InstitutionDetailDto.from(institutionRepository.save(institution));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<InstitutionStudentDto> students(UUID id) {
+        require(id);
+        return studentRepository.findByInstitutionId(id).stream()
+                .map(student -> toStudentDto(id, student))
+                .sorted(Comparator.comparing(InstitutionStudentDto::fullName,
+                        Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public InstitutionApplicationDto application(UUID id) {
+        return InstitutionApplicationDto.from(require(id));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public InstitutionIntegrationDto integration(UUID id) {
+        return InstitutionIntegrationDto.from(require(id));
+    }
+
+    private InstitutionStudentDto toStudentDto(UUID institutionId, Student student) {
+        BigDecimal total = BigDecimal.ZERO;
+        BigDecimal paid = BigDecimal.ZERO;
+        BigDecimal outstanding = BigDecimal.ZERO;
+
+        for (FeeLine fee : feeLineRepository.findByInstitutionIdAndStudentId(institutionId, student.getId())) {
+            if (fee.getStatus() == FeeStatus.CANCELLED) {
+                continue;
+            }
+            total = total.add(nz(fee.getTotalAmount()));
+            paid = paid.add(nz(fee.getPaidAmount()));
+            outstanding = outstanding.add(nz(fee.getRemainingAmount()));
+        }
+
+        String status;
+        if (outstanding.compareTo(BigDecimal.ZERO) <= 0) {
+            status = "Paid";
+        } else if (paid.compareTo(BigDecimal.ZERO) <= 0) {
+            status = "Unpaid";
+        } else {
+            status = "Partial";
+        }
+
+        return new InstitutionStudentDto(
+                student.getId(), student.getFullName(), student.getDateOfBirth(),
+                total, paid, outstanding, status);
+    }
+
+    private static BigDecimal nz(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
     }
 
     private Institution require(UUID id) {

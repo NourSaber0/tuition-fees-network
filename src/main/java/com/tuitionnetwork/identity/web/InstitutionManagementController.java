@@ -6,7 +6,10 @@ import com.tuitionnetwork.common.dto.PageResponse;
 import com.tuitionnetwork.identity.domain.AccountStatus;
 import com.tuitionnetwork.identity.domain.InstitutionType;
 import com.tuitionnetwork.identity.domain.RegistrationStatus;
+import com.tuitionnetwork.identity.dto.InstitutionApplicationDto;
 import com.tuitionnetwork.identity.dto.InstitutionDetailDto;
+import com.tuitionnetwork.identity.dto.InstitutionIntegrationDto;
+import com.tuitionnetwork.identity.dto.InstitutionStudentDto;
 import com.tuitionnetwork.identity.dto.InstitutionSummaryDto;
 import com.tuitionnetwork.identity.dto.RegisterInstitutionRequest;
 import com.tuitionnetwork.identity.dto.RejectInstitutionRequest;
@@ -30,6 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -77,6 +81,21 @@ public class InstitutionManagementController {
     @GetMapping("/{id}")
     public ResponseEntity<InstitutionDetailDto> get(@PathVariable("id") UUID id) {
         return ResponseEntity.ok(institutionManagementService.get(id));
+    }
+
+    @GetMapping("/{id}/students")
+    public ResponseEntity<List<InstitutionStudentDto>> students(@PathVariable("id") UUID id) {
+        return ResponseEntity.ok(institutionManagementService.students(id));
+    }
+
+    @GetMapping("/{id}/application")
+    public ResponseEntity<InstitutionApplicationDto> application(@PathVariable("id") UUID id) {
+        return ResponseEntity.ok(institutionManagementService.application(id));
+    }
+
+    @GetMapping("/{id}/integration")
+    public ResponseEntity<InstitutionIntegrationDto> integration(@PathVariable("id") UUID id) {
+        return ResponseEntity.ok(institutionManagementService.integration(id));
     }
 
     @PostMapping("/{id}/approve")
