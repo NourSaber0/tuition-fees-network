@@ -9,6 +9,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import org.springframework.context.ApplicationEventPublisher;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
@@ -19,12 +21,14 @@ import static org.mockito.Mockito.when;
 class BackOfficeNotificationPublisherTest {
 
     private BackOfficeNotificationRepository repository;
+    private ApplicationEventPublisher eventPublisher;
     private BackOfficeNotificationPublisher publisher;
 
     @BeforeEach
     void setUp() {
         repository = mock(BackOfficeNotificationRepository.class);
-        publisher = new BackOfficeNotificationPublisher(repository);
+        eventPublisher = mock(ApplicationEventPublisher.class);
+        publisher = new BackOfficeNotificationPublisher(repository, eventPublisher);
         when(repository.save(any(BackOfficeNotification.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 
@@ -41,6 +45,7 @@ class BackOfficeNotificationPublisherTest {
         assertEquals("transactions", n.getActionScreen());
         assertEquals("TX-20260831-0004", n.getActionEntityId());
         assertEquals("Transaction: TX-20260831-0004", n.getMeta());
+        verify(eventPublisher).publishEvent(n);
     }
 
     @Test
@@ -51,6 +56,7 @@ class BackOfficeNotificationPublisherTest {
         verify(repository).save(captor.capture());
         assertEquals("reconciliation", captor.getValue().getActionScreen());
         assertEquals("Exception: EXC-001", captor.getValue().getMeta());
+        verify(eventPublisher).publishEvent(captor.getValue());
     }
 
     @Test
@@ -63,5 +69,13 @@ class BackOfficeNotificationPublisherTest {
         assertEquals(NotifType.SYSTEM_ALERT, n.getNotifType());
         assertNull(n.getActionLabel());
         assertNull(n.getActionScreen());
+        verify(eventPublisher).publishEvent(n);
+    }
+
+    @Test
+    void singleArgConstructor_worksWithoutEventPublisher() {
+        BackOfficeNotificationPublisher pub = new BackOfficeNotificationPublisher(repository);
+        BackOfficeNotification n = pub.systemAlert(NotifSeverity.LOW, "title", "body");
+        verify(repository).save(any(BackOfficeNotification.class));
     }
 }

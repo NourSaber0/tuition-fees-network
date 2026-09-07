@@ -6,6 +6,7 @@ import com.tuitionnetwork.notifications.dto.UnreadCountResponse;
 import com.tuitionnetwork.notifications.service.NotificationsService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -39,13 +41,22 @@ public class NotificationsController {
 
     @GetMapping
     public ResponseEntity<NotificationListResponse> list(
-            @RequestParam(value = "type", required = false) NotifType type,
+            @RequestParam(value = "type", required = false) String type,
             @RequestParam(value = "unread", defaultValue = "false") boolean unread,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", required = false) Integer size,
             @RequestParam(value = "pageSize", required = false) Integer pageSize) {
+        NotifType resolvedType = null;
+        if (type != null && !type.isBlank()) {
+            for (NotifType t : NotifType.values()) {
+                if (t.name().equalsIgnoreCase(type.trim())) {
+                    resolvedType = t;
+                    break;
+                }
+            }
+        }
         int resolvedSize = pageSize != null ? pageSize : (size != null ? size : 25);
-        return ResponseEntity.ok(notificationsService.list(type, unread, page, resolvedSize));
+        return ResponseEntity.ok(notificationsService.list(resolvedType, unread, page, resolvedSize));
     }
 
     @GetMapping("/unread-count")
@@ -74,6 +85,11 @@ public class NotificationsController {
     public ResponseEntity<Void> dismiss(@PathVariable("id") UUID id) {
         notificationsService.dismiss(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter stream() {
+        return notificationsService.subscribe();
     }
 
     @ExceptionHandler(ResponseStatusException.class)

@@ -1,5 +1,7 @@
 package com.tuitionnetwork.notifications;
 
+import com.tuitionnetwork.audit.domain.AuditLog;
+import com.tuitionnetwork.audit.repository.AuditLogRepository;
 import com.tuitionnetwork.notifications.domain.BackOfficeNotification;
 import com.tuitionnetwork.notifications.domain.NotifSeverity;
 import com.tuitionnetwork.notifications.domain.NotifType;
@@ -17,6 +19,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -29,12 +32,14 @@ import static org.mockito.Mockito.when;
 class NotificationsServiceImplTest {
 
     private BackOfficeNotificationRepository repository;
+    private AuditLogRepository auditLogRepository;
     private NotificationsServiceImpl service;
 
     @BeforeEach
     void setUp() {
         repository = mock(BackOfficeNotificationRepository.class);
-        service = new NotificationsServiceImpl(repository);
+        auditLogRepository = mock(AuditLogRepository.class);
+        service = new NotificationsServiceImpl(repository, auditLogRepository);
         when(repository.save(any(BackOfficeNotification.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 
@@ -137,5 +142,47 @@ class NotificationsServiceImplTest {
         when(repository.existsById(id)).thenReturn(false);
         assertThrows(ResponseStatusException.class, () -> service.dismiss(id));
         verify(repository, never()).deleteById(any());
+    }
+
+    @Test
+    void markRead_logsAudit() {
+        BackOfficeNotification n = notif(NotifType.FAILED_PAYMENT, false);
+        when(repository.findById(n.getId())).thenReturn(Optional.of(n));
+
+        service.markRead(n.getId());
+
+        verify(auditLogRepository).save(any(AuditLog.class));
+    }
+
+    @Test
+    void markAllRead_logsAudit() {
+        when(repository.markAllRead()).thenReturn(3);
+
+        service.markAllRead();
+
+        verify(auditLogRepository).save(any(AuditLog.class));
+    }
+
+    @Test
+    void dismiss_logsAudit() {
+        UUID id = UUID.randomUUID();
+        when(repository.existsById(id)).thenReturn(true);
+
+        service.dismiss(id);
+
+        verify(auditLogRepository).save(any(AuditLog.class));
+    }
+
+    @Test
+    void subscribe_returnsEmitter() {
+        var emitter = service.subscribe();
+        assertNotNull(emitter);
+    }
+
+    @Test
+    void broadcast_sendsToSubscribers() {
+        service.subscribe();
+        BackOfficeNotification n = notif(NotifType.FAILED_PAYMENT, false);
+        service.broadcast(n);
     }
 }

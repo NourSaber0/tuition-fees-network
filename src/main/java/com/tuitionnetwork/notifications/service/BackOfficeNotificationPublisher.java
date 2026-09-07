@@ -4,6 +4,8 @@ import com.tuitionnetwork.notifications.domain.BackOfficeNotification;
 import com.tuitionnetwork.notifications.domain.NotifSeverity;
 import com.tuitionnetwork.notifications.domain.NotifType;
 import com.tuitionnetwork.notifications.repository.BackOfficeNotificationRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,9 +18,17 @@ import org.springframework.transaction.annotation.Transactional;
 public class BackOfficeNotificationPublisher {
 
     private final BackOfficeNotificationRepository repository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public BackOfficeNotificationPublisher(BackOfficeNotificationRepository repository) {
+        this(repository, null);
+    }
+
+    @Autowired
+    public BackOfficeNotificationPublisher(BackOfficeNotificationRepository repository,
+                                           @Autowired(required = false) ApplicationEventPublisher eventPublisher) {
         this.repository = repository;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -29,7 +39,11 @@ public class BackOfficeNotificationPublisher {
         n.setActionLabel(actionLabel);
         n.setActionScreen(actionScreen);
         n.setActionEntityId(actionEntityId);
-        return repository.save(n);
+        BackOfficeNotification saved = repository.save(n);
+        if (eventPublisher != null) {
+            eventPublisher.publishEvent(saved);
+        }
+        return saved;
     }
 
     public BackOfficeNotification failedPayment(String title, String body, String transactionId) {

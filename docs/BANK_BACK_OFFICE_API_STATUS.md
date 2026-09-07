@@ -11,15 +11,15 @@
 
 The Bank Back-Office Portal contract defines approximately **90+ endpoints** across **11 phases** to back the front-end portal screens.
 
-Currently, **Phases 1 through 7 are 100% complete and verified** (with 179 passing automated unit and integration tests).
+Currently, **Phases 1 through 8 are 100% complete and verified** (with 211 passing automated unit and integration tests).
 
 | Metric | Count | Percentage |
 |---|:---:|:---:|
 | **Total Contract Endpoints** | ~92 | 100% |
-| **Fully Implemented & Matching (Phases 1–7)** | 60 | ~65.2% |
+| **Fully Implemented & Matching (Phases 1–8)** | 66 | ~71.7% |
 | **Excluded by Explicit Business Policy (No Refunds)** | 2 | ~2.2% |
-| **Partially Implemented (Domain/Service ready, Feature branches active)** | 5 | ~5.4% |
-| **Remaining to Implement (Phases 8, 10, 11)** | 25 | ~27.2% |
+| **Partially Implemented (Feature branches active)** | 5 | ~5.4% |
+| **Remaining to Implement (Phases 9, 10, 11, 12)** | 19 | ~20.7% |
 
 ---
 
@@ -147,16 +147,16 @@ Currently, **Phases 1 through 7 are 100% complete and verified** (with 179 passi
 ---
 
 ### Phase 8 — Notifications
-**Source:** `Notifications.tsx` | **Roles:** All 4 roles | **Total Endpoints:** 6
+**Source:** `Notifications.tsx` | **Roles:** All 4 roles | **Total Endpoints:** 6 (6 DONE)
 
 | Endpoint | Method | Contract Purpose | Status | Current Code / Notes |
 |---|---|---|:---:|---|
-| `/notifications` | `GET` | Paginated notifications list | ❌ **NOT DONE** | Entity [`Notification.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/notifications/domain/Notification.java) and [`NotificationRepository.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/notifications/repository/NotificationRepository.java) exist; no REST controller. |
-| `/notifications/unread-count` | `GET` | Unread count for bell badge | ❌ **NOT DONE** | Not implemented. |
-| `/notifications/{id}/read` | `POST` | Mark single notification read | ❌ **NOT DONE** | Not implemented. |
-| `/notifications/read-all` | `POST` | Mark all notifications read | ❌ **NOT DONE** | Not implemented. |
-| `/notifications/{id}` | `DELETE` | Dismiss notification | ❌ **NOT DONE** | Not implemented. |
-| `/notifications/stream` | `GET` | SSE / WebSocket live push | ❌ **NOT DONE** | Not implemented. |
+| `/notifications` | `GET` | Paginated notifications list | ✅ **DONE** | [`NotificationsController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/notifications/web/NotificationsController.java#L40-L50). Returns paginated notifications with filters (`type`, `unread`), page metadata, and `unreadCount`. |
+| `/notifications/unread-count` | `GET` | Unread count for bell badge | ✅ **DONE** | [`NotificationsController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/notifications/web/NotificationsController.java#L52-L55). Returns `{ "count": N }` for top navigation bell badge. |
+| `/notifications/{id}/read` | `POST` | Mark single notification read | ✅ **DONE** | [`NotificationsController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/notifications/web/NotificationsController.java#L57-L64). Marks notification read, logs Phase 9 audit event, returns `{ "id": id, "read": true }`. |
+| `/notifications/read-all` | `POST` | Mark all notifications read | ✅ **DONE** | [`NotificationsController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/notifications/web/NotificationsController.java#L66-L72). Bulk marks all unread notifications read, logs Phase 9 audit trail, returns `{ "updated": count }`. |
+| `/notifications/{id}` | `DELETE` | Dismiss notification | ✅ **DONE** | [`NotificationsController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/notifications/web/NotificationsController.java#L74-L78). Deletes/dismisses notification by ID, logs Phase 9 audit event, returns 204 No Content. |
+| `/notifications/stream` | `GET` | SSE / WebSocket live push | ✅ **DONE** | [`NotificationsController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/notifications/web/NotificationsController.java#L80-L83). Real-time Server-Sent Events stream (`text/event-stream`) subscribing clients to live back-office alerts. |
 
 ---
 

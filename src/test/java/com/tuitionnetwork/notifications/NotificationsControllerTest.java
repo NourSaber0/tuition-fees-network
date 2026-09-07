@@ -159,4 +159,27 @@ class NotificationsControllerTest {
     void unauthenticated_isUnauthorized() throws Exception {
         mockMvc.perform(get("/api/v1/notifications")).andExpect(status().isUnauthorized());
     }
+
+    @Test
+    @WithMockUser(username = "ops@cibeg.com", roles = {"BACK_OFFICE"})
+    void stream_returns200_andSubscribes() throws Exception {
+        org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter = new org.springframework.web.servlet.mvc.method.annotation.SseEmitter();
+        when(notificationsService.subscribe()).thenReturn(emitter);
+
+        mockMvc.perform(get("/api/v1/notifications/stream"))
+                .andExpect(status().isOk());
+
+        verify(notificationsService).subscribe();
+    }
+
+    @Test
+    @WithMockUser(username = "parent@example.com", roles = {"GUARDIAN"})
+    void stream_guardian_isForbidden() throws Exception {
+        mockMvc.perform(get("/api/v1/notifications/stream")).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void stream_unauthenticated_isUnauthorized() throws Exception {
+        mockMvc.perform(get("/api/v1/notifications/stream")).andExpect(status().isUnauthorized());
+    }
 }

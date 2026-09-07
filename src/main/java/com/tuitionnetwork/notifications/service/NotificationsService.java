@@ -17,4 +17,8 @@ public interface NotificationsService {
     int markAllRead();
 
     void dismiss(UUID id);
+
+    org.springframework.web.servlet.mvc.method.annotation.SseEmitter subscribe();
+
+    void broadcast(com.tuitionnetwork.notifications.domain.BackOfficeNotification notification);
 }
