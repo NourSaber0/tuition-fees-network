@@ -100,6 +100,11 @@ public class InstitutionManagementController {
         return ResponseEntity.ok(institutionManagementService.integration(id));
     }
 
+    @GetMapping("/{id}/settlements")
+    public ResponseEntity<com.tuitionnetwork.identity.dto.InstitutionSettlementsResponse> settlements(@PathVariable("id") UUID id) {
+        return ResponseEntity.ok(institutionManagementService.settlements(id));
+    }
+
     @PostMapping("/{id}/approve")
     public ResponseEntity<InstitutionDetailDto> approve(@PathVariable("id") UUID id) {
         InstitutionDetailDto result = institutionManagementService.approve(id);
