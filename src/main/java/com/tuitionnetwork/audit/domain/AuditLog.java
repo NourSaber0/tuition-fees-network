@@ -34,15 +34,23 @@ public class AuditLog {
 
     @Column(name = "timestamp", nullable = false)
     private LocalDateTime timestamp;
+    
+    @Column(name = "severity", nullable = false)
+    private String severity = "INFO"; // INFO, WARNING, CRITICAL
 
     public AuditLog() {
     }
 
     public AuditLog(UUID actorId, String actorType, String action, String targetResource) {
+        this(actorId, actorType, action, targetResource, "INFO");
+    }
+
+    public AuditLog(UUID actorId, String actorType, String action, String targetResource, String severity) {
         this.actorId = actorId;
         this.actorType = actorType;
         this.action = action;
         this.targetResource = targetResource;
+        this.severity = severity == null ? "INFO" : severity;
         this.timestamp = LocalDateTime.now();
     }
 
@@ -100,6 +108,9 @@ public class AuditLog {
     public void setTimestamp(LocalDateTime timestamp) {
         this.timestamp = timestamp;
     }
+
+    public String getSeverity() { return severity; }
+    public void setSeverity(String severity) { this.severity = severity; }
 
     @Override
     public boolean equals(Object o) {
