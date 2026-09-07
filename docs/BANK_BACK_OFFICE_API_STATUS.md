@@ -16,10 +16,10 @@ Currently, the backend codebase implements the **core transaction and settlement
 | Metric | Count | Percentage |
 |---|:---:|:---:|
 | **Total Contract Endpoints** | ~92 | 100% |
-| **Fully Implemented & Matching** | 11 | ~12.0% |
+| **Fully Implemented & Matching** | 15 | ~16.3% |
 | **Implemented with Different Path / Shape** | 2 | ~2.2% |
 | **Partially Implemented (Domain/Service only, No Controller)** | 18 | ~19.5% |
-| **Not Implemented Yet** | 61 | ~66.3% |
+| **Not Implemented Yet** | 57 | ~62.0% |
 
 ---
 
@@ -44,14 +44,14 @@ Currently, the backend codebase implements the **core transaction and settlement
 ---
 
 ### Phase 2 — Dashboard
-**Source:** `Dashboard.tsx` | **Roles:** Read-only (all 4 roles) | **Total Endpoints:** 4
+**Source:** `Dashboard.tsx` | **Roles:** Read-only (all 4 roles) | **Total Endpoints:** 4 (100% DONE)
 
 | Endpoint | Method | Contract Purpose | Status | Current Code / Notes |
 |---|---|---|:---:|---|
-| `/dashboard/summary` | `GET` | Aggregates KPIs (institutions, students, today txs, collections, EPPs) | ❌ **NOT DONE** | No dashboard service or aggregation queries implemented. |
-| `/dashboard/collections/weekly` | `GET` | Returns 7-day collection totals (Mon–Sun) | ❌ **NOT DONE** | Not implemented. |
-| `/dashboard/institution-status` | `GET` | Institution status breakdown (Integrated, Suspended, etc.) | ❌ **NOT DONE** | Not implemented. |
-| `/dashboard/recent-transactions` | `GET` | Returns last 6 transactions | ❌ **NOT DONE** | Not implemented. |
+| `/dashboard/summary` | `GET` | Aggregates KPIs (institutions, students, today txs, collections, EPPs) | ✅ **DONE** | [`DashboardController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/dashboard/web/DashboardController.java#L29-L32). Real KPIs for students, active institutions, collections, today transactions, and EPP plans. |
+| `/dashboard/collections/weekly` | `GET` | Returns 7-day collection totals (Mon–Sun) | ✅ **DONE** | [`DashboardController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/dashboard/web/DashboardController.java#L34-L39). 7-day series with daily collection totals and transaction counts. |
+| `/dashboard/institution-status` | `GET` | Institution status breakdown (Integrated, Suspended, etc.) | ✅ **DONE** | [`DashboardController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/dashboard/web/DashboardController.java#L41-L44). Returns breakdown of institutions and integration status. |
+| `/dashboard/recent-transactions` | `GET` | Returns last 6 transactions | ✅ **DONE** | [`DashboardController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/dashboard/web/DashboardController.java#L46-L50). Returns recent transactions list with limit support. |
 
 ---
 
