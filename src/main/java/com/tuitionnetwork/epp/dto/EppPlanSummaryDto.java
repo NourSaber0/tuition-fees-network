@@ -8,6 +8,7 @@ public record EppPlanSummaryDto(
         UUID id,
         String payRef,
         String institution,
+        String institutionType,
         String student,
         BigDecimal principalEGP,
         int tenor,

@@ -54,6 +54,9 @@ class EppPlanIntegrationTest {
     private PaymentRepository paymentRepository;
 
     @Autowired
+    private com.tuitionnetwork.audit.repository.AuditLogRepository auditLogRepository;
+
+    @Autowired
     private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
@@ -190,22 +193,28 @@ class EppPlanIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("Active"))
                 .andExpect(jsonPath("$.tenor").value(12))
+                .andExpect(jsonPath("$.institutionType").value("SCHOOL"))
+                .andExpect(jsonPath("$.firstPaymentDate").isNotEmpty())
                 .andReturn();
 
         String planId = objectMapper.readTree(createResult.getResponse().getContentAsString()).get("id").asText();
 
         mockMvc.perform(get("/api/v1/epp/plans/{id}", planId))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.institutionType").value("SCHOOL"))
                 .andExpect(jsonPath("$.progress.totalInstallments").value(12));
 
         mockMvc.perform(get("/api/v1/epp/plans/{id}/schedule", planId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(12))
-                .andExpect(jsonPath("$[0].status").value("Upcoming"));
+                .andExpect(jsonPath("$[0].status").value("Upcoming"))
+                .andExpect(jsonPath("$[0].installmentNumber").value(1))
+                .andExpect(jsonPath("$[0].number").value(1));
 
         mockMvc.perform(get("/api/v1/epp/plans").param("search", planId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(1));
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].institutionType").value("SCHOOL"));
 
         mockMvc.perform(get("/api/v1/epp/summary"))
                 .andExpect(status().isOk())
@@ -220,6 +229,9 @@ class EppPlanIntegrationTest {
         mockMvc.perform(get("/api/v1/epp/summary"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.active").value(0));
+
+        org.junit.jupiter.api.Assertions.assertFalse(auditLogRepository.findByAction("CREATE_EPP_PLAN").isEmpty());
+        org.junit.jupiter.api.Assertions.assertFalse(auditLogRepository.findByAction("UPDATE_EPP_PLAN_STATUS").isEmpty());
     }
 
     @Test

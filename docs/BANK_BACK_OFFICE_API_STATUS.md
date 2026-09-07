@@ -11,15 +11,15 @@
 
 The Bank Back-Office Portal contract defines approximately **90+ endpoints** across **11 phases** to back the front-end portal screens.
 
-Currently, **Phases 1 through 5 are 100% complete and verified on `main`** (with 148 passing automated unit and integration tests).
+Currently, **Phases 1 through 6 are 100% complete and verified** (with 155 passing automated unit and integration tests).
 
 | Metric | Count | Percentage |
 |---|:---:|:---:|
 | **Total Contract Endpoints** | ~92 | 100% |
-| **Fully Implemented & Matching (Phases 1–5)** | 47 | ~51.1% |
+| **Fully Implemented & Matching (Phases 1–6)** | 55 | ~59.8% |
 | **Excluded by Explicit Business Policy (No Refunds)** | 2 | ~2.2% |
-| **Partially Implemented (Domain/Service ready, Feature branches active)** | 18 | ~19.5% |
-| **Remaining to Implement (Phases 8, 10, etc.)** | 25 | ~27.2% |
+| **Partially Implemented (Domain/Service ready, Feature branches active)** | 10 | ~10.9% |
+| **Remaining to Implement (Phases 7, 8, 10, 11)** | 25 | ~27.2% |
 
 ---
 
@@ -118,18 +118,18 @@ Currently, **Phases 1 through 5 are 100% complete and verified on `main`** (with
 ---
 
 ### Phase 6 — EPP Plans
-**Source:** `EPP.tsx` | **Roles:** `bank-admin`, `bank-operations`, `bank-finance` | **Total Endpoints:** 8
+**Source:** `EPP.tsx` | **Roles:** `bank-admin`, `bank-operations`, `bank-finance` | **Total Endpoints:** 8 (100% DONE)
 
 | Endpoint | Method | Contract Purpose | Status | Current Code / Notes |
 |---|---|---|:---:|---|
-| `/epp/plans` | `GET` | Paginated list of EPP plans | ❌ **NOT DONE** | [`EPPScheduleRepository.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/payments/repository/EPPScheduleRepository.java) exists; no REST endpoint. |
-| `/epp/summary` | `GET` | Active, completed, defaulted, outstanding stats | ❌ **NOT DONE** | Not implemented. |
-| `/epp/plans/{id}` | `GET` | Plan detail + progress | ❌ **NOT DONE** | Not implemented. |
-| `/epp/plans/{id}/schedule` | `GET` | Installment breakdown (Paid / Due / Upcoming) | ❌ **NOT DONE** | [`EppInstallmentRepository.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/payments/repository/EppInstallmentRepository.java) exists; no REST endpoint. |
-| `/epp/quote` | `POST` | Pricing calculation preview (tenor, interest, fees, monthly) | ❌ **NOT DONE** | Calculation logic exists in [`EppScheduleGenerator.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/epp/EppScheduleGenerator.java); no quote REST controller. |
-| `/epp/cards/validate` | `POST` | Card BIN validation (credit eligible vs debit rejected) | ❌ **NOT DONE** | Logic exists inside [`MockBankAdapterImpl.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/payments/infrastructure/MockBankAdapterImpl.java); no REST endpoint. |
-| `/epp/plans` | `POST` | Create standalone EPP plan | ⚠️ **PARTIAL** | EPP plan creation currently occurs automatically during `POST /api/v1/payments/settle` when payment method is EPP. |
-| `/epp/plans/{id}` | `PATCH` | Update plan status | ❌ **NOT DONE** | Not implemented. |
+| `/epp/plans` | `GET` | Paginated list of EPP plans | ✅ **DONE** | [`EppPlanController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/epp/web/EppPlanController.java#L41-L48). Returns paginated `EppPlanListResponse` with search by ID/student/payRef, filter by status and tenor. |
+| `/epp/summary` | `GET` | Active, completed, defaulted, outstanding stats | ✅ **DONE** | [`EppPlanController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/epp/web/EppPlanController.java#L50-L53). Returns `EppSummaryResponse` with active, completed, defaulted counts and totalOutstandingEGP. |
+| `/epp/plans/{id}` | `GET` | Plan detail + progress | ✅ **DONE** | [`EppPlanController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/epp/web/EppPlanController.java#L55-L58). Returns full `EppPlanDetailDto` including institution, institutionType, firstPaymentDate, and progress object. |
+| `/epp/plans/{id}/schedule` | `GET` | Installment breakdown (Paid / Due / Upcoming) | ✅ **DONE** | [`EppPlanController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/epp/web/EppPlanController.java#L60-L63). Returns list of `EppScheduleInstallmentDto` with installment number, due date, principal, interest, total amount, and status. |
+| `/epp/quote` | `POST` | Pricing calculation preview (tenor, interest, fees, monthly) | ✅ **DONE** | [`EppPlanController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/epp/web/EppPlanController.java#L65-L68). Calculates standard EPP pricing: interest, admin fee, total payable, and monthly installment for 3/6/12/18 months. |
+| `/epp/cards/validate` | `POST` | Card BIN validation (credit eligible vs debit rejected) | ✅ **DONE** | [`EppPlanController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/epp/web/EppPlanController.java#L70-L73). Checks BIN classifier: rejects debit BINs (5078, etc.) and returns `{ eligible, result: "valid-credit" | "rejected-debit" }`. |
+| `/epp/plans` | `POST` | Create standalone EPP plan | ✅ **DONE** | [`EppPlanController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/epp/web/EppPlanController.java#L75-L79). Creates EPP plan from captured payment, validates card eligibility, principal range, max student plans, logs audit trail. |
+| `/epp/plans/{id}` | `PATCH` | Update plan status | ✅ **DONE** | [`EppPlanController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/epp/web/EppPlanController.java#L81-L85). Updates plan status (Active/Completed/Defaulted/Cancelled), records reason, and logs audit trail. |
 
 ---
 

@@ -26,6 +26,9 @@ import com.tuitionnetwork.payments.domain.PaymentStatus;
 import com.tuitionnetwork.payments.repository.EPPScheduleRepository;
 import com.tuitionnetwork.payments.repository.EppInstallmentRepository;
 import com.tuitionnetwork.payments.repository.PaymentRepository;
+import com.tuitionnetwork.audit.domain.AuditLog;
+import com.tuitionnetwork.audit.repository.AuditLogRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -53,17 +56,29 @@ public class EppPlanServiceImpl implements EppPlanService {
     private final PaymentRepository paymentRepository;
     private final InstitutionRepository institutionRepository;
     private final StudentRepository studentRepository;
+    private final AuditLogRepository auditLogRepository;
+
+    @Autowired
+    public EppPlanServiceImpl(EPPScheduleRepository eppScheduleRepository,
+                               EppInstallmentRepository eppInstallmentRepository,
+                               PaymentRepository paymentRepository,
+                               InstitutionRepository institutionRepository,
+                               StudentRepository studentRepository,
+                               @Autowired(required = false) AuditLogRepository auditLogRepository) {
+        this.eppScheduleRepository = eppScheduleRepository;
+        this.eppInstallmentRepository = eppInstallmentRepository;
+        this.paymentRepository = paymentRepository;
+        this.institutionRepository = institutionRepository;
+        this.studentRepository = studentRepository;
+        this.auditLogRepository = auditLogRepository;
+    }
 
     public EppPlanServiceImpl(EPPScheduleRepository eppScheduleRepository,
                                EppInstallmentRepository eppInstallmentRepository,
                                PaymentRepository paymentRepository,
                                InstitutionRepository institutionRepository,
                                StudentRepository studentRepository) {
-        this.eppScheduleRepository = eppScheduleRepository;
-        this.eppInstallmentRepository = eppInstallmentRepository;
-        this.paymentRepository = paymentRepository;
-        this.institutionRepository = institutionRepository;
-        this.studentRepository = studentRepository;
+        this(eppScheduleRepository, eppInstallmentRepository, paymentRepository, institutionRepository, studentRepository, null);
     }
 
     @Override
@@ -191,11 +206,11 @@ public class EppPlanServiceImpl implements EppPlanService {
     @Override
     public CardValidationResponse validateCard(String cardNumber) {
         if (cardNumber == null || cardNumber.isBlank()) {
-            return new CardValidationResponse("rejected-not-eligible");
+            return CardValidationResponse.ineligible("Card number is required");
         }
         return CardBinClassifier.isDebitCard(cardNumber)
-                ? new CardValidationResponse("rejected-debit")
-                : new CardValidationResponse("valid-credit");
+                ? CardValidationResponse.ineligible("Debit cards not eligible for EPP")
+                : CardValidationResponse.eligible("CIB", "Credit", 18);
     }
 
     @Override
@@ -210,6 +225,9 @@ public class EppPlanServiceImpl implements EppPlanService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "source_payment_not_successful");
         }
         if (sourcePayment.getPaymentMethod() != PaymentMethod.CREDIT_CARD) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "card_not_eligible");
+        }
+        if (request.cardToken() != null && CardBinClassifier.isDebitCard(request.cardToken())) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "card_not_eligible");
         }
         if (eppScheduleRepository.findByPaymentId(sourcePayment.getId()).isPresent()) {
@@ -241,6 +259,15 @@ public class EppPlanServiceImpl implements EppPlanService {
         );
         schedule = eppScheduleRepository.save(schedule);
 
+        if (auditLogRepository != null) {
+            auditLogRepository.save(new AuditLog(
+                    null,
+                    "BACK_OFFICE",
+                    "CREATE_EPP_PLAN",
+                    "EPP Plan created for payment " + sourcePayment.getId() + ", tenor " + tenor + ", principal " + principal
+            ));
+        }
+
         return toDetail(schedule);
     }
 
@@ -258,6 +285,15 @@ public class EppPlanServiceImpl implements EppPlanService {
 
         schedule.setStatus(normalized);
         schedule = eppScheduleRepository.save(schedule);
+
+        if (auditLogRepository != null) {
+            auditLogRepository.save(new AuditLog(
+                    null,
+                    "BACK_OFFICE",
+                    "UPDATE_EPP_PLAN_STATUS",
+                    "EPP Plan " + planId + " status updated to " + normalized + (request.reason() != null ? ", reason: " + request.reason() : "")
+            ));
+        }
 
         return toDetail(schedule);
     }
@@ -281,11 +317,15 @@ public class EppPlanServiceImpl implements EppPlanService {
         Payment payment = schedule.getPayment();
         Optional<PaymentAllocation> allocation = firstAllocation(payment);
 
-        String institution = allocation
+        Institution inst = allocation
                 .map(a -> a.getFeeLine().getInstitutionId())
                 .flatMap(institutionRepository::findById)
-                .map(Institution::getName)
                 .orElse(null);
+
+        String institution = inst != null ? inst.getName() : null;
+        String institutionType = inst != null && inst.getInstitutionType() != null
+                ? inst.getInstitutionType().name()
+                : "SCHOOL";
 
         String student = allocation
                 .map(a -> a.getFeeLine().getStudentId())
@@ -299,6 +339,7 @@ public class EppPlanServiceImpl implements EppPlanService {
                 schedule.getId(),
                 payReference(payment),
                 institution,
+                institutionType,
                 student,
                 schedule.getPrincipalAmount(),
                 schedule.getTenorMonths(),
@@ -326,6 +367,7 @@ public class EppPlanServiceImpl implements EppPlanService {
                 summary.id(),
                 summary.payRef(),
                 summary.institution(),
+                summary.institutionType(),
                 summary.student(),
                 summary.principalEGP(),
                 summary.tenor(),
@@ -337,6 +379,7 @@ public class EppPlanServiceImpl implements EppPlanService {
                 summary.paidInstallments(),
                 summary.status(),
                 summary.startDate(),
+                summary.startDate() != null ? summary.startDate().plusMonths(1) : null,
                 progress
         );
     }
