@@ -14,6 +14,7 @@ import com.tuitionnetwork.payments.dto.SelectedDueDto;
 import com.tuitionnetwork.payments.repository.PaymentRepository;
 import com.tuitionnetwork.payments.service.PaymentSettlementService;
 import com.tuitionnetwork.payments.spi.BankGatewayAdapterInterface;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -83,13 +85,33 @@ public class PaymentSettlementIntegrationTest {
 
         try {
             jdbcTemplate.execute("ALTER TABLE event_publication ALTER COLUMN serialized_event VARCHAR(65535)");
+            // Wait for the previous test's async listeners (ReceiptGenerator, EppScheduleGenerator,
+            // PaymentNotificationService) to finish before wiping tables, otherwise a late-arriving
+            // receipt insert can race the payment delete below and fail on the FK constraint.
+            Awaitility.await()
+                    .atMost(Duration.ofSeconds(5))
+                    .pollInterval(Duration.ofMillis(50))
+                    .until(() -> jdbcTemplate.queryForObject(
+                            "SELECT COUNT(*) FROM event_publication WHERE completion_date IS NULL",
+                            Integer.class) == 0);
             jdbcTemplate.execute("DELETE FROM event_publication");
         } catch (Exception ignored) {}
-        jdbcTemplate.execute("DELETE FROM receipt");
-        jdbcTemplate.execute("DELETE FROM payment_allocation");
-        jdbcTemplate.execute("DELETE FROM payment_state_log");
-        jdbcTemplate.execute("DELETE FROM epp_schedule");
-        paymentRepository.deleteAll();
+
+        // Even after the wait above, a listener can still be mid-write (it finished its DB work but
+        // hasn't marked event_publication complete yet). Retry the wipe itself so a late receipt/epp
+        // insert that races the delete just gets swept up on the next attempt instead of failing the test.
+        Awaitility.await()
+                .atMost(Duration.ofSeconds(5))
+                .pollInterval(Duration.ofMillis(50))
+                .ignoreExceptions()
+                .until(() -> {
+                    jdbcTemplate.execute("DELETE FROM receipt");
+                    jdbcTemplate.execute("DELETE FROM payment_allocation");
+                    jdbcTemplate.execute("DELETE FROM payment_state_log");
+                    jdbcTemplate.execute("DELETE FROM epp_schedule");
+                    paymentRepository.deleteAll();
+                    return true;
+                });
         feeLineRepository.deleteAll();
         reset(bankGatewayAdapter);
     }

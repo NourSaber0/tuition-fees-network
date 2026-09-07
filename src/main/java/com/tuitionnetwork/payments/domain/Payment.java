@@ -14,6 +14,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -78,13 +79,13 @@ public class Payment {
         this.idempotencyKey = idempotencyKey;
         this.status = PaymentStatus.PENDING;
         this.currency = "EGP";
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS);
     }
 
     @PrePersist
     protected void onCreate() {
         if (this.createdAt == null) {
-            this.createdAt = LocalDateTime.now();
+            this.createdAt = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS);
         }
         if (this.currency == null) {
             this.currency = "EGP";

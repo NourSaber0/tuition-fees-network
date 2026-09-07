@@ -1,0 +1,7 @@
+﻿T24 CustomerBilling Mock — Operation Mapping,,,,
+Backend wraps these SOAP operations behind a REST adapter. Source: Postman workspace 'MOCKFees'.,,,,
+T24 Mock Operation (MOCKFees),Type,Used For,App Feature / Task,Used in Phase
+RetrieveCustomerBillingProcedure,Read,Fetch a customer's outstanding billing / fees,CIB verification + Fee search by National ID,Phase 1 & 2
+RequestCustomerBillingProcedure,Create,Create a new billing record for a customer,Institution CSV upload → create dues,Phase 4
+UpdateCustomerBillingProcedure,Update,Update a billing record (reduce balance / mark paid),Payment processing (full / partial / EPP),Phase 3
+customerbilling (base service),Base,Root SOAP service / shared envelope & auth,Adapter foundation for all calls above,Phase 0
