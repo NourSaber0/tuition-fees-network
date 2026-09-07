@@ -2,9 +2,10 @@ package com.tuitionnetwork.reconciliation.dto;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
-public record ReconciliationRunDto(
+public record ReconciliationRunDetailDto(
         UUID id,
         String institution,
         String institutionType,
@@ -17,5 +18,6 @@ public record ReconciliationRunDto(
         LocalDateTime createdAt,
         Integer totalTransactions,
         Integer matchedCount,
-        Integer exceptionCount
+        Integer exceptionCount,
+        List<ReconciliationRunTransactionDto> transactions
 ) {}

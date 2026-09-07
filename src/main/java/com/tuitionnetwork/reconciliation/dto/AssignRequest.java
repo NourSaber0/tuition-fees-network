@@ -1,3 +1,12 @@
 package com.tuitionnetwork.reconciliation.dto;
 
-public record AssignRequest(String assignee) {}
+import com.fasterxml.jackson.annotation.JsonAlias;
+
+public record AssignRequest(
+        @JsonAlias("assignee")
+        String assignedTo
+) {
+    public String assignee() {
+        return assignedTo;
+    }
+}

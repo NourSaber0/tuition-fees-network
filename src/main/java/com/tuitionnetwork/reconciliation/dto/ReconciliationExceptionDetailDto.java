@@ -2,9 +2,10 @@ package com.tuitionnetwork.reconciliation.dto;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
-public record ReconciliationExceptionDto(
+public record ReconciliationExceptionDetailDto(
         UUID id,
         UUID reconRowId,
         UUID paymentId,
@@ -30,10 +31,10 @@ public record ReconciliationExceptionDto(
         String reason,
         String resolutionAction,
         String supportingReference,
+        String notes,
         LocalDateTime createdAt,
-        LocalDateTime resolvedAt
-) {
-    public UUID runId() {
-        return reconRowId;
-    }
-}
+        LocalDateTime resolvedAt,
+        List<ComparisonRowDto> comparisonRows,
+        List<WorkflowStepDto> workflow,
+        SlaDto sla
+) {}

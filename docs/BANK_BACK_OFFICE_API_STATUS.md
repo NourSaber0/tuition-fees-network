@@ -103,16 +103,17 @@ Currently, the backend codebase implements the **core transaction and settlement
 
 | Endpoint | Method | Contract Purpose | Status | Current Code / Notes |
 |---|---|---|:---:|---|
-| `/reconciliation/summary` | `GET` | Summary (total, matched, pending, exceptions) | ❌ **NOT DONE** | Domain entities and service do not exist. |
-| `/reconciliation/runs` | `GET` | Recon runs list | ❌ **NOT DONE** | Not implemented. |
-| `/reconciliation/runs/{id}` | `GET` | Single run + matched txs | ❌ **NOT DONE** | Not implemented. |
-| `/reconciliation/runs` | `POST` | Trigger manual or scheduled 6h/daily recon run | ❌ **NOT DONE** | Not implemented. |
-| `/reconciliation/exceptions` | `GET` | Exceptions list with status/priority filters | ❌ **NOT DONE** | Not implemented. |
-| `/reconciliation/exceptions/{id}` | `GET` | Exception detail + 3-way match | ❌ **NOT DONE** | Not implemented. |
-| `/reconciliation/exceptions/{id}` | `PATCH` | Save resolution action (US-59/60) | ❌ **NOT DONE** | Not implemented. |
-| `/reconciliation/exceptions/{id}/assign` | `POST` | Assign exception to an investigator | ❌ **NOT DONE** | Not implemented. |
-| `/reconciliation/assignees` | `GET` | Eligible assignees list | ❌ **NOT DONE** | Not implemented. |
-| `/reconciliation/export` | `GET` | Export reconciliation report | ❌ **NOT DONE** | Not implemented. |
+| `/reconciliation/summary` | `GET` | Summary (total, matched, pending, exceptions) | ✅ **DONE** | [`ReconciliationController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/reconciliation/web/ReconciliationController.java#L38-L41). Aggregates 3-way totals (`totalTransactions`, `matched`, `pending`, `exceptions`). |
+| `/reconciliation/runs` | `GET` | Recon runs list | ✅ **DONE** | [`ReconciliationController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/reconciliation/web/ReconciliationController.java#L43-L54). Returns `PageResponse<ReconciliationRunDto>` with date, institution, and status filters. |
+| `/reconciliation/runs/{id}` | `GET` | Single run + matched txs | ✅ **DONE** | [`ReconciliationController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/reconciliation/web/ReconciliationController.java#L56-L60). Returns `ReconciliationRunDetailDto` with run metrics and linked transaction list. |
+| `/reconciliation/runs` | `POST` | Trigger manual or scheduled 6h/daily recon run | ✅ **DONE** | [`ReconciliationController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/reconciliation/web/ReconciliationController.java#L62-L66). Accepts optional `{ date, institutionId }`, returns 202 Accepted, and writes to audit log. |
+| `/reconciliation/exceptions` | `GET` | Exceptions list with status/priority filters | ✅ **DONE** | [`ReconciliationController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/reconciliation/web/ReconciliationController.java#L68-L81). Returns `PageResponse<ReconciliationExceptionDto>` with `status`, `priority`, `assignedTo`, `includeResolved`. |
+| `/reconciliation/exceptions/{id}` | `GET` | Exception detail + 3-way match | ✅ **DONE** | [`ReconciliationController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/reconciliation/web/ReconciliationController.java#L83-L87). Returns `ReconciliationExceptionDetailDto` with 3-way comparison rows, workflow, and SLA. |
+| `/reconciliation/exceptions/{id}` | `PATCH` | Save resolution action (US-59/60) | ✅ **DONE** | [`ReconciliationController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/reconciliation/web/ReconciliationController.java#L89-L98). Validates 400 `resolution_action_required` when resolving, updates status, and logs audit trail. |
+| `/reconciliation/exceptions/{id}/assign` | `POST` | Assign exception to an investigator | ✅ **DONE** | [`ReconciliationController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/reconciliation/web/ReconciliationController.java#L100-L109). Reassigns investigator, transitions status from Open to Under Investigation, and logs audit trail. |
+| `/reconciliation/assignees` | `GET` | Eligible assignees list | ✅ **DONE** | [`ReconciliationController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/reconciliation/web/ReconciliationController.java#L111-L114). Returns distinct list of active bank employees and reconciliation officers. |
+| `/reconciliation/export` | `GET` | Export reconciliation report | ✅ **DONE** | [`ReconciliationController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/reconciliation/web/ReconciliationController.java#L116-L123). Streams UTF-8 CSV attachment `reconciliation.csv` with runs and exceptions. |
+
 
 ---
 
