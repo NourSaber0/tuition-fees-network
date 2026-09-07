@@ -16,10 +16,10 @@ Currently, the backend codebase implements the **core transaction and settlement
 | Metric | Count | Percentage |
 |---|:---:|:---:|
 | **Total Contract Endpoints** | ~92 | 100% |
-| **Fully Implemented & Matching** | 15 | ~16.3% |
+| **Fully Implemented & Matching** | 22 | ~23.9% |
 | **Implemented with Different Path / Shape** | 2 | ~2.2% |
 | **Partially Implemented (Domain/Service only, No Controller)** | 18 | ~19.5% |
-| **Not Implemented Yet** | 57 | ~62.0% |
+| **Not Implemented Yet** | 50 | ~54.4% |
 
 ---
 
@@ -60,18 +60,18 @@ Currently, the backend codebase implements the **core transaction and settlement
 
 | Endpoint | Method | Contract Purpose | Status | Current Code / Notes |
 |---|---|---|:---:|---|
-| `/institutions` | `GET` | Paginated search & list of institutions | ❌ **NOT DONE** | `InstitutionRepository` exists, but no controller query endpoint. |
-| `/institutions` | `POST` | Register new institution (US-06) | ❌ **NOT DONE** | Entity exists; registration workflow not exposed. |
-| `/institutions/{id}` | `GET` | Institution detail header & info | ❌ **NOT DONE** | Not implemented. |
+| `/institutions` | `GET` | Paginated search & list of institutions | ✅ **DONE** | [`InstitutionManagementController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/identity/web/InstitutionManagementController.java#L57-L68). Filter by search, type, regStatus, accountStatus with pagination. |
+| `/institutions` | `POST` | Register new institution (US-06) | ✅ **DONE** | [`InstitutionManagementController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/identity/web/InstitutionManagementController.java#L70-L75). Validates registration request and creates pending institution. |
+| `/institutions/{id}` | `GET` | Institution detail header & info | ✅ **DONE** | [`InstitutionManagementController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/identity/web/InstitutionManagementController.java#L77-L80). Returns full institution details by ID. |
 | `/institutions/{id}/students` | `GET` | Student list with fee balances | ⚠️ **PARTIAL** | Implemented as [`InstitutionDuesController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/billing/web/InstitutionDuesController.java#L53-L90): `GET /api/v1/institutions/{id}/dues` & `GET /api/v1/institutions/{id}/students/{studentId}/dues` (Protected for `INSTITUTION_ADMIN`, not back-office). |
 | `/institutions/{id}/integration` | `GET` | Integration status, protocol & sync events (US-13) | ❌ **NOT DONE** | Not implemented. |
 | `/institutions/{id}/fee-submissions` | `GET` | History of fee uploads (US-14) | ❌ **NOT DONE** | Entities `CsvUpload` and `IngestionBatch` exist; no GET query endpoint. |
 | `/institutions/{id}/settlements` | `GET` | Settlement history & 2% CIB fee breakdown (US-15) | ❌ **NOT DONE** | Not implemented. |
 | `/institutions/{id}/application` | `GET` | Registration review data (US-08) | ❌ **NOT DONE** | Not implemented. |
-| `/institutions/{id}/approve` | `POST` | Dual-approval workflow action (US-09) | ❌ **NOT DONE** | Not implemented. |
-| `/institutions/{id}/reject` | `POST` | Rejection with reason & notes (US-10) | ❌ **NOT DONE** | Not implemented. |
-| `/institutions/{id}/activate` | `POST` | Activate approved institution (US-11) | ❌ **NOT DONE** | Not implemented. |
-| `/institutions/{id}/deactivate` | `POST` | Suspend dues collection (US-11) | ❌ **NOT DONE** | Not implemented. |
+| `/institutions/{id}/approve` | `POST` | Dual-approval workflow action (US-09) | ✅ **DONE** | [`InstitutionManagementController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/identity/web/InstitutionManagementController.java#L82-L87). Approves institution and transitions to APPROVED status. |
+| `/institutions/{id}/reject` | `POST` | Rejection with reason & notes (US-10) | ✅ **DONE** | [`InstitutionManagementController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/identity/web/InstitutionManagementController.java#L89-L95). Rejects institution with required reason. |
+| `/institutions/{id}/activate` | `POST` | Activate approved institution (US-11) | ✅ **DONE** | [`InstitutionManagementController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/identity/web/InstitutionManagementController.java#L97-L102). Activates account status and integration. |
+| `/institutions/{id}/deactivate` | `POST` | Suspend dues collection (US-11) | ✅ **DONE** | [`InstitutionManagementController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/identity/web/InstitutionManagementController.java#L104-L109). Suspends dues collection / deactivates account status. |
 | `/institutions/{id}/fee-submissions` | `POST` | Bulk dues ingestion (CSV/JSON) with error isolation | ✅ **DONE** | Implemented as [`CsvIngestionController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/ingestion/web/CsvIngestionController.java#L43-L52) under `POST /api/v1/institutions/{id}/dues/upload`. Accepts multipart CSV, isolates row errors in `UploadError`, creates idempotent `FeeLine` entries. |
 | `/institutions/{id}/fee-submissions/{submissionId}` | `GET` | Submission status & error report | ❌ **NOT DONE** | Reports are returned synchronously in upload response, but no GET by ID endpoint exists. |
 
