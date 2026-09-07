@@ -16,10 +16,10 @@ Currently, the backend codebase implements the **core transaction and settlement
 | Metric | Count | Percentage |
 |---|:---:|:---:|
 | **Total Contract Endpoints** | ~92 | 100% |
-| **Fully Implemented & Matching** | 27 | ~29.3% |
-| **Implemented with Different Path / Shape** | 2 | ~2.2% |
+| **Fully Implemented & Matching** | 36 | ~39.1% |
+| **Excluded by Explicit Business Policy (No Refunds)** | 2 | ~2.2% |
 | **Partially Implemented (Domain/Service only, No Controller)** | 18 | ~19.5% |
-| **Not Implemented Yet** | 45 | ~48.9% |
+| **Not Implemented Yet** | 36 | ~39.1% |
 
 ---
 
@@ -78,21 +78,21 @@ Currently, the backend codebase implements the **core transaction and settlement
 ---
 
 ### Phase 4 — Transactions & Payment Workflow
-**Source:** `Transactions.tsx` | **Roles:** `bank-admin`, `bank-operations`, `bank-finance` | **Total Endpoints:** 11
+**Source:** `Transactions.tsx` | **Roles:** `bank-admin`, `bank-operations`, `bank-finance` | **Total Endpoints:** 11 (9 DONE, 2 Excluded by Business Policy)
 
 | Endpoint | Method | Contract Purpose | Status | Current Code / Notes |
 |---|---|---|:---:|---|
-| `/transactions` | `GET` | Paginated transaction list with filters | ❌ **NOT DONE** | `PaymentRepository` exists, but no listing controller exists. |
-| `/transactions/tab-counts` | `GET` | Status counts (All, Successful, Pending, Failed, Refunded, Reversed) | ❌ **NOT DONE** | Not implemented. |
-| `/transactions/{id}` | `GET` | Full transaction details + event timeline | ❌ **NOT DONE** | `PaymentStateLog` entity exists; no query endpoint. |
-| `/transactions/export` | `GET` | CSV export of transaction data | ❌ **NOT DONE** | Not implemented. |
-| `/customers/fees?nationalId=` | `GET` | Look up open dues for a citizen by National ID (US-42/43) | ⚠️ **DONE (Different Path)** | Implemented as [`DuesSearchController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/search/web/DuesSearchController.java#L23-L40): `GET /api/v1/guardian/dues?parentNationalId=...` (also accepts header `X-Guardian-National-Id`). Has HMAC-SHA256 privacy hashing, audit logging, and consolidated student fee lines. |
-| `/payments` | `POST` | Process payment (Debit, Credit Card, EPP) with idempotency (US-45/46) | ⚠️ **DONE (Different Path)** | Implemented as [`PaymentController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/payments/web/PaymentController.java#L30-L38): `POST /api/v1/payments/settle`. Enforces `Idempotency-Key` header, optimistic locking on `FeeLine`, multi-due allocation, EPP plan generation, receipt generation, and atomic balance deduction. |
-| `/payments/{id}` | `GET` | Payment detail alias | ❌ **NOT DONE** | Not implemented. |
-| `/payments/{id}/retry` | `POST` | Retry failed payment attempt | ❌ **NOT DONE** | Not implemented. |
-| `/payments/{id}/receipt` | `GET` | Download crypto-signed receipt (US-47) | ❌ **NOT DONE** | Entity [`Receipt.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/payments/domain/Receipt.java) and generator [`ReceiptGenerator.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/receipts/ReceiptGenerator.java) exist; no REST download endpoint. |
-| `/transactions/{id}/refund` | `POST` | Refund transaction | ❌ **NOT DONE** | Not implemented. |
-| `/transactions/{id}/reverse` | `POST` | Reverse transaction | ❌ **NOT DONE** | Not implemented. |
+| `/transactions` | `GET` | Paginated transaction list with filters | ✅ **DONE** | [`TransactionController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/payments/web/TransactionController.java#L35-L53). Filters: status, search, institution, institutionType, method, date range, and pagination (`page`, `pageSize`, `size`). |
+| `/transactions/tab-counts` | `GET` | Status counts (All, Successful, Pending, Failed) | ✅ **DONE** | [`TransactionController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/payments/web/TransactionController.java#L55-L58). Computes real counts across database records for All, Successful, Pending, Failed. |
+| `/transactions/{id}` | `GET` | Full transaction details + event timeline | ✅ **DONE** | [`TransactionController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/payments/web/TransactionController.java#L60-L63). Returns full record plus 5-stage timeline and allocated dues breakdown. |
+| `/transactions/export` | `GET` | CSV export of transaction data | ✅ **DONE** | [`TransactionController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/payments/web/TransactionController.java#L65-L81). Streams UTF-8 CSV attachment with complete transaction details. |
+| `/customers/fees?nationalId=` | `GET` | Look up open dues for a citizen by National ID (US-42/43) | ✅ **DONE** | [`CustomerFeesController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/payments/web/CustomerFeesController.java#L27-L30). 14-digit National ID validation, privacy masking (`299*******4567`), eligible fee lookup, and audit trail logging. |
+| `/payments` | `POST` | Process payment (Debit, Credit Card, EPP) with idempotency (US-45/46) | ✅ **DONE** | [`BackOfficePaymentController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/payments/web/BackOfficePaymentController.java#L35-L42). Gated with `Idempotency-Key`, amount & balance validation, EPP eligibility guardrails, idempotent replay, and audit logging. |
+| `/payments/{id}` | `GET` | Payment detail alias | ✅ **DONE** | [`BackOfficePaymentController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/payments/web/BackOfficePaymentController.java#L44-L47). Returns transaction details by payment ID. |
+| `/payments/{id}/retry` | `POST` | Retry failed payment attempt | ✅ **DONE** | [`BackOfficePaymentController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/payments/web/BackOfficePaymentController.java#L49-L56). Gated with new `Idempotency-Key`, re-executes payment authorization on failed attempts. |
+| `/payments/{id}/receipt` | `GET` | Download crypto-signed receipt (US-47) | ✅ **DONE** | [`BackOfficePaymentController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/payments/web/BackOfficePaymentController.java#L58-L61). Returns receipt reference, crypto signature, and file URL. |
+| `/transactions/{id}/refund` | `POST` | Refund transaction | 🚫 **EXCLUDED** | Explicit Business Rule: Refunds are disallowed across all portals. |
+| `/transactions/{id}/reverse` | `POST` | Reverse transaction | 🚫 **EXCLUDED** | Explicit Business Rule: Reversals are disallowed across all portals. |
 
 *Note:* [`InstitutionDuesController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/billing/web/InstitutionDuesController.java#L92-L116) also implements `POST /api/v1/institutions/{id}/dues/{feeLineId}/cancel` with mid-year EPP lock protection.
 
