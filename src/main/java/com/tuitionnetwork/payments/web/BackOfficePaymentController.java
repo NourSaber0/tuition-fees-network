@@ -196,4 +196,26 @@ public class BackOfficePaymentController {
         body.put("message", ex.getReason() != null ? ex.getReason() : ex.getMessage());
         return ResponseEntity.status(ex.getStatusCode()).body(body);
     }
+
+    @ExceptionHandler(com.tuitionnetwork.common.exceptions.PendingBusinessRuleException.class)
+    public ResponseEntity<Map<String, Object>> handlePendingBusinessRule(
+            com.tuitionnetwork.common.exceptions.PendingBusinessRuleException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("error", "PENDING_BUSINESS_RULE");
+        body.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(body);
+    }
+
+    @ExceptionHandler({
+            org.springframework.orm.ObjectOptimisticLockingFailureException.class,
+            jakarta.persistence.OptimisticLockException.class,
+            org.springframework.dao.PessimisticLockingFailureException.class,
+            org.springframework.dao.CannotAcquireLockException.class
+    })
+    public ResponseEntity<Map<String, Object>> handleLockFailure(Exception ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("error", "CONCURRENT_MODIFICATION_CONFLICT");
+        body.put("message", "This fee is being settled by another request. Please refresh and try again.");
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
 }

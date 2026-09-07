@@ -130,6 +130,7 @@ class PaymentSettlementServiceTest {
 
         when(paymentRepository.findByIdempotencyKey(idempotencyKey)).thenReturn(Optional.empty());
         when(feeLineRepository.findById(feeLineId)).thenReturn(Optional.of(feeLine));
+        when(feeLineRepository.lockAllById(any())).thenReturn(List.of(feeLine));
         when(bankGatewayAdapter.chargeCard(eq(new BigDecimal("6000.00")), eq(idempotencyKey)))
                 .thenReturn(new GatewayResponse(PaymentStatus.CAPTURED, "AUTH-123", "TXN-999"));
 

@@ -67,8 +67,11 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
     }
 
     @Override
-    @Transactional
     public BackOfficePaymentResponse processPayment(BackOfficePaymentRequest request, String idempotencyKeyHeader) {
+        // Not @Transactional on purpose: settlePayment manages its own boundaries -
+        // it reserves the balance under a row lock, then charges the card outside any
+        // transaction, then records the payment. Wrapping it all in one transaction
+        // would hold the lock across the gateway call and break the compensation path.
         if (idempotencyKeyHeader == null || idempotencyKeyHeader.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Idempotency-Key header is required.");
         }

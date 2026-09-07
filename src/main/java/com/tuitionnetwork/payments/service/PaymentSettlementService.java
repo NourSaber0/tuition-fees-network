@@ -22,9 +22,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -95,18 +93,15 @@ public class PaymentSettlementService {
             }
         }
 
-        // 3. Load FeeLines & Guardrail Checks: Overpayment & Post-Deadline Partial Payments
-        Map<UUID, FeeLine> feeLinesById = new HashMap<>();
+        // 3. Fast pre-check (a friendly early failure; the authoritative check runs
+        //    again under a row lock inside reserveFeeLines).
         if (request.selectedDues() != null) {
             for (SelectedDueDto due : request.selectedDues()) {
                 FeeLine feeLine = feeLineRepository.findById(due.feeLineId())
                         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Fee line not found with ID: " + due.feeLineId()));
 
-                feeLinesById.put(due.feeLineId(), feeLine);
-
                 BigDecimal remaining = feeLine.getRemainingAmount() != null ? feeLine.getRemainingAmount() : feeLine.getTotalAmount();
 
-                // Guardrail: Overpayment Check (Paid amount must NEVER exceed remaining balance)
                 if (due.amountToPay().compareTo(remaining) > 0) {
                     throw new PendingBusinessRuleException(
                             "Overpayment Guardrail: Payment amount (" + due.amountToPay() + " EGP) " +
@@ -116,7 +111,6 @@ public class PaymentSettlementService {
 
                 boolean isPartialPayment = due.amountToPay().compareTo(remaining) < 0;
                 boolean isPastDue = feeLine.getDueDate() != null && feeLine.getDueDate().isBefore(LocalDate.now());
-
                 if (isPartialPayment && isPastDue) {
                     throw new PendingBusinessRuleException(
                             "Pending Business Rule: Post-Deadline Partial Payments are undefined for overdue fee line " +
@@ -126,9 +120,23 @@ public class PaymentSettlementService {
             }
         }
 
-        // 4. Call Bank Gateway Adapter OUTSIDE of any database transaction
-        GatewayResponse gatewayResponse = bankGatewayAdapter.chargeCard(request.totalAmount(), idempotencyKey);
+        // 4. RESERVE the balance under a pessimistic write lock, BEFORE charging.
+        //    Two payers on the same fee line are serialised here: the first claims the
+        //    amount, the second blocks on the lock, then fails the overpayment check
+        //    and returns an error WITHOUT the card ever being charged.
+        transactionExecutor.reserveFeeLines(request.selectedDues());
+
+        // 5. Call the bank gateway OUTSIDE of any database transaction.
+        //    If the charge fails, hand the reserved amount back.
+        GatewayResponse gatewayResponse;
+        try {
+            gatewayResponse = bankGatewayAdapter.chargeCard(request.totalAmount(), idempotencyKey);
+        } catch (RuntimeException gatewayError) {
+            transactionExecutor.releaseFeeLines(request.selectedDues());
+            throw gatewayError;
+        }
         if (gatewayResponse.status() != PaymentStatus.CAPTURED && gatewayResponse.status() != PaymentStatus.AUTHORIZED) {
+            transactionExecutor.releaseFeeLines(request.selectedDues());
             throw new IllegalStateException("Payment authorization failed at bank gateway: " + gatewayResponse.message());
         }
 
@@ -137,11 +145,16 @@ public class PaymentSettlementService {
             int tenor = (request.eppSelection() != null && request.eppSelection().tenorMonths() != null)
                     ? request.eppSelection().tenorMonths()
                     : 12;
-            eppPlan = bankGatewayAdapter.generateEppSchedule(request.totalAmount(), tenor);
+            try {
+                eppPlan = bankGatewayAdapter.generateEppSchedule(request.totalAmount(), tenor);
+            } catch (RuntimeException eppError) {
+                transactionExecutor.releaseFeeLines(request.selectedDues());
+                throw eppError;
+            }
         }
 
-        // 5. If successful, open @Transactional block to update FeeLines, save Payment & Allocations, log states, and publish event
-        return transactionExecutor.executeCapturedPayment(request, idempotencyKey, gatewayResponse, eppPlan, feeLinesById);
+        // 6. Record the payment. Balances were already decremented in step 4.
+        return transactionExecutor.finalizeCapturedPayment(request, idempotencyKey, gatewayResponse, eppPlan);
     }
 
     private boolean isDebitCard(String cardNumber) {
