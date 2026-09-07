@@ -33,6 +33,14 @@ public class SecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/api/v1/auth/login", "/auth/login",
+                                "/api/v1/auth/mfa/**", "/auth/mfa/**",
+                                "/api/v1/auth/forgot-password", "/auth/forgot-password",
+                                "/api/v1/auth/reset-password", "/auth/reset-password",
+                                "/api/v1/auth/refresh", "/auth/refresh",
+                                "/api/v1/roles/**", "/roles/**"
+                        ).permitAll()
                         .requestMatchers("/api/v1/**").authenticated()
                         .anyRequest().permitAll()
                 )
