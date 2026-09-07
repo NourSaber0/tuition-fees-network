@@ -13,6 +13,7 @@ import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -22,6 +23,11 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID>, JpaSpec
     Optional<Payment> findByIdempotencyKey(String idempotencyKey);
 
     Page<Payment> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    List<Payment> findByCreatedAtBetweenOrderByCreatedAtDesc(LocalDateTime from, LocalDateTime to);
+
+    List<Payment> findByStatusInAndCreatedAtBetweenOrderByCreatedAtDesc(
+            Collection<PaymentStatus> statuses, LocalDateTime from, LocalDateTime to);
 
     long countByStatus(PaymentStatus status);
 
