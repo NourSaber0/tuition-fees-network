@@ -11,15 +11,15 @@
 
 The Bank Back-Office Portal contract defines approximately **90+ endpoints** across **11 phases** to back the front-end portal screens.
 
-Currently, the backend codebase implements the **core transaction and settlement engines**, but **only a small fraction of the back-office management REST endpoints are currently exposed**. Several core domain models and services exist (e.g., `AuditLog`, `Notification`, `Receipt`, `EPPSchedule`, `BankEmployee`), but they lack REST controllers matching the contract.
+Currently, **Phases 1 through 5 are 100% complete and verified on `main`** (with 148 passing automated unit and integration tests).
 
 | Metric | Count | Percentage |
 |---|:---:|:---:|
 | **Total Contract Endpoints** | ~92 | 100% |
-| **Fully Implemented & Matching** | 36 | ~39.1% |
+| **Fully Implemented & Matching (Phases 1–5)** | 47 | ~51.1% |
 | **Excluded by Explicit Business Policy (No Refunds)** | 2 | ~2.2% |
-| **Partially Implemented (Domain/Service only, No Controller)** | 18 | ~19.5% |
-| **Not Implemented Yet** | 36 | ~39.1% |
+| **Partially Implemented (Domain/Service ready, Feature branches active)** | 18 | ~19.5% |
+| **Remaining to Implement (Phases 8, 10, etc.)** | 25 | ~27.2% |
 
 ---
 
