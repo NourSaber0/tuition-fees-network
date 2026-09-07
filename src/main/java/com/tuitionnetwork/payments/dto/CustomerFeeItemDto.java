@@ -1,6 +1,7 @@
 package com.tuitionnetwork.payments.dto;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 public record CustomerFeeItemDto(
         String id,
@@ -9,6 +10,11 @@ public record CustomerFeeItemDto(
         BigDecimal paidEGP,
         BigDecimal remainingEGP,
         String status,
-        boolean eligible
+        boolean eligible,
+        LocalDate dueDate,
+        String priority,
+        Long daysToDue,
+        BigDecimal penaltyEGP,
+        BigDecimal totalDueEGP
 ) {
 }

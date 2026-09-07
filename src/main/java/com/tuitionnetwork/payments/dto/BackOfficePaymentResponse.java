@@ -1,6 +1,7 @@
 package com.tuitionnetwork.payments.dto;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 public record BackOfficePaymentResponse(
         String transactionId,
@@ -12,6 +13,10 @@ public record BackOfficePaymentResponse(
         String bankRef,
         String authCode,
         String receiptRef,
-        EppSummaryDto epp
+        EppSummaryDto epp,
+        BigDecimal originalFeeEGP,
+        BigDecimal penaltyEGP,
+        BigDecimal totalCollectedEGP,
+        LocalDateTime penaltyAppliedAt
 ) {
 }

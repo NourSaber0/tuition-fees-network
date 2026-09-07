@@ -1,6 +1,7 @@
 package com.tuitionnetwork.payments;
 
 import com.example.demo.DemoApplication;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tuitionnetwork.billing.domain.FeeLine;
 import com.tuitionnetwork.billing.domain.FeeStatus;
 import com.tuitionnetwork.billing.domain.FeeType;
@@ -24,6 +25,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
@@ -58,6 +60,9 @@ class TransactionIntegrationTest {
 
     @Autowired
     private InstitutionRepository institutionRepository;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     private MockMvc mockMvc;
     private Payment samplePayment;
@@ -174,5 +179,41 @@ class TransactionIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Type", org.hamcrest.Matchers.startsWith("text/csv")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Transaction ID,Timestamp,Institution")));
+    }
+
+    @Test
+    @WithMockUser(username = "ops@cibeg.com", roles = {"BACK_OFFICE"})
+    void detail_includesDeadlineFields() throws Exception {
+        mockMvc.perform(get("/api/v1/transactions/{id}", samplePayment.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dueDate").exists())
+                .andExpect(jsonPath("$.priority").exists())
+                .andExpect(jsonPath("$.totalDueEGP").exists());
+    }
+
+    @Test
+    @WithMockUser(username = "ops@cibeg.com", roles = {"BACK_OFFICE"})
+    void list_filterByPriority_matchesTheTransactionsActualPriority() throws Exception {
+        MvcResult detail = mockMvc.perform(get("/api/v1/transactions/{id}", samplePayment.getId()))
+                .andExpect(status().isOk())
+                .andReturn();
+        String actualPriority = objectMapper.readTree(detail.getResponse().getContentAsString()).get("priority").asText();
+
+        mockMvc.perform(get("/api/v1/transactions").param("priority", actualPriority))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.id=='" + samplePayment.getId() + "')]").exists());
+
+        mockMvc.perform(get("/api/v1/transactions").param("priority", "OVERDUE_" + UUID.randomUUID()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.id=='" + samplePayment.getId() + "')]").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "ops@cibeg.com", roles = {"BACK_OFFICE"})
+    void list_filterByDueBucketOverdue_excludesFutureFee() throws Exception {
+        // The fixture's fee line is due a month out, so it must never show up under dueBucket=overdue
+        mockMvc.perform(get("/api/v1/transactions").param("dueBucket", "overdue"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.id=='" + samplePayment.getId() + "')]").doesNotExist());
     }
 }

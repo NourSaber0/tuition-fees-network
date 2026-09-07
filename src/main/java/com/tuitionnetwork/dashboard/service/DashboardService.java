@@ -1,6 +1,7 @@
 package com.tuitionnetwork.dashboard.service;
 
 import com.tuitionnetwork.dashboard.dto.DashboardSummaryResponse;
+import com.tuitionnetwork.dashboard.dto.DeadlineSummaryResponse;
 import com.tuitionnetwork.dashboard.dto.InstitutionStatusResponse;
 import com.tuitionnetwork.dashboard.dto.RecentTransactionsResponse;
 import com.tuitionnetwork.dashboard.dto.WeeklyCollectionsResponse;
@@ -16,4 +17,6 @@ public interface DashboardService {
     InstitutionStatusResponse getInstitutionStatus();
 
     RecentTransactionsResponse getRecentTransactions(int limit);
+
+    DeadlineSummaryResponse getDeadlineSummary();
 }

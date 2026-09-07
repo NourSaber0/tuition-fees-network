@@ -1,9 +1,16 @@
 package com.tuitionnetwork.dashboard.service;
 
+import com.tuitionnetwork.billing.domain.FeeLine;
+import com.tuitionnetwork.billing.domain.FeePriority;
+import com.tuitionnetwork.billing.dto.FeeDeadlineSnapshot;
+import com.tuitionnetwork.billing.repository.FeeLineRepository;
+import com.tuitionnetwork.billing.service.FeeDeadlineService;
 import com.tuitionnetwork.dashboard.dto.ActiveInstitutionsKpi;
 import com.tuitionnetwork.dashboard.dto.CollectionKpi;
 import com.tuitionnetwork.dashboard.dto.DashboardKpis;
 import com.tuitionnetwork.dashboard.dto.DashboardSummaryResponse;
+import com.tuitionnetwork.dashboard.dto.DeadlineQueueItemDto;
+import com.tuitionnetwork.dashboard.dto.DeadlineSummaryResponse;
 import com.tuitionnetwork.dashboard.dto.EppPlansKpi;
 import com.tuitionnetwork.dashboard.dto.InstitutionStatusBreakdown;
 import com.tuitionnetwork.dashboard.dto.InstitutionStatusResponse;
@@ -34,6 +41,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.TextStyle;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -43,23 +51,30 @@ import java.util.stream.Collectors;
 public class DashboardServiceImpl implements DashboardService {
 
     private static final List<PaymentStatus> PENDING_STATUSES = List.of(PaymentStatus.PENDING, PaymentStatus.AUTHORIZED);
+    private static final int DEADLINE_QUEUE_LIMIT = 20;
 
     private final PaymentRepository paymentRepository;
     private final InstitutionRepository institutionRepository;
     private final StudentRepository studentRepository;
     private final EPPScheduleRepository eppScheduleRepository;
     private final EppInstallmentRepository eppInstallmentRepository;
+    private final FeeLineRepository feeLineRepository;
+    private final FeeDeadlineService feeDeadlineService;
 
     public DashboardServiceImpl(PaymentRepository paymentRepository,
                                  InstitutionRepository institutionRepository,
                                  StudentRepository studentRepository,
                                  EPPScheduleRepository eppScheduleRepository,
-                                 EppInstallmentRepository eppInstallmentRepository) {
+                                 EppInstallmentRepository eppInstallmentRepository,
+                                 FeeLineRepository feeLineRepository,
+                                 FeeDeadlineService feeDeadlineService) {
         this.paymentRepository = paymentRepository;
         this.institutionRepository = institutionRepository;
         this.studentRepository = studentRepository;
         this.eppScheduleRepository = eppScheduleRepository;
         this.eppInstallmentRepository = eppInstallmentRepository;
+        this.feeLineRepository = feeLineRepository;
+        this.feeDeadlineService = feeDeadlineService;
     }
 
     @Override
@@ -234,5 +249,93 @@ public class DashboardServiceImpl implements DashboardService {
                 .multiply(BigDecimal.valueOf(100))
                 .divide(BigDecimal.valueOf(total), 1, RoundingMode.HALF_UP)
                 .doubleValue();
+    }
+
+    @Override
+    public DeadlineSummaryResponse getDeadlineSummary() {
+        List<FeeLine> outstanding = feeLineRepository.findAllOutstanding();
+
+        long dueToday = 0;
+        long dueThisWeek = 0;
+        long urgent = 0;
+        long overdue = 0;
+        BigDecimal penaltiesAppliedEGP = BigDecimal.ZERO;
+
+        record Scored(FeeLine feeLine, FeeDeadlineSnapshot snapshot, int sortRank) {
+        }
+
+        List<Scored> scored = new java.util.ArrayList<>();
+        for (FeeLine feeLine : outstanding) {
+            FeeDeadlineSnapshot snapshot = feeDeadlineService.computeSnapshot(feeLine);
+            if (snapshot.daysToDue() == 0) {
+                dueToday++;
+            }
+            if (snapshot.daysToDue() >= 0 && snapshot.daysToDue() <= 6) {
+                dueThisWeek++;
+            }
+            if (snapshot.priority() == FeePriority.URGENT) {
+                urgent++;
+            }
+            if (snapshot.priority() == FeePriority.OVERDUE) {
+                overdue++;
+            }
+            if (snapshot.penaltyAppliedAt() != null && snapshot.penaltyEGP() != null) {
+                penaltiesAppliedEGP = penaltiesAppliedEGP.add(snapshot.penaltyEGP());
+            }
+            scored.add(new Scored(feeLine, snapshot, priorityRank(snapshot)));
+        }
+
+        List<DeadlineQueueItemDto> priorityQueue = scored.stream()
+                .sorted(Comparator.<Scored>comparingInt(s -> s.sortRank())
+                        .thenComparing(s -> s.snapshot().dueDate()))
+                .limit(DEADLINE_QUEUE_LIMIT)
+                .map(s -> toQueueItem(s.feeLine(), s.snapshot()))
+                .toList();
+
+        return new DeadlineSummaryResponse(dueToday, dueThisWeek, urgent, overdue,
+                penaltiesAppliedEGP.setScale(2, RoundingMode.HALF_UP), priorityQueue);
+    }
+
+    /**
+     * Sort key for the priority queue: OVERDUE, then "due today" (a sub-bucket of URGENT called
+     * out separately by the spec), then the rest of URGENT, then HIGH/MEDIUM/LOW. PAID fee lines
+     * never appear here since we only scan outstanding balances.
+     */
+    private int priorityRank(FeeDeadlineSnapshot snapshot) {
+        if (snapshot.priority() == FeePriority.OVERDUE) {
+            return 0;
+        }
+        if (snapshot.daysToDue() == 0) {
+            return 1;
+        }
+        return switch (snapshot.priority()) {
+            case URGENT -> 2;
+            case HIGH -> 3;
+            case MEDIUM -> 4;
+            case LOW -> 5;
+            default -> 6;
+        };
+    }
+
+    private DeadlineQueueItemDto toQueueItem(FeeLine feeLine, FeeDeadlineSnapshot snapshot) {
+        String institution = institutionRepository.findById(feeLine.getInstitutionId())
+                .map(Institution::getName)
+                .orElse(null);
+        String student = studentRepository.findById(feeLine.getStudentId())
+                .map(Student::getFullName)
+                .orElse(null);
+
+        return new DeadlineQueueItemDto(
+                feeLine.getId(),
+                institution,
+                student,
+                feeLine.getFeeType() != null ? feeLine.getFeeType().getDisplayName() : null,
+                snapshot.dueDate(),
+                snapshot.priority().name(),
+                snapshot.daysToDue(),
+                snapshot.outstandingEGP(),
+                snapshot.penaltyEGP(),
+                snapshot.totalDueEGP()
+        );
     }
 }

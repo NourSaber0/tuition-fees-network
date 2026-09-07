@@ -20,6 +20,8 @@ public interface TransactionQueryService {
             String method,
             LocalDate dateFrom,
             LocalDate dateTo,
+            String priority,
+            String dueBucket,
             int page,
             int pageSize
     );

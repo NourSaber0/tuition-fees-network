@@ -44,13 +44,15 @@ public class TransactionController {
             @RequestParam(value = "method", required = false) String method,
             @RequestParam(value = "dateFrom", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
             @RequestParam(value = "dateTo", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
+            @RequestParam(value = "priority", required = false) String priority,
+            @RequestParam(value = "dueBucket", required = false) String dueBucket,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", required = false) Integer size,
             @RequestParam(value = "pageSize", required = false) Integer pageSize) {
 
         int resolvedSize = pageSize != null ? pageSize : (size != null ? size : 25);
         return ResponseEntity.ok(transactionQueryService.listTransactions(
-                status, search, institution, institutionType, method, dateFrom, dateTo, page, resolvedSize
+                status, search, institution, institutionType, method, dateFrom, dateTo, priority, dueBucket, page, resolvedSize
         ));
     }
 

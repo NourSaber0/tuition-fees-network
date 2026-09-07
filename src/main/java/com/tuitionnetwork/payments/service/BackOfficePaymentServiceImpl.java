@@ -4,6 +4,7 @@ import com.tuitionnetwork.audit.domain.AuditLog;
 import com.tuitionnetwork.audit.repository.AuditLogRepository;
 import com.tuitionnetwork.billing.domain.FeeLine;
 import com.tuitionnetwork.billing.repository.FeeLineRepository;
+import com.tuitionnetwork.billing.service.FeeDeadlineService;
 import com.tuitionnetwork.identity.domain.Student;
 import com.tuitionnetwork.identity.dto.ResolvedGuardianDto;
 import com.tuitionnetwork.identity.repository.StudentRepository;
@@ -28,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -43,6 +45,7 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
     private final IdentityResolverService identityResolverService;
     private final TransactionQueryService transactionQueryService;
     private final AuditLogRepository auditLogRepository;
+    private final FeeDeadlineService feeDeadlineService;
 
     @Autowired
     public BackOfficePaymentServiceImpl(PaymentSettlementService paymentSettlementService,
@@ -51,7 +54,8 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
                                         StudentRepository studentRepository,
                                         IdentityResolverService identityResolverService,
                                         TransactionQueryService transactionQueryService,
-                                        @Autowired(required = false) AuditLogRepository auditLogRepository) {
+                                        @Autowired(required = false) AuditLogRepository auditLogRepository,
+                                        FeeDeadlineService feeDeadlineService) {
         this.paymentSettlementService = paymentSettlementService;
         this.paymentRepository = paymentRepository;
         this.feeLineRepository = feeLineRepository;
@@ -59,6 +63,7 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
         this.identityResolverService = identityResolverService;
         this.transactionQueryService = transactionQueryService;
         this.auditLogRepository = auditLogRepository;
+        this.feeDeadlineService = feeDeadlineService;
     }
 
     @Override
@@ -107,6 +112,10 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
                     existing.getTransactionReference() != null ? existing.getTransactionReference() : "BNK-" + existing.getAuthCode(),
                     existing.getAuthCode() != null ? existing.getAuthCode() : "AUTH-OK",
                     existing.getReceipt() != null ? existing.getReceipt().getFileUrl() : "/receipts/" + existing.getId() + ".pdf",
+                    null,
+                    null,
+                    null,
+                    existing.getTotalAmount(),
                     null
             );
         }
@@ -128,19 +137,39 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "no_fees_selected: No matching fee lines found.");
         }
 
+        // Apply the 5% late penalty (idempotent - a no-op if already applied or not overdue)
+        // BEFORE computing what's owed, so an overdue fee is validated/settled against the
+        // full totalDue (outstanding + penalty), not just the original outstanding balance.
         BigDecimal totalRemaining = BigDecimal.ZERO;
+        BigDecimal totalPenalty = BigDecimal.ZERO;
+        LocalDateTime latestPenaltyAppliedAt = null;
         for (FeeLine fl : feeLines) {
+            feeDeadlineService.applyPenaltyIfDue(fl);
             totalRemaining = totalRemaining.add(fl.getRemainingAmount() != null ? fl.getRemainingAmount() : BigDecimal.ZERO);
+            if (fl.getPenaltyAmountEGP() != null) {
+                totalPenalty = totalPenalty.add(fl.getPenaltyAmountEGP());
+            }
+            if (fl.getPenaltyAppliedAt() != null
+                    && (latestPenaltyAppliedAt == null || fl.getPenaltyAppliedAt().isAfter(latestPenaltyAppliedAt))) {
+                latestPenaltyAppliedAt = fl.getPenaltyAppliedAt();
+            }
         }
+        BigDecimal totalDue = totalRemaining.add(totalPenalty);
 
-        if (request.amountEGP().compareTo(totalRemaining) > 0) {
+        if (request.amountEGP().compareTo(totalDue) > 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "amount_exceeds_balance: Payment amount " + request.amountEGP() + " exceeds total remaining balance " + totalRemaining);
+                    "amount_exceeds_balance: Payment amount " + request.amountEGP() + " exceeds total amount due " + totalDue
+                            + " (outstanding " + totalRemaining + " + penalty " + totalPenalty + ")");
         }
 
-        // Distribute payment across fees
+        // Distribute payment across fees - only the fee-principal portion (never the penalty)
+        // is allocated against FeeLine.remainingAmount, so the underlying overpayment guardrail
+        // in PaymentSettlementService still sees amounts it can validate line-by-line.
+        BigDecimal feePortion = request.amountEGP().min(totalRemaining);
+        BigDecimal penaltyPortion = request.amountEGP().subtract(feePortion);
+
         List<SelectedDueDto> selectedDues = new ArrayList<>();
-        BigDecimal remainingToDistribute = request.amountEGP();
+        BigDecimal remainingToDistribute = feePortion;
         for (FeeLine fl : feeLines) {
             if (remainingToDistribute.compareTo(BigDecimal.ZERO) <= 0) {
                 break;
@@ -196,8 +225,8 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
             ));
         }
 
-        boolean isPartial = request.amountEGP().compareTo(totalRemaining) < 0;
-        BigDecimal remainingBalance = totalRemaining.subtract(request.amountEGP());
+        boolean isPartial = request.amountEGP().compareTo(totalDue) < 0;
+        BigDecimal remainingBalance = totalDue.subtract(request.amountEGP());
 
         EppSummaryDto eppDto = null;
         if (isEpp && request.eppTenor() != null) {
@@ -215,7 +244,11 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
                 settleResponse.transactionReference() != null ? settleResponse.transactionReference() : "BNK-" + settleResponse.authCode(),
                 settleResponse.authCode() != null ? settleResponse.authCode() : "AUTH-OK",
                 "RCP-" + settleResponse.paymentId().toString().substring(0, 8).toUpperCase(),
-                eppDto
+                eppDto,
+                feePortion,
+                penaltyPortion,
+                request.amountEGP(),
+                latestPenaltyAppliedAt
         );
     }
 

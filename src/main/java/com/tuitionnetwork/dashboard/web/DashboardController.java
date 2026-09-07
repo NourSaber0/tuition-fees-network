@@ -1,6 +1,7 @@
 package com.tuitionnetwork.dashboard.web;
 
 import com.tuitionnetwork.dashboard.dto.DashboardSummaryResponse;
+import com.tuitionnetwork.dashboard.dto.DeadlineSummaryResponse;
 import com.tuitionnetwork.dashboard.dto.InstitutionStatusResponse;
 import com.tuitionnetwork.dashboard.dto.RecentTransactionsResponse;
 import com.tuitionnetwork.dashboard.dto.WeeklyCollectionsResponse;
@@ -47,5 +48,10 @@ public class DashboardController {
     public ResponseEntity<RecentTransactionsResponse> getRecentTransactions(
             @RequestParam(value = "limit", defaultValue = "6") int limit) {
         return ResponseEntity.ok(dashboardService.getRecentTransactions(limit));
+    }
+
+    @GetMapping("/deadline-summary")
+    public ResponseEntity<DeadlineSummaryResponse> getDeadlineSummary() {
+        return ResponseEntity.ok(dashboardService.getDeadlineSummary());
     }
 }

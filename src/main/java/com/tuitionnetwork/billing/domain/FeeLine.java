@@ -11,6 +11,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -60,6 +61,12 @@ public class FeeLine {
 
     @Column(name = "row_idempotency_key", unique = true)
     private String rowIdempotencyKey;
+
+    @Column(name = "penalty_amount", precision = 19, scale = 2)
+    private BigDecimal penaltyAmountEGP;
+
+    @Column(name = "penalty_applied_at")
+    private LocalDateTime penaltyAppliedAt;
 
     public FeeLine() {
     }
@@ -180,6 +187,22 @@ public class FeeLine {
 
     public void setRowIdempotencyKey(String rowIdempotencyKey) {
         this.rowIdempotencyKey = rowIdempotencyKey;
+    }
+
+    public BigDecimal getPenaltyAmountEGP() {
+        return penaltyAmountEGP;
+    }
+
+    public void setPenaltyAmountEGP(BigDecimal penaltyAmountEGP) {
+        this.penaltyAmountEGP = penaltyAmountEGP;
+    }
+
+    public LocalDateTime getPenaltyAppliedAt() {
+        return penaltyAppliedAt;
+    }
+
+    public void setPenaltyAppliedAt(LocalDateTime penaltyAppliedAt) {
+        this.penaltyAppliedAt = penaltyAppliedAt;
     }
 
     @Override

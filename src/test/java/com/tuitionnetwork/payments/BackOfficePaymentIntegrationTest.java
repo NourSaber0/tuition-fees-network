@@ -299,4 +299,95 @@ class BackOfficePaymentIntegrationTest {
                         .content("{\"reason\":\"test\"}"))
                 .andExpect(status().isNotFound());
     }
+
+    private FeeLine overdueFee(BigDecimal remaining) {
+        FeeLine fl = new FeeLine();
+        fl.setInstitutionId(sampleFee.getInstitutionId());
+        fl.setStudentId(sampleFee.getStudentId());
+        fl.setFeeType(FeeType.TUITION);
+        fl.setTotalAmount(remaining);
+        fl.setPaidAmount(BigDecimal.ZERO);
+        fl.setRemainingAmount(remaining);
+        fl.setStatus(FeeStatus.OUTSTANDING);
+        fl.setCollectionPeriod("Term 1 - 2026");
+        fl.setDueDate(LocalDate.now().minusDays(1));
+        return feeLineRepository.save(fl);
+    }
+
+    @Test
+    @WithMockUser(username = "ops@cibeg.com", roles = {"BACK_OFFICE"})
+    void processPayment_fullyClearsOverdueFeeAndPenalty_returnsBreakdown() throws Exception {
+        FeeLine overdue = overdueFee(new BigDecimal("8000.00"));
+        String idempKey = UUID.randomUUID().toString();
+        String body = """
+                {
+                    "nationalId": "%s",
+                    "feeIds": ["%s"],
+                    "amountEGP": 8400.00,
+                    "method": "CIB Credit Card",
+                    "processedBy": "EMP-001"
+                }
+                """.formatted(testNationalId, overdue.getId());
+
+        mockMvc.perform(post("/api/v1/payments")
+                        .header("Idempotency-Key", idempKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("Successful"))
+                .andExpect(jsonPath("$.isPartial").value(false))
+                .andExpect(jsonPath("$.remainingBalanceEGP").value(0.00))
+                .andExpect(jsonPath("$.originalFeeEGP").value(8000.00))
+                .andExpect(jsonPath("$.penaltyEGP").value(400.00))
+                .andExpect(jsonPath("$.totalCollectedEGP").value(8400.00))
+                .andExpect(jsonPath("$.penaltyAppliedAt").exists());
+    }
+
+    @Test
+    @WithMockUser(username = "ops@cibeg.com", roles = {"BACK_OFFICE"})
+    void processPayment_payingOnlyFeePortion_leavesPenaltyOutstanding() throws Exception {
+        FeeLine overdue = overdueFee(new BigDecimal("8000.00"));
+        String idempKey = UUID.randomUUID().toString();
+        String body = """
+                {
+                    "nationalId": "%s",
+                    "feeIds": ["%s"],
+                    "amountEGP": 8000.00,
+                    "method": "CIB Credit Card",
+                    "processedBy": "EMP-001"
+                }
+                """.formatted(testNationalId, overdue.getId());
+
+        mockMvc.perform(post("/api/v1/payments")
+                        .header("Idempotency-Key", idempKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.isPartial").value(true))
+                .andExpect(jsonPath("$.remainingBalanceEGP").value(400.00))
+                .andExpect(jsonPath("$.originalFeeEGP").value(8000.00))
+                .andExpect(jsonPath("$.penaltyEGP").value(0.00));
+    }
+
+    @Test
+    @WithMockUser(username = "ops@cibeg.com", roles = {"BACK_OFFICE"})
+    void processPayment_amountExceedingTotalDue_returns400() throws Exception {
+        FeeLine overdue = overdueFee(new BigDecimal("8000.00"));
+        String idempKey = UUID.randomUUID().toString();
+        String body = """
+                {
+                    "nationalId": "%s",
+                    "feeIds": ["%s"],
+                    "amountEGP": 9000.00,
+                    "method": "CIB Credit Card",
+                    "processedBy": "EMP-001"
+                }
+                """.formatted(testNationalId, overdue.getId());
+
+        mockMvc.perform(post("/api/v1/payments")
+                        .header("Idempotency-Key", idempKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
 }

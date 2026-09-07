@@ -3,8 +3,11 @@ package com.tuitionnetwork.payments.service;
 import com.tuitionnetwork.audit.domain.AuditLog;
 import com.tuitionnetwork.audit.repository.AuditLogRepository;
 import com.tuitionnetwork.billing.domain.FeeLine;
+import com.tuitionnetwork.billing.domain.FeePriority;
 import com.tuitionnetwork.billing.domain.FeeStatus;
+import com.tuitionnetwork.billing.dto.FeeDeadlineSnapshot;
 import com.tuitionnetwork.billing.repository.FeeLineRepository;
+import com.tuitionnetwork.billing.service.FeeDeadlineService;
 import com.tuitionnetwork.common.dto.PageResponse;
 import com.tuitionnetwork.identity.domain.Guardian;
 import com.tuitionnetwork.identity.domain.Institution;
@@ -65,6 +68,7 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
     private final IdentityResolverService identityResolverService;
     private final AuditLogRepository auditLogRepository;
     private final ReceiptRepository receiptRepository;
+    private final FeeDeadlineService feeDeadlineService;
 
     @Autowired
     public TransactionQueryServiceImpl(PaymentRepository paymentRepository,
@@ -74,7 +78,8 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
                                        GuardianRepository guardianRepository,
                                        IdentityResolverService identityResolverService,
                                        @Autowired(required = false) AuditLogRepository auditLogRepository,
-                                       ReceiptRepository receiptRepository) {
+                                       ReceiptRepository receiptRepository,
+                                       FeeDeadlineService feeDeadlineService) {
         this.paymentRepository = paymentRepository;
         this.feeLineRepository = feeLineRepository;
         this.studentRepository = studentRepository;
@@ -83,6 +88,7 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
         this.identityResolverService = identityResolverService;
         this.auditLogRepository = auditLogRepository;
         this.receiptRepository = receiptRepository;
+        this.feeDeadlineService = feeDeadlineService;
     }
 
     @Override
@@ -94,6 +100,8 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
             String method,
             LocalDate dateFrom,
             LocalDate dateTo,
+            String priority,
+            String dueBucket,
             int page,
             int pageSize) {
 
@@ -148,12 +156,47 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
             return cb.and(predicates.toArray(new Predicate[0]));
         };
 
-        Page<Payment> paymentPage = paymentRepository.findAll(
-                spec,
-                PageRequest.of(resolvedPage, resolvedSize, Sort.by(Sort.Direction.DESC, "createdAt"))
-        );
+        boolean needsDerivedFilter = (priority != null && !priority.isBlank()) || (dueBucket != null && !dueBucket.isBlank());
+        if (!needsDerivedFilter) {
+            Page<Payment> paymentPage = paymentRepository.findAll(
+                    spec,
+                    PageRequest.of(resolvedPage, resolvedSize, Sort.by(Sort.Direction.DESC, "createdAt"))
+            );
+            return PageResponse.from(paymentPage, this::mapToTransactionDto);
+        }
 
-        return PageResponse.from(paymentPage, this::mapToTransactionDto);
+        // priority/dueBucket are derived from the fee line's dueDate, not a Payment column, so they
+        // can't be pushed into the DB predicate above. Filter in memory, then paginate the result.
+        List<TransactionDto> matching = paymentRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "createdAt")).stream()
+                .map(this::mapToTransactionDto)
+                .filter(tx -> matchesPriority(tx, priority))
+                .filter(tx -> matchesDueBucket(tx, dueBucket))
+                .toList();
+
+        int fromIndex = Math.min(resolvedPage * resolvedSize, matching.size());
+        int toIndex = Math.min(fromIndex + resolvedSize, matching.size());
+        var pageImpl = new org.springframework.data.domain.PageImpl<>(
+                matching.subList(fromIndex, toIndex),
+                PageRequest.of(resolvedPage, resolvedSize),
+                matching.size()
+        );
+        return PageResponse.from(pageImpl, java.util.function.Function.identity());
+    }
+
+    private boolean matchesPriority(TransactionDto tx, String priority) {
+        return priority == null || priority.isBlank() || priority.equalsIgnoreCase(tx.priority());
+    }
+
+    private boolean matchesDueBucket(TransactionDto tx, String dueBucket) {
+        if (dueBucket == null || dueBucket.isBlank() || tx.daysToDue() == null) {
+            return true;
+        }
+        return switch (dueBucket.toLowerCase()) {
+            case "today" -> tx.daysToDue() == 0;
+            case "this-week" -> tx.daysToDue() >= 0 && tx.daysToDue() <= 6;
+            case "overdue" -> tx.daysToDue() < 0;
+            default -> true;
+        };
     }
 
     @Override
@@ -217,6 +260,14 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
                 base.partial(),
                 base.idempotencyKey(),
                 base.channel(),
+                base.dueDate(),
+                base.priority(),
+                base.daysToDue(),
+                base.outstandingEGP(),
+                base.penaltyEGP(),
+                base.penaltyAppliedAt(),
+                base.graceEnded(),
+                base.totalDueEGP(),
                 timeline,
                 allocations
         );
@@ -232,7 +283,7 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
             LocalDate dateFrom,
             LocalDate dateTo) {
 
-        PageResponse<TransactionDto> page = listTransactions(status, search, institution, institutionType, method, dateFrom, dateTo, 0, 5000);
+        PageResponse<TransactionDto> page = listTransactions(status, search, institution, institutionType, method, dateFrom, dateTo, null, null, 0, 5000);
 
         StringBuilder sb = new StringBuilder();
         sb.append("Transaction ID,Timestamp,Institution,Institution Type,Student,Fee Type,Amount (EGP),Method,Status,Bank Ref,Settlement Status,Recon Status,Channel\n");
@@ -291,15 +342,7 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
             for (Student student : students) {
                 List<FeeLine> fees = feeLineRepository.findByStudentId(student.getId());
                 for (FeeLine f : fees) {
-                    feeDtos.add(new CustomerFeeItemDto(
-                            f.getId().toString(),
-                            (f.getFeeType() != null ? f.getFeeType().name() : "Fee") + " - " + (f.getCollectionPeriod() != null ? f.getCollectionPeriod() : ""),
-                            f.getTotalAmount(),
-                            f.getPaidAmount() != null ? f.getPaidAmount() : BigDecimal.ZERO,
-                            f.getRemainingAmount(),
-                            f.getStatus() != null ? f.getStatus().name() : "OUTSTANDING",
-                            f.getStatus() != FeeStatus.PAID && f.getStatus() != FeeStatus.CANCELLED
-                    ));
+                    feeDtos.add(toCustomerFeeItemDto(f));
                 }
             }
 
@@ -327,15 +370,7 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
             List<FeeLine> fees = feeLineRepository.findByStudentId(student.getId());
             List<CustomerFeeItemDto> feeDtos = new ArrayList<>();
             for (FeeLine f : fees) {
-                feeDtos.add(new CustomerFeeItemDto(
-                        f.getId().toString(),
-                        (f.getFeeType() != null ? f.getFeeType().name() : "Fee") + " - " + (f.getCollectionPeriod() != null ? f.getCollectionPeriod() : ""),
-                        f.getTotalAmount(),
-                        f.getPaidAmount() != null ? f.getPaidAmount() : BigDecimal.ZERO,
-                        f.getRemainingAmount(),
-                        f.getStatus() != null ? f.getStatus().name() : "OUTSTANDING",
-                        f.getStatus() != FeeStatus.PAID && f.getStatus() != FeeStatus.CANCELLED
-                ));
+                feeDtos.add(toCustomerFeeItemDto(f));
             }
 
             auditCustomerSearch(masked);
@@ -388,6 +423,24 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
         }
     }
 
+    private CustomerFeeItemDto toCustomerFeeItemDto(FeeLine f) {
+        FeeDeadlineSnapshot deadline = feeDeadlineService.computeSnapshot(f);
+        return new CustomerFeeItemDto(
+                f.getId().toString(),
+                (f.getFeeType() != null ? f.getFeeType().name() : "Fee") + " - " + (f.getCollectionPeriod() != null ? f.getCollectionPeriod() : ""),
+                f.getTotalAmount(),
+                f.getPaidAmount() != null ? f.getPaidAmount() : BigDecimal.ZERO,
+                f.getRemainingAmount(),
+                f.getStatus() != null ? f.getStatus().name() : "OUTSTANDING",
+                f.getStatus() != FeeStatus.PAID && f.getStatus() != FeeStatus.CANCELLED,
+                deadline.dueDate(),
+                deadline.priority().name(),
+                deadline.daysToDue(),
+                deadline.penaltyEGP(),
+                deadline.totalDueEGP()
+        );
+    }
+
     private TransactionDto mapToTransactionDto(Payment payment) {
         String institution = "-";
         String institutionType = "School";
@@ -396,6 +449,7 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
 
         BigDecimal originalAmount = BigDecimal.ZERO;
         BigDecimal previouslyPaid = BigDecimal.ZERO;
+        FeeLine primaryFeeForDeadline = null;
 
         if (payment.getAllocations() != null && !payment.getAllocations().isEmpty()) {
             for (PaymentAllocation pa : payment.getAllocations()) {
@@ -411,6 +465,7 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
             }
 
             FeeLine primaryFee = payment.getAllocations().get(0).getFeeLine();
+            primaryFeeForDeadline = primaryFee;
             if (primaryFee != null) {
                 if (primaryFee.getFeeType() != null) {
                     feeType = primaryFee.getFeeType().name();
@@ -463,6 +518,10 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
             partial = new PartialPaymentDto(originalAmount, previouslyPaid);
         }
 
+        FeeDeadlineSnapshot deadline = primaryFeeForDeadline != null
+                ? feeDeadlineService.computeSnapshot(primaryFeeForDeadline)
+                : null;
+
         return new TransactionDto(
                 payment.getId(),
                 institution,
@@ -478,7 +537,15 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
                 payment.getCreatedAt(),
                 partial,
                 payment.getIdempotencyKey(),
-                "Counter"
+                "Counter",
+                deadline != null ? deadline.dueDate() : null,
+                deadline != null ? deadline.priority().name() : null,
+                deadline != null ? deadline.daysToDue() : null,
+                deadline != null ? deadline.outstandingEGP() : null,
+                deadline != null ? deadline.penaltyEGP() : null,
+                deadline != null ? deadline.penaltyAppliedAt() : null,
+                deadline != null ? deadline.graceEnded() : null,
+                deadline != null ? deadline.totalDueEGP() : null
         );
     }
 

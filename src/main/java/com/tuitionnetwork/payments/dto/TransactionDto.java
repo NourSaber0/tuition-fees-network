@@ -1,6 +1,7 @@
 package com.tuitionnetwork.payments.dto;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -19,6 +20,14 @@ public record TransactionDto(
         LocalDateTime timestamp,
         PartialPaymentDto partial,
         String idempotencyKey,
-        String channel
+        String channel,
+        LocalDate dueDate,
+        String priority,
+        Long daysToDue,
+        BigDecimal outstandingEGP,
+        BigDecimal penaltyEGP,
+        LocalDateTime penaltyAppliedAt,
+        Boolean graceEnded,
+        BigDecimal totalDueEGP
 ) {
 }
