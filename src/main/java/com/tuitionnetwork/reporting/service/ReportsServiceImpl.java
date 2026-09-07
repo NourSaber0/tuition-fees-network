@@ -29,6 +29,9 @@ import com.tuitionnetwork.reporting.dto.ReportHistoryEntry;
 import com.tuitionnetwork.reporting.dto.ReportJobResponse;
 import com.tuitionnetwork.reporting.dto.ReportPreview;
 import com.tuitionnetwork.reporting.repository.GeneratedReportRepository;
+import com.tuitionnetwork.audit.domain.AuditLog;
+import com.tuitionnetwork.audit.repository.AuditLogRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
@@ -63,6 +66,26 @@ public class ReportsServiceImpl implements ReportsService {
     private final InstitutionRepository institutionRepository;
     private final StudentRepository studentRepository;
     private final ObjectMapper objectMapper;
+    private final AuditLogRepository auditLogRepository;
+
+    @Autowired
+    public ReportsServiceImpl(GeneratedReportRepository generatedReportRepository,
+                              PaymentRepository paymentRepository,
+                              FeeLineRepository feeLineRepository,
+                              EPPScheduleRepository eppScheduleRepository,
+                              InstitutionRepository institutionRepository,
+                              StudentRepository studentRepository,
+                              ObjectMapper objectMapper,
+                              @Autowired(required = false) AuditLogRepository auditLogRepository) {
+        this.generatedReportRepository = generatedReportRepository;
+        this.paymentRepository = paymentRepository;
+        this.feeLineRepository = feeLineRepository;
+        this.eppScheduleRepository = eppScheduleRepository;
+        this.institutionRepository = institutionRepository;
+        this.studentRepository = studentRepository;
+        this.objectMapper = objectMapper;
+        this.auditLogRepository = auditLogRepository;
+    }
 
     public ReportsServiceImpl(GeneratedReportRepository generatedReportRepository,
                               PaymentRepository paymentRepository,
@@ -71,18 +94,25 @@ public class ReportsServiceImpl implements ReportsService {
                               InstitutionRepository institutionRepository,
                               StudentRepository studentRepository,
                               ObjectMapper objectMapper) {
-        this.generatedReportRepository = generatedReportRepository;
-        this.paymentRepository = paymentRepository;
-        this.feeLineRepository = feeLineRepository;
-        this.eppScheduleRepository = eppScheduleRepository;
-        this.institutionRepository = institutionRepository;
-        this.studentRepository = studentRepository;
-        this.objectMapper = objectMapper;
+        this(generatedReportRepository, paymentRepository, feeLineRepository, eppScheduleRepository,
+                institutionRepository, studentRepository, objectMapper, null);
     }
 
     @Override
     public List<ReportCatalogueEntry> catalogue() {
-        return ReportCatalogue.all();
+        return ReportCatalogue.all().stream()
+                .map(e -> {
+                    LocalDateTime lastGen = generatedReportRepository
+                            .findFirstByReportIdOrderByCreatedAtDesc(e.id())
+                            .map(GeneratedReport::getCreatedAt)
+                            .orElse(null);
+                    return new ReportCatalogueEntry(
+                            e.id(), e.title(), e.description(), e.category(),
+                            e.formats(), e.singleDate(), e.contextFilters(),
+                            e.available(), e.unavailableReason(), lastGen
+                    );
+                })
+                .toList();
     }
 
     @Override
@@ -98,8 +128,7 @@ public class ReportsServiceImpl implements ReportsService {
 
         String format = request.formatOrDefault();
         if (!"CSV".equals(format)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Only CSV export is implemented in the MVP (requested: " + format + ").");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "unsupported_format_for_report");
         }
 
         LocalDate from;
@@ -115,8 +144,7 @@ public class ReportsServiceImpl implements ReportsService {
                         "dateFrom and dateTo are required for this report.");
             }
             if (from.isAfter(to)) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "dateFrom must not be after dateTo.");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "date_from_after_date_to");
             }
         }
 
@@ -144,6 +172,16 @@ public class ReportsServiceImpl implements ReportsService {
         report.setStatus(ReportStatus.READY);
 
         GeneratedReport saved = generatedReportRepository.save(report);
+
+        if (auditLogRepository != null) {
+            auditLogRepository.save(new AuditLog(
+                    null,
+                    "BACK_OFFICE",
+                    "GENERATE_REPORT",
+                    "Report " + entry.id() + " generated (" + format + ") with " + data.rows().size() + " rows"
+            ));
+        }
+
         return toJobResponse(saved, preview);
     }
 

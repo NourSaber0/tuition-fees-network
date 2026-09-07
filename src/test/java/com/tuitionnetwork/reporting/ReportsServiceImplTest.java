@@ -53,6 +53,7 @@ class ReportsServiceImplTest {
     private EPPScheduleRepository eppScheduleRepository;
     private InstitutionRepository institutionRepository;
     private StudentRepository studentRepository;
+    private com.tuitionnetwork.audit.repository.AuditLogRepository auditLogRepository;
     private ReportsServiceImpl service;
 
     private final GeneratedReport[] lastSaved = new GeneratedReport[1];
@@ -65,9 +66,10 @@ class ReportsServiceImplTest {
         eppScheduleRepository = mock(EPPScheduleRepository.class);
         institutionRepository = mock(InstitutionRepository.class);
         studentRepository = mock(StudentRepository.class);
+        auditLogRepository = mock(com.tuitionnetwork.audit.repository.AuditLogRepository.class);
 
         service = new ReportsServiceImpl(generatedReportRepository, paymentRepository, feeLineRepository,
-                eppScheduleRepository, institutionRepository, studentRepository, new ObjectMapper());
+                eppScheduleRepository, institutionRepository, studentRepository, new ObjectMapper(), auditLogRepository);
 
         when(generatedReportRepository.save(any(GeneratedReport.class))).thenAnswer(inv -> {
             GeneratedReport r = inv.getArgument(0);
@@ -105,11 +107,20 @@ class ReportsServiceImplTest {
 
     @Test
     void catalogue_hasTenEntries_withReconciliationUnavailable() {
-        assertEquals(10, service.catalogue().size());
-        assertTrue(service.catalogue().stream()
-                .anyMatch(e -> e.id().equals("reconciliation") && !e.available()));
-        assertTrue(service.catalogue().stream()
-                .anyMatch(e -> e.id().equals("collections-by-type") && e.available()));
+        LocalDateTime sampleTime = LocalDateTime.of(2026, 8, 31, 8, 0, 0);
+        GeneratedReport sampleReport = new GeneratedReport();
+        sampleReport.setCreatedAt(sampleTime);
+        when(generatedReportRepository.findFirstByReportIdOrderByCreatedAtDesc("daily-collections"))
+                .thenReturn(Optional.of(sampleReport));
+
+        List<com.tuitionnetwork.reporting.dto.ReportCatalogueEntry> cat = service.catalogue();
+        assertEquals(10, cat.size());
+        assertTrue(cat.stream().anyMatch(e -> e.id().equals("reconciliation") && !e.available()));
+        assertTrue(cat.stream().anyMatch(e -> e.id().equals("collections-by-type") && e.available()));
+
+        com.tuitionnetwork.reporting.dto.ReportCatalogueEntry daily = cat.stream()
+                .filter(e -> e.id().equals("daily-collections")).findFirst().orElseThrow();
+        assertEquals(sampleTime, daily.lastGeneratedAt());
     }
 
     // ── generate ───────────────────────────────────────────────────────────
@@ -133,6 +144,7 @@ class ReportsServiceImplTest {
         assertEquals("Cairo International School", resp.preview().rows().get(0).get("institution"));
         assertTrue(resp.downloadUrl().contains(resp.jobId().toString()));
         verify(generatedReportRepository).save(any(GeneratedReport.class));
+        verify(auditLogRepository).save(any(com.tuitionnetwork.audit.domain.AuditLog.class));
         assertNotNull(lastSaved[0].getCsvContent());
         assertTrue(lastSaved[0].getCsvContent().contains("Cairo International School"));
     }

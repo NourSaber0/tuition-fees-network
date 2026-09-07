@@ -11,15 +11,15 @@
 
 The Bank Back-Office Portal contract defines approximately **90+ endpoints** across **11 phases** to back the front-end portal screens.
 
-Currently, **Phases 1 through 6 are 100% complete and verified** (with 155 passing automated unit and integration tests).
+Currently, **Phases 1 through 7 are 100% complete and verified** (with 179 passing automated unit and integration tests).
 
 | Metric | Count | Percentage |
 |---|:---:|:---:|
 | **Total Contract Endpoints** | ~92 | 100% |
-| **Fully Implemented & Matching (Phases 1–6)** | 55 | ~59.8% |
+| **Fully Implemented & Matching (Phases 1–7)** | 60 | ~65.2% |
 | **Excluded by Explicit Business Policy (No Refunds)** | 2 | ~2.2% |
-| **Partially Implemented (Domain/Service ready, Feature branches active)** | 10 | ~10.9% |
-| **Remaining to Implement (Phases 7, 8, 10, 11)** | 25 | ~27.2% |
+| **Partially Implemented (Domain/Service ready, Feature branches active)** | 5 | ~5.4% |
+| **Remaining to Implement (Phases 8, 10, 11)** | 25 | ~27.2% |
 
 ---
 
@@ -134,15 +134,15 @@ Currently, **Phases 1 through 6 are 100% complete and verified** (with 155 passi
 ---
 
 ### Phase 7 — Reports
-**Source:** `Reports.tsx` | **Roles:** `bank-admin`, `bank-finance` | **Total Endpoints:** 5
+**Source:** `Reports.tsx` | **Roles:** `bank-admin`, `bank-finance` | **Total Endpoints:** 5 (100% DONE)
 
 | Endpoint | Method | Contract Purpose | Status | Current Code / Notes |
 |---|---|---|:---:|---|
-| `/reports/catalogue` | `GET` | Catalogue of standard reports | ❌ **NOT DONE** | Not implemented. |
-| `/reports/generate` | `POST` | Asynchronous report generation job | ❌ **NOT DONE** | Not implemented. |
-| `/reports/jobs/{jobId}` | `GET` | Status & preview rows | ❌ **NOT DONE** | Not implemented. |
-| `/reports/jobs/{jobId}/download` | `GET` | Stream report file (XLSX / PDF / CSV) | ❌ **NOT DONE** | Not implemented. |
-| `/reports/history` | `GET` | Previous generation history | ❌ **NOT DONE** | Not implemented. |
+| `/reports/catalogue` | `GET` | Catalogue of standard reports | ✅ **DONE** | [`ReportsController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/reporting/web/ReportsController.java#L49-L52). Returns list of 10 standard reports with titles, categories, available formats, filters, and `lastGeneratedAt` timestamps. |
+| `/reports/generate` | `POST` | Asynchronous/synchronous report generation job | ✅ **DONE** | [`ReportsController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/reporting/web/ReportsController.java#L54-L57). Validates date range (`date_from_after_date_to`), formats (`unsupported_format_for_report`), filters by institution/fee/method, logs Phase 9 audit trail. |
+| `/reports/jobs/{jobId}` | `GET` | Status & preview rows | ✅ **DONE** | [`ReportsController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/reporting/web/ReportsController.java#L59-L62). Returns job status, filename, download URL, preview column headers, sample rows, and summary notes. |
+| `/reports/jobs/{jobId}/download` | `GET` | Stream report file (XLSX / PDF / CSV) | ✅ **DONE** | [`ReportsController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/reporting/web/ReportsController.java#L64-L72). Streams UTF-8 CSV attachment with RFC-compliant headers and formatted data rows. |
+| `/reports/history` | `GET` | Previous generation history | ✅ **DONE** | [`ReportsController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/reporting/web/ReportsController.java#L74-L82). Returns paginated `PageResponse<ReportHistoryEntry>` with filter by `reportId`, total count, page, and size. |
 
 ---
 

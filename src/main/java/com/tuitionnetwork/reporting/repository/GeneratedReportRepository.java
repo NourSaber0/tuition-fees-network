@@ -14,4 +14,6 @@ public interface GeneratedReportRepository extends JpaRepository<GeneratedReport
     Page<GeneratedReport> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
     Page<GeneratedReport> findByReportIdOrderByCreatedAtDesc(String reportId, Pageable pageable);
+
+    java.util.Optional<GeneratedReport> findFirstByReportIdOrderByCreatedAtDesc(String reportId);
 }
