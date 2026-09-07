@@ -57,4 +57,8 @@ public interface InstitutionManagementService {
 
     /** Integration channel status (US-13). */
     InstitutionIntegrationDto integration(UUID id);
+
+    /** Settlement history and 2% CIB fee breakdown (US-15). */
+    com.tuitionnetwork.identity.dto.InstitutionSettlementsResponse settlements(UUID id);
 }
+
