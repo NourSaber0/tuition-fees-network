@@ -2,17 +2,21 @@ package com.tuitionnetwork.audit.service;
 
 import com.tuitionnetwork.audit.dto.AuditLogDto;
 import com.tuitionnetwork.audit.dto.AuditLogStatsDto;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import com.tuitionnetwork.common.dto.PageResponse;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
 public interface AuditLogService {
-    Page<AuditLogDto> search(UUID actorId, String actorType, String action, LocalDateTime from, LocalDateTime to, Pageable pageable);
+
+    PageResponse<AuditLogDto> search(String search, String role, String severity,
+                                     String dateFrom, String dateTo, int page, int pageSize);
+
     AuditLogDto getById(UUID id);
-    AuditLogStatsDto stats(LocalDateTime from, LocalDateTime to);
+
+    AuditLogStatsDto stats(String dateFrom, String dateTo);
+
     List<String> roles();
-    byte[] export(UUID actorId, String actorType, String action, LocalDateTime from, LocalDateTime to);
+
+    byte[] export(String search, String role, String severity, String dateFrom, String dateTo);
 }

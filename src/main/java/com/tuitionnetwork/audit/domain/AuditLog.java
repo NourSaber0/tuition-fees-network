@@ -38,6 +38,24 @@ public class AuditLog {
     @Column(name = "severity", nullable = false)
     private String severity = "INFO"; // INFO, WARNING, CRITICAL
 
+    @Column(name = "entity")
+    private String entity;
+
+    @Column(name = "entity_id")
+    private String entityId;
+
+    @Column(name = "prev_value", length = 1000)
+    private String prevValue;
+
+    @Column(name = "new_value", length = 1000)
+    private String newValue;
+
+    @Column(name = "ip_address")
+    private String ipAddress;
+
+    @Column(name = "user_name")
+    private String userName;
+
     public AuditLog() {
     }
 
@@ -51,6 +69,22 @@ public class AuditLog {
         this.action = action;
         this.targetResource = targetResource;
         this.severity = severity == null ? "INFO" : severity;
+        this.timestamp = LocalDateTime.now();
+    }
+
+    public AuditLog(UUID actorId, String actorType, String action, String targetResource, String severity,
+                    String entity, String entityId, String prevValue, String newValue, String ipAddress, String userName) {
+        this.actorId = actorId;
+        this.actorType = actorType;
+        this.action = action;
+        this.targetResource = targetResource;
+        this.severity = severity == null ? "INFO" : severity;
+        this.entity = entity;
+        this.entityId = entityId;
+        this.prevValue = prevValue;
+        this.newValue = newValue;
+        this.ipAddress = ipAddress;
+        this.userName = userName;
         this.timestamp = LocalDateTime.now();
     }
 
@@ -111,6 +145,24 @@ public class AuditLog {
 
     public String getSeverity() { return severity; }
     public void setSeverity(String severity) { this.severity = severity; }
+
+    public String getEntity() { return entity; }
+    public void setEntity(String entity) { this.entity = entity; }
+
+    public String getEntityId() { return entityId; }
+    public void setEntityId(String entityId) { this.entityId = entityId; }
+
+    public String getPrevValue() { return prevValue; }
+    public void setPrevValue(String prevValue) { this.prevValue = prevValue; }
+
+    public String getNewValue() { return newValue; }
+    public void setNewValue(String newValue) { this.newValue = newValue; }
+
+    public String getIpAddress() { return ipAddress; }
+    public void setIpAddress(String ipAddress) { this.ipAddress = ipAddress; }
+
+    public String getUserName() { return userName; }
+    public void setUserName(String userName) { this.userName = userName; }
 
     @Override
     public boolean equals(Object o) {

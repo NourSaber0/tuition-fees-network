@@ -11,15 +11,14 @@
 
 The Bank Back-Office Portal contract defines approximately **90+ endpoints** across **11 phases** to back the front-end portal screens.
 
-Currently, **Phases 1 through 8 are 100% complete and verified** (with 211 passing automated unit and integration tests).
+Currently, **Phases 1 through 9 are 100% complete and verified** (with 229 passing automated unit and integration tests).
 
 | Metric | Count | Percentage |
 |---|:---:|:---:|
 | **Total Contract Endpoints** | ~92 | 100% |
-| **Fully Implemented & Matching (Phases 1–8)** | 66 | ~71.7% |
+| **Fully Implemented & Matching (Phases 1–9)** | 71 | ~77.2% |
 | **Excluded by Explicit Business Policy (No Refunds)** | 2 | ~2.2% |
-| **Partially Implemented (Feature branches active)** | 5 | ~5.4% |
-| **Remaining to Implement (Phases 9, 10, 11, 12)** | 19 | ~20.7% |
+| **Remaining to Implement (Phases 10, 11, 12)** | 19 | ~20.7% |
 
 ---
 
@@ -161,15 +160,15 @@ Currently, **Phases 1 through 8 are 100% complete and verified** (with 211 passi
 ---
 
 ### Phase 9 — Audit Logs
-**Source:** `AuditLogs.tsx` | **Roles:** `bank-admin` only | **Total Endpoints:** 5
+**Source:** `AuditLogs.tsx` | **Roles:** `bank-admin` only | **Total Endpoints:** 5 (5 DONE)
 
 | Endpoint | Method | Contract Purpose | Status | Current Code / Notes |
 |---|---|---|:---:|---|
-| `/audit-logs` | `GET` | Search & query audit records | ❌ **NOT DONE** | Entity [`AuditLog.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/audit/domain/AuditLog.java) and [`AuditLogRepository.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/audit/repository/AuditLogRepository.java) exist; written during search, dues view, and upload. No REST controller. |
-| `/audit-logs/{id}` | `GET` | Full audit log detail | ❌ **NOT DONE** | Not implemented. |
-| `/audit-logs/stats` | `GET` | Severity counts (critical, warning, info) | ❌ **NOT DONE** | Not implemented. |
-| `/audit-logs/roles` | `GET` | Distinct roles list for filtering | ❌ **NOT DONE** | Not implemented. |
-| `/audit-logs/export` | `GET` | CSV export of audit trail | ❌ **NOT DONE** | Not implemented. |
+| `/audit-logs` | `GET` | Search & query audit records | ✅ **DONE** | [`AuditLogController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/audit/web/AuditLogController.java#L38-L54). Multi-field search (`search`, `role`, `severity`, `dateFrom`, `dateTo`, `page`, `pageSize`) returning `PageResponse<AuditLogDto>`. |
+| `/audit-logs/{id}` | `GET` | Full audit log detail | ✅ **DONE** | [`AuditLogController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/audit/web/AuditLogController.java#L56-L59). Expanded detail returning 200 or 404. |
+| `/audit-logs/stats` | `GET` | Severity counts (critical, warning, info) | ✅ **DONE** | [`AuditLogController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/audit/web/AuditLogController.java#L61-L69). Returns `{ "total": 15, "critical": 5, "warning": 6, "info": 4 }` with date range filters. |
+| `/audit-logs/roles` | `GET` | Distinct roles list for filtering | ✅ **DONE** | [`AuditLogController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/audit/web/AuditLogController.java#L71-L74). Returns distinct roles for filter dropdown. |
+| `/audit-logs/export` | `GET` | CSV export of audit trail | ✅ **DONE** | [`AuditLogController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/audit/web/AuditLogController.java#L76-L92). Streams UTF-8 CSV attachment (`audit-logs.csv`) matching applied filters. |
 
 ---
 
