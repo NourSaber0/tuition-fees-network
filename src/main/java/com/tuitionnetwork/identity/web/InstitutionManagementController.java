@@ -65,10 +65,12 @@ public class InstitutionManagementController {
             @RequestParam(value = "regStatus", required = false) RegistrationStatus regStatus,
             @RequestParam(value = "accountStatus", required = false) AccountStatus accountStatus,
             @RequestParam(value = "page", defaultValue = "0") int page,
-            @RequestParam(value = "size", defaultValue = "25") int size) {
+            @RequestParam(value = "size", required = false) Integer size,
+            @RequestParam(value = "pageSize", required = false) Integer pageSize) {
 
+        int resolvedSize = pageSize != null ? pageSize : (size != null ? size : 25);
         return ResponseEntity.ok(
-                institutionManagementService.list(search, type, regStatus, accountStatus, page, size));
+                institutionManagementService.list(search, type, regStatus, accountStatus, page, resolvedSize));
     }
 
     @PostMapping

@@ -17,6 +17,11 @@ public record PageResponse<T>(
         long total,
         int totalPages
 ) {
+    @com.fasterxml.jackson.annotation.JsonProperty("pageSize")
+    public int getPageSize() {
+        return size;
+    }
+
     public static <E, T> PageResponse<T> from(Page<E> page, Function<E, T> mapper) {
         return new PageResponse<>(
                 page.getContent().stream().map(mapper).toList(),

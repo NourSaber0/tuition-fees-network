@@ -114,9 +114,11 @@ class InstitutionManagementControllerTest {
         when(service.list(any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(new PageResponse<>(List.of(row), 0, 25, 1, 1));
 
-        mockMvc.perform(get("/api/v1/institutions").param("search", "Cairo"))
+        mockMvc.perform(get("/api/v1/institutions").param("search", "Cairo").param("pageSize", "25"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.pageSize").value(25))
+                .andExpect(jsonPath("$.size").value(25))
                 .andExpect(jsonPath("$.data[0].code").value("SCH-001"));
     }
 
