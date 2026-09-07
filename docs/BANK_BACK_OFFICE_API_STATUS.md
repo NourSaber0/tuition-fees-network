@@ -56,7 +56,7 @@ Currently, the backend codebase implements the **core transaction and settlement
 ---
 
 ### Phase 3 — Institution Management
-**Source:** `Schools.tsx` | **Roles:** `bank-admin`, `bank-operations` | **Total Endpoints:** 14 (13 DONE, 1 Deferred to Phase 5)
+**Source:** `Schools.tsx` | **Roles:** `bank-admin`, `bank-operations` | **Total Endpoints:** 14 (14 DONE)
 
 | Endpoint | Method | Contract Purpose | Status | Current Code / Notes |
 |---|---|---|:---:|---|
@@ -66,7 +66,7 @@ Currently, the backend codebase implements the **core transaction and settlement
 | `/institutions/{id}/students` | `GET` | Student list with fee balances | ✅ **DONE** | [`InstitutionManagementController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/identity/web/InstitutionManagementController.java#L89-L92). Back-office student roster with rolled-up total, paid, and remaining fee balances (US-12). |
 | `/institutions/{id}/integration` | `GET` | Integration status, protocol & sync events (US-13) | ✅ **DONE** | [`InstitutionManagementController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/identity/web/InstitutionManagementController.java#L99-L102). Channel status, protocol, sync frequency, and last sync timestamp. |
 | `/institutions/{id}/fee-submissions` | `GET` | History of fee uploads (US-14) | ✅ **DONE** | [`InstitutionFeeSubmissionsController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/ingestion/web/InstitutionFeeSubmissionsController.java#L38-L41). Full upload history for institution. |
-| `/institutions/{id}/settlements` | `GET` | Settlement history & 2% CIB fee breakdown (US-15) | ⏳ **DEFERRED** | Deferred to Phase 5 Reconciliation / Payout module. |
+| `/institutions/{id}/settlements` | `GET` | Settlement history & 2% CIB fee breakdown (US-15) | ✅ **DONE** | [`InstitutionManagementController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/identity/web/InstitutionManagementController.java#L103-L106). Aggregates settlement cycles, gross/net amounts, 2% CIB fee, and links to Phase 5 reconciliation runs. |
 | `/institutions/{id}/application` | `GET` | Registration review data (US-08) | ✅ **DONE** | [`InstitutionManagementController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/identity/web/InstitutionManagementController.java#L94-L97). Registration review packet with contact, principal, and required documents. |
 | `/institutions/{id}/approve` | `POST` | Approval workflow action (US-09) | ✅ **DONE** | [`InstitutionManagementController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/identity/web/InstitutionManagementController.java#L104-L109). Approves institution and transitions to APPROVED status. |
 | `/institutions/{id}/reject` | `POST` | Rejection with reason & notes (US-10) | ✅ **DONE** | [`InstitutionManagementController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/identity/web/InstitutionManagementController.java#L111-L117). Rejects institution with required reason. |
