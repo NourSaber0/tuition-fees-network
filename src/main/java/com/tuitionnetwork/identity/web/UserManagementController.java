@@ -28,7 +28,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/users")
+@RequestMapping({"/api/v1/users", "/users"})
 @PreAuthorize("hasRole('BACK_OFFICE')")
 public class UserManagementController {
 
@@ -44,9 +44,11 @@ public class UserManagementController {
             @RequestParam(value = "role", required = false) String role,
             @RequestParam(value = "status", required = false) String status,
             @RequestParam(value = "page", defaultValue = "1") int page,
-            @RequestParam(value = "pageSize", defaultValue = "25") int pageSize) {
-        int zeroBasedPage = Math.max(page - 1, 0);
-        return ResponseEntity.ok(userManagementService.listUsers(search, role, status, zeroBasedPage, pageSize));
+            @RequestParam(value = "size", required = false) Integer size,
+            @RequestParam(value = "pageSize", required = false) Integer pageSize) {
+        int zeroBasedPage = page > 0 ? page - 1 : 0;
+        int resolvedSize = pageSize != null ? pageSize : (size != null ? size : 25);
+        return ResponseEntity.ok(userManagementService.listUsers(search, role, status, zeroBasedPage, resolvedSize));
     }
 
     @GetMapping("/summary")

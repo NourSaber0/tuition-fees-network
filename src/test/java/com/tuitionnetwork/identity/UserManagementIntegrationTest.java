@@ -143,4 +143,89 @@ class UserManagementIntegrationTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("user_not_found"));
     }
+
+    @Test
+    void listUsers_directAliasAndPaginationParams() throws Exception {
+        mockMvc().perform(get("/users")
+                        .param("page", "1")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.pageSize").value(10));
+    }
+
+    @Test
+    void listUsers_searchFilterMatching() throws Exception {
+        mockMvc().perform(get("/api/v1/users")
+                        .param("search", "mohamed")
+                        .param("role", "Bank Admin"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data[0].email").value("mohamed.ali@cibeg.com"));
+    }
+
+    @Test
+    void createUser_validations() throws Exception {
+        // Missing name
+        mockMvc().perform(post("/api/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateBankUserRequest("", "valid@cibeg.com", null, "bank-finance", "Finance"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("name_required"));
+
+        // Invalid email
+        mockMvc().perform(post("/api/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateBankUserRequest("Name", "invalid-email", null, "bank-finance", "Finance"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("invalid_email"));
+
+        // Invalid role
+        mockMvc().perform(post("/api/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateBankUserRequest("Name", "test@cibeg.com", null, "super-hacker", "Finance"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("invalid_role"));
+    }
+
+    @Test
+    void updateUser_validations() throws Exception {
+        String email1 = "u1." + UUID.randomUUID() + "@cibeg.com";
+        String email2 = "u2." + UUID.randomUUID() + "@cibeg.com";
+
+        MvcResult r1 = mockMvc().perform(post("/api/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateBankUserRequest("User One", email1, "u1_unique", "bank-finance", "Finance"))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String id1 = objectMapper.readTree(r1.getResponse().getContentAsString()).get("id").asText();
+
+        mockMvc().perform(post("/api/v1/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateBankUserRequest("User Two", email2, "u2_unique", "bank-finance", "Finance"))))
+                .andExpect(status().isCreated());
+
+        // Duplicate username
+        mockMvc().perform(patch("/api/v1/users/{id}", id1)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new UpdateBankUserRequest(null, null, "u2_unique", null, null))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("username_taken"));
+
+        // Invalid email
+        mockMvc().perform(patch("/api/v1/users/{id}", id1)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new UpdateBankUserRequest(null, "invalid-email-no-at", null, null, null))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("invalid_email"));
+    }
+
+    @Test
+    void unauthenticatedAccess_isRejected() throws Exception {
+        MockMvc unauthMockMvc = MockMvcBuilders.webAppContextSetup(context).build();
+        // Without springSecurity or mock user, if spring security is active
+        mockMvc().perform(get("/api/v1/users")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.anonymous()))
+                .andExpect(status().isUnauthorized());
+    }
 }

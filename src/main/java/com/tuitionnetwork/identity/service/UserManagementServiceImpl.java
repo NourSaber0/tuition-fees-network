@@ -48,11 +48,20 @@ public class UserManagementServiceImpl implements UserManagementService {
         Optional<BankRole> roleFilter = role != null && !role.isBlank() ? BankRole.fromString(role) : Optional.empty();
 
         List<BankEmployee> matching = bankEmployeeRepository.findAll().stream()
-                .filter(e -> needle == null || needle.isBlank()
-                        || containsIgnoreCase(e.getName(), needle)
-                        || containsIgnoreCase(e.getEmployeeId(), needle)
-                        || containsIgnoreCase(e.getEmail(), needle)
-                        || containsIgnoreCase(e.getRole(), needle))
+                .filter(e -> {
+                    if (needle == null || needle.isBlank()) {
+                        return true;
+                    }
+                    BankRole employeeRole = BankRole.fromString(e.getRole()).orElse(null);
+                    String roleDisplay = employeeRole != null ? employeeRole.getDisplayName().toLowerCase() : "";
+                    String roleId = employeeRole != null ? employeeRole.getRoleId().toLowerCase() : "";
+                    return containsIgnoreCase(e.getName(), needle)
+                            || containsIgnoreCase(e.getEmployeeId(), needle)
+                            || containsIgnoreCase(e.getEmail(), needle)
+                            || containsIgnoreCase(e.getRole(), needle)
+                            || roleDisplay.contains(needle)
+                            || roleId.contains(needle);
+                })
                 .filter(e -> roleFilter.isEmpty() || roleFilter.get().getRoleId().equalsIgnoreCase(e.getRole()))
                 .filter(e -> status == null || status.isBlank() || status.equalsIgnoreCase(e.getStatus()))
                 .sorted(Comparator.comparing(BankEmployee::getName, Comparator.nullsLast(String::compareToIgnoreCase)))
@@ -120,19 +129,24 @@ public class UserManagementServiceImpl implements UserManagementService {
             throw new AuthException(HttpStatus.CONFLICT, "username_taken", "This username is already in use");
         }
 
+        String department = (request.department() != null && !request.department().isBlank())
+                ? request.department().trim()
+                : role.getDisplayName();
+
         String temporaryPassword = "TEMP-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         BankEmployee employee = new BankEmployee(
                 request.name().trim(),
                 normalizedEmail,
                 username,
                 temporaryPassword,
-                request.department(),
+                department,
                 role.getRoleId()
         );
         employee.setMustChangePassword(true);
         employee = bankEmployeeRepository.save(employee);
 
-        writeAudit(actor, "USER_CREATED", "Created bank user " + employee.getEmail() + " with role " + role.getRoleId());
+        writeAudit(actor, "USER_CREATED", "Created bank user " + employee.getEmail() + " with role " + role.getRoleId(),
+                "INFO", "User", employee.getId().toString(), null, employee.getEmail());
 
         return toSummary(employee);
     }
@@ -141,8 +155,14 @@ public class UserManagementServiceImpl implements UserManagementService {
     @Transactional
     public BankUserSummaryDto updateUser(UUID id, UpdateBankUserRequest request, SecurityUserPrincipal actor) {
         BankEmployee employee = findOrThrow(id);
+        String prevEmail = employee.getEmail();
+        String prevRole = employee.getRole();
+        String prevDept = employee.getDepartment();
 
         if (request.email() != null && !request.email().isBlank()) {
+            if (!request.email().contains("@")) {
+                throw new AuthException(HttpStatus.BAD_REQUEST, "invalid_email", "A valid email address is required");
+            }
             String normalizedEmail = request.email().trim().toLowerCase();
             if (!normalizedEmail.equalsIgnoreCase(employee.getEmail())) {
                 bankEmployeeRepository.findByEmail(normalizedEmail).ifPresent(existing -> {
@@ -173,7 +193,10 @@ public class UserManagementServiceImpl implements UserManagementService {
         }
 
         employee = bankEmployeeRepository.save(employee);
-        writeAudit(actor, "USER_UPDATED", "Updated bank user " + employee.getEmail());
+        String prevSummary = "email=" + prevEmail + ", role=" + prevRole + ", dept=" + prevDept;
+        String newSummary = "email=" + employee.getEmail() + ", role=" + employee.getRole() + ", dept=" + employee.getDepartment();
+        writeAudit(actor, "USER_UPDATED", "Updated bank user " + employee.getEmail(),
+                "INFO", "User", employee.getId().toString(), prevSummary, newSummary);
 
         return toSummary(employee);
     }
@@ -182,9 +205,11 @@ public class UserManagementServiceImpl implements UserManagementService {
     @Transactional
     public UserStatusResponse deactivateUser(UUID id, SecurityUserPrincipal actor) {
         BankEmployee employee = findOrThrow(id);
+        String prevStatus = employee.getStatus();
         employee.setStatus("Inactive");
         bankEmployeeRepository.save(employee);
-        writeAudit(actor, "USER_DEACTIVATED", "Deactivated bank user " + employee.getEmail());
+        writeAudit(actor, "USER_DEACTIVATED", "Deactivated bank user " + employee.getEmail(),
+                "WARNING", "User", employee.getId().toString(), prevStatus, "Inactive");
         return new UserStatusResponse("Inactive");
     }
 
@@ -192,9 +217,11 @@ public class UserManagementServiceImpl implements UserManagementService {
     @Transactional
     public UserStatusResponse activateUser(UUID id, SecurityUserPrincipal actor) {
         BankEmployee employee = findOrThrow(id);
+        String prevStatus = employee.getStatus();
         employee.setStatus("Active");
         bankEmployeeRepository.save(employee);
-        writeAudit(actor, "USER_ACTIVATED", "Activated bank user " + employee.getEmail());
+        writeAudit(actor, "USER_ACTIVATED", "Activated bank user " + employee.getEmail(),
+                "INFO", "User", employee.getId().toString(), prevStatus, "Active");
         return new UserStatusResponse("Active");
     }
 
@@ -203,7 +230,8 @@ public class UserManagementServiceImpl implements UserManagementService {
     public MessageResponse triggerPasswordReset(UUID id, SecurityUserPrincipal actor) {
         BankEmployee employee = findOrThrow(id);
         bankAuthService.forgotPassword(new ForgotPasswordRequest(employee.getEmail()));
-        writeAudit(actor, "USER_PASSWORD_RESET_TRIGGERED", "Triggered password reset for " + employee.getEmail());
+        writeAudit(actor, "USER_PASSWORD_RESET_TRIGGERED", "AUD-012: Password reset email sent to " + employee.getEmail(),
+                "WARNING", "User", employee.getId().toString(), null, employee.getEmail());
         return new MessageResponse("Password reset email sent");
     }
 
@@ -212,12 +240,15 @@ public class UserManagementServiceImpl implements UserManagementService {
                 .orElseThrow(() -> new AuthException(HttpStatus.NOT_FOUND, "user_not_found", "Bank user not found"));
     }
 
-    private void writeAudit(SecurityUserPrincipal actor, String action, String targetResource) {
+    private void writeAudit(SecurityUserPrincipal actor, String action, String targetResource,
+                            String severity, String entity, String entityId, String prevValue, String newValue) {
         if (auditLogRepository == null) {
             return;
         }
         UUID actorId = actor != null ? actor.userId() : null;
-        auditLogRepository.save(new AuditLog(actorId, "BANK_EMPLOYEE", action, targetResource));
+        String actorName = actor != null ? actor.getUsername() : "system";
+        auditLogRepository.save(new AuditLog(actorId, "BANK_EMPLOYEE", action, targetResource,
+                severity, entity, entityId, prevValue, newValue, null, actorName));
     }
 
     private String generateUsername(String name) {

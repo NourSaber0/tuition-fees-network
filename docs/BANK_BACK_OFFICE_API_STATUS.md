@@ -11,14 +11,14 @@
 
 The Bank Back-Office Portal contract defines approximately **90+ endpoints** across **11 phases** to back the front-end portal screens.
 
-Currently, **Phases 1 through 9 are 100% complete and verified** (with 229 passing automated unit and integration tests).
+Currently, **Phases 1 through 10 are 100% complete and verified** (with 250 passing automated unit and integration tests).
 
 | Metric | Count | Percentage |
 |---|:---:|:---:|
 | **Total Contract Endpoints** | ~92 | 100% |
-| **Fully Implemented & Matching (Phases 1–9)** | 71 | ~77.2% |
+| **Fully Implemented & Matching (Phases 1–10)** | 81 | ~88.0% |
 | **Excluded by Explicit Business Policy (No Refunds)** | 2 | ~2.2% |
-| **Remaining to Implement (Phases 10, 11, 12)** | 19 | ~20.7% |
+| **Remaining to Implement (Phases 11, 12)** | 9 | ~9.8% |
 
 ---
 
@@ -173,20 +173,20 @@ Currently, **Phases 1 through 9 are 100% complete and verified** (with 229 passi
 ---
 
 ### Phase 10 — Users & Roles
-**Source:** `Users.tsx` | **Roles:** `bank-admin` only | **Total Endpoints:** 10
+**Source:** `Users.tsx` | **Roles:** `bank-admin` only | **Total Endpoints:** 10 (100% DONE)
 
 | Endpoint | Method | Contract Purpose | Status | Current Code / Notes |
 |---|---|---|:---:|---|
-| `/users` | `GET` | Bank user list with filters | ❌ **NOT DONE** | [`BankEmployee.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/identity/domain/BankEmployee.java) and [`BankEmployeeRepository.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/identity/repository/BankEmployeeRepository.java) exist; no REST controller. |
-| `/users/summary` | `GET` | Active counts by role | ❌ **NOT DONE** | Not implemented. |
-| `/users` | `POST` | Create bank employee | ❌ **NOT DONE** | Not implemented. |
-| `/users/{id}` | `GET` | Employee details | ❌ **NOT DONE** | Not implemented. |
-| `/users/{id}` | `PATCH` | Update employee | ❌ **NOT DONE** | Not implemented. |
-| `/users/{id}/deactivate`| `POST` | Deactivate account | ❌ **NOT DONE** | Not implemented. |
-| `/users/{id}/activate` | `POST` | Reactivate account | ❌ **NOT DONE** | Not implemented. |
-| `/users/{id}/reset-password` | `POST` | Trigger reset email | ❌ **NOT DONE** | Not implemented. |
-| `/roles` | `GET` | Roles matrix | ❌ **NOT DONE** | Not implemented. |
-| `/roles/{role}/permissions` | `GET` | Role permissions | ❌ **NOT DONE** | Not implemented. |
+| `/users` | `GET` | Bank user list with filters | ✅ **DONE** | [`UserManagementController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/identity/web/UserManagementController.java#L41-L51). Paginated bank user list matching name, username, email, role, with role/status filters. |
+| `/users/summary` | `GET` | Active counts by role | ✅ **DONE** | [`UserManagementController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/identity/web/UserManagementController.java#L53-L56). Returns active employee counts per role: `Bank Admin`, `Operations`, `Finance`, `Reconciliation`. |
+| `/users` | `POST` | Create bank employee | ✅ **DONE** | [`UserManagementController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/identity/web/UserManagementController.java#L63-L67). Creates user, auto-generates username if blank, default department fallback, enforces 409 email_exists, 409 username_taken, 400 invalid_email, logs Phase 9 audit. |
+| `/users/{id}` | `GET` | Employee details | ✅ **DONE** | [`UserManagementController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/identity/web/UserManagementController.java#L58-L61). Returns `BankUserSummaryDto` detail (or 404 user_not_found). |
+| `/users/{id}` | `PATCH` | Update employee | ✅ **DONE** | [`UserManagementController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/identity/web/UserManagementController.java#L69-L73). Updates user attributes, enforces 409 duplicate checks and 400 email validation, logs Phase 9 audit. |
+| `/users/{id}/deactivate`| `POST` | Deactivate account | ✅ **DONE** | [`UserManagementController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/identity/web/UserManagementController.java#L75-L79). Returns `{ status: "Inactive" }`, immediate access loss, WARNING audit retained. |
+| `/users/{id}/activate` | `POST` | Reactivate account | ✅ **DONE** | [`UserManagementController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/identity/web/UserManagementController.java#L81-L85). Returns `{ status: "Active" }`, INFO audit. |
+| `/users/{id}/reset-password` | `POST` | Trigger reset email | ✅ **DONE** | [`UserManagementController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/identity/web/UserManagementController.java#L87-L91). Issues reset token via `BankAuthService.forgotPassword`, returns `{ "message": "Password reset email sent" }`, AUD-012 audit log. |
+| `/roles` | `GET` | Roles matrix | ✅ **DONE** | [`RoleController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/identity/web/RoleController.java#L26-L29). Returns role permissions matrix for all 4 roles. |
+| `/roles/{role}/permissions` | `GET` | Role permissions | ✅ **DONE** | [`RoleController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/identity/web/RoleController.java#L31-L34). Returns permissions list for specified role. |
 
 ---
 

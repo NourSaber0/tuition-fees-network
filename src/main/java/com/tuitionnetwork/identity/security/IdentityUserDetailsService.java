@@ -52,6 +52,9 @@ public class IdentityUserDetailsService implements UserDetailsService {
         Optional<BankEmployee> bankEmployee = bankEmployeeRepository.findByEmail(cleanEmail);
         if (bankEmployee.isPresent()) {
             BankEmployee emp = bankEmployee.get();
+            if ("Inactive".equalsIgnoreCase(emp.getStatus()) || emp.isAccountLocked()) {
+                return Optional.empty();
+            }
             return Optional.of(new SecurityUserPrincipal(
                     emp.getId(),
                     emp.getEmail(),
@@ -102,6 +105,9 @@ public class IdentityUserDetailsService implements UserDetailsService {
         Optional<BankEmployee> bankEmployee = bankEmployeeRepository.findById(userId);
         if (bankEmployee.isPresent()) {
             BankEmployee emp = bankEmployee.get();
+            if ("Inactive".equalsIgnoreCase(emp.getStatus()) || emp.isAccountLocked()) {
+                return Optional.empty();
+            }
             return Optional.of(new SecurityUserPrincipal(
                     emp.getId(),
                     emp.getEmail(),
