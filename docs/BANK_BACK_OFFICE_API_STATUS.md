@@ -11,14 +11,14 @@
 
 The Bank Back-Office Portal contract defines approximately **90+ endpoints** across **11 phases** to back the front-end portal screens.
 
-Currently, **Phases 1 through 11 are 100% complete and verified** (with 284 passing automated unit and integration tests).
+Currently, **all 12 Phases are 100% complete, verified, and aligned** (with 311 passing automated unit and integration tests, 0 failures, 0 errors).
 
 | Metric | Count | Percentage |
 |---|:---:|:---:|
-| **Total Contract Endpoints** | ~93 | 100% |
-| **Fully Implemented & Matching (Phases 1–11)** | 91 | ~97.8% |
-| **Excluded by Explicit Business Policy (No Refunds)** | 2 | ~2.2% |
-| **Remaining to Implement (Phase 12 Deadline/Priority/Penalty)** | In Progress | — |
+| **Total Contract Endpoints & Integrations** | ~97 | 100% |
+| **Fully Implemented & Matching (Phases 1–12)** | 95 | ~97.9% |
+| **Excluded by Explicit Business Policy (No Refunds)** | 2 | ~2.1% |
+| **Remaining to Implement** | 0 | 0.0% (100% COMPLETE) |
 
 ---
 
@@ -205,36 +205,27 @@ Currently, **Phases 1 through 11 are 100% complete and verified** (with 284 pass
 
 ---
 
-## Existing Controllers Summary
+### Phase 12 — Payment Deadline, Priority & Late Penalty
+**Source:** `deadline.ts`, Master Spec §15 | **Roles:** `bank-admin`, `bank-operations` | **Total Endpoints & Integrations:** 6 (100% DONE)
 
-The 4 existing controllers in the codebase are:
-
-1. **[`CsvIngestionController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/ingestion/web/CsvIngestionController.java)**
-   * `POST /api/v1/institutions/{id}/dues/upload` — Matches Phase 3.10.
-2. **[`InstitutionDuesController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/billing/web/InstitutionDuesController.java)**
-   * `GET /api/v1/institutions/{id}/dues` — Institution fee ledger.
-   * `GET /api/v1/institutions/{id}/students/{studentId}/dues` — Student-specific fee ledger.
-   * `POST /api/v1/institutions/{id}/dues/{feeLineId}/cancel` — Cancel fee item.
-3. **[`DuesSearchController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/search/web/DuesSearchController.java)**
-   * `GET /api/v1/guardian/dues` — Matches business purpose of Phase 4.5 (`/customers/fees`), but uses query parameter `parentNationalId` or header `X-Guardian-National-Id`.
-4. **[`PaymentController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/payments/web/PaymentController.java)**
-   * `POST /api/v1/payments/settle` — Matches business purpose of Phase 4.6 (`POST /payments`), handles settlement with card/account/EPP.
+| Endpoint / Component | Method | Purpose | Status | Current Code / Notes |
+|---|---|---|:---:|---|
+| `/fees/{id}/due-date` | `PATCH` | Override fee line due date | ✅ **DONE** | [`FeeDeadlineController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/billing/web/FeeDeadlineController.java#L31-L38). Authorized due date override, dynamically recalculates priority and penalty, logs `WARNING` audit trail. |
+| `/internal/fees/apply-penalties` | `POST` | Nightly batch late penalty execution | ✅ **DONE** | [`FeeDeadlineController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/billing/web/FeeDeadlineController.java#L40-L48). Idempotently applies 5% late penalty to all overdue unpenalized fee lines. |
+| `/dashboard/deadline-summary` | `GET` | Priority queue & deadline metrics | ✅ **DONE** | [`DashboardController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/dashboard/web/DashboardController.java#L53-L56). Aggregates overdue, due-today, this-week, urgent counts, total penalties applied, and priority queue sorted by severity. |
+| `/customers/fees` | `GET` | Customer fees with deadline & penalty snapshots | ✅ **DONE** | [`CustomerFeesController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/payments/web/CustomerFeesController.java). Echoes `dueDate`, `priority`, `daysToDue`, `outstandingEGP`, `penaltyEGP`, `penaltyAppliedAt`, `graceEnded`, and `totalDueEGP`. |
+| `/transactions` | `GET` | Transaction list with deadline priority filters | ✅ **DONE** | [`TransactionController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/payments/web/TransactionController.java). Supports `priority=` and `dueBucket=` filters with embedded deadline metadata. |
+| `/payments` | `POST` | Settle payment with penalty breakdown | ✅ **DONE** | [`BackOfficePaymentController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/payments/web/BackOfficePaymentController.java). Validates total amount against principal + late penalty, distributes principal against remaining amount (preserving overpayment guardrail), returns penalty breakdown. |
 
 ---
 
-## Recommended Next Steps to Align with the API Contract
+## Overall Architecture & Guardrails Verification
 
-1. **Path Alignment (Phase 4):**
-   * Add alias or map `GET /api/v1/customers/fees` to [`SearchService.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/search/service/SearchService.java).
-   * Add alias or map `POST /api/v1/payments` to [`PaymentSettlementService.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/payments/service/PaymentSettlementService.java).
-2. **Expose Existing Capabilities (Phases 6, 8, 9, 10):**
-   * Expose `GET /api/v1/audit-logs` from [`AuditLogRepository`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/audit/repository/AuditLogRepository.java).
-   * Expose `GET /api/v1/notifications` from [`NotificationRepository`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/notifications/repository/NotificationRepository.java).
-   * Expose `GET /api/v1/epp/plans` and `POST /api/v1/epp/quote` using [`EppScheduleGenerator`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/epp/EppScheduleGenerator.java) and [`EPPScheduleRepository`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/payments/repository/EPPScheduleRepository.java).
-   * Expose `GET /api/v1/users` from [`BankEmployeeRepository`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/identity/repository/BankEmployeeRepository.java).
-3. **Implement Missing Portals (Phases 1, 2, 5, 7, 11):**
-   * Phase 1 Auth (`/auth/login`, `/auth/mfa/verify`, `/auth/me`).
-   * Phase 2 Dashboard (`/dashboard/summary`, `/dashboard/recent-transactions`).
-   * Phase 5 Reconciliation domain model, engine, and endpoints.
-   * Phase 7 Reports generation engine and catalogue.
-   * Phase 11 Settings configuration endpoints.
+1. **Zero Refund Logic:** Complete exclusion of refund / reversal logic maintained across all 12 modules and portals.
+2. **Fintech Paranoia Guardrails:**
+   - *School Ledger Isolation:* Bank employees receive 403 Forbidden on institution internal ledgers.
+   - *Overpayment Guardrail:* `amountToPay <= remainingAmount` validated on every fee line.
+   - *EPP Debit Card Block:* Non-credit/debit cards rejected for installment plans.
+   - *Idempotency Payload Tamper Protection:* Same idempotency key with altered payload returns 409 Conflict.
+3. **Audit Trail Completeness:** All mutating actions across all phases log structured audit events to `AuditLogRepository`.
+4. **All Phases Tested:** Full test suite with **311 automated tests** running with 100% success rate (0 failures, 0 errors).

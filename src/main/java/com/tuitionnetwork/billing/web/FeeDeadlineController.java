@@ -28,7 +28,7 @@ public class FeeDeadlineController {
         this.feeDeadlineService = feeDeadlineService;
     }
 
-    @PatchMapping("/api/v1/fees/{id}/due-date")
+    @PatchMapping({"/api/v1/fees/{id}/due-date", "/fees/{id}/due-date"})
     public ResponseEntity<FeeDeadlineDto> updateDueDate(@PathVariable("id") UUID id,
                                                           @RequestBody UpdateDueDateRequest request,
                                                           @AuthenticationPrincipal SecurityUserPrincipal principal) {
@@ -42,7 +42,7 @@ public class FeeDeadlineController {
      * over HTTP behind the same back-office auth as everything else; production hardening should
      * restrict this to an internal service account or the scheduler's own network, not a browser role.
      */
-    @PostMapping("/api/v1/internal/fees/apply-penalties")
+    @PostMapping({"/api/v1/internal/fees/apply-penalties", "/internal/fees/apply-penalties"})
     public ResponseEntity<ApplyPenaltiesResult> applyPenalties() {
         return ResponseEntity.ok(feeDeadlineService.applyOverduePenalties());
     }

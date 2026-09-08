@@ -100,12 +100,24 @@ public class FeeDeadlineService {
         feeLineRepository.save(feeLine);
 
         if (auditLogRepository != null) {
+            String actorName = "system";
+            var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null) {
+                actorName = auth.getName();
+            }
             auditLogRepository.save(new AuditLog(
                     actorId,
                     "BACK_OFFICE",
                     "FEE_DUE_DATE_CHANGED",
                     "FeeLine " + feeLineId + " due date changed from " + previousDueDate + " to " + newDueDate
-                            + (reason != null && !reason.isBlank() ? " (" + reason + ")" : "")
+                            + (reason != null && !reason.isBlank() ? " (" + reason + ")" : ""),
+                    "WARNING",
+                    "FeeLine",
+                    feeLineId.toString(),
+                    String.valueOf(previousDueDate),
+                    String.valueOf(newDueDate),
+                    null,
+                    actorName
             ));
         }
 
@@ -129,6 +141,22 @@ public class FeeDeadlineService {
                 totalApplied = totalApplied.add(penalty);
                 processed++;
             }
+        }
+
+        if (auditLogRepository != null && processed > 0) {
+            auditLogRepository.save(new AuditLog(
+                    null,
+                    "SYSTEM",
+                    "BATCH_PENALTIES_APPLIED",
+                    "Applied late penalties to " + processed + " fee lines totaling " + totalApplied + " EGP",
+                    "INFO",
+                    "FeeLine",
+                    "batch",
+                    null,
+                    totalApplied.toPlainString(),
+                    null,
+                    "system"
+            ));
         }
 
         return new ApplyPenaltiesResult(processed, totalApplied);
