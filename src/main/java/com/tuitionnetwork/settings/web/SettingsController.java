@@ -38,7 +38,7 @@ import java.util.UUID;
  * (same as dashboard / reports / institutions). Finer gating is a follow-up.
  */
 @RestController
-@RequestMapping("/api/v1/settings")
+@RequestMapping({"/api/v1/settings", "/settings"})
 @PreAuthorize("hasRole('BACK_OFFICE')")
 public class SettingsController {
 

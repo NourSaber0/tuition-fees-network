@@ -82,7 +82,7 @@ public class SettingsServiceImpl implements SettingsService {
         });
         FeeTypeSetting saved = feeTypeSettingRepository.save(new FeeTypeSetting(
                 request.name().trim(), code, request.taxableOrDefault(), request.activeOrDefault()));
-        audit("CREATE_FEE_TYPE", "FeeType " + code + " (" + saved.getName() + ")");
+        audit("CREATE_FEE_TYPE", "FeeType " + code + " (" + saved.getName() + ")", "INFO", "FeeType", code, null, saved.getName());
         return FeeTypeSettingDto.from(saved);
     }
 
@@ -92,6 +92,8 @@ public class SettingsServiceImpl implements SettingsService {
         FeeTypeSetting feeType = feeTypeSettingRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Fee type not found: " + id));
+
+        String prevSummary = "name=" + feeType.getName() + ", code=" + feeType.getCode() + ", active=" + feeType.isActive() + ", taxable=" + feeType.isTaxable();
 
         if (request.name() != null && !request.name().isBlank()) {
             feeType.setName(request.name().trim());
@@ -114,7 +116,8 @@ public class SettingsServiceImpl implements SettingsService {
         }
 
         FeeTypeSetting saved = feeTypeSettingRepository.save(feeType);
-        audit("UPDATE_FEE_TYPE", "FeeType " + saved.getCode() + " (active=" + saved.isActive() + ")");
+        String newSummary = "name=" + saved.getName() + ", code=" + saved.getCode() + ", active=" + saved.isActive() + ", taxable=" + saved.isTaxable();
+        audit("UPDATE_FEE_TYPE", "FeeType " + saved.getCode() + " (active=" + saved.isActive() + ")", "WARNING", "FeeType", saved.getCode(), prevSummary, newSummary);
         return FeeTypeSettingDto.from(saved);
     }
 
@@ -137,8 +140,10 @@ public class SettingsServiceImpl implements SettingsService {
     @Transactional
     public EppSettingsDto updateEpp(EppSettingsDto settings) {
         validateEpp(settings);
+        String prevJson = systemSettingRepository.findBySettingKey(KEY_EPP).map(SystemSetting::getSettingValue).orElse(null);
         writeSetting(KEY_EPP, settings);
-        audit("UPDATE_EPP_SETTINGS", "EPP configuration updated");
+        String newJson = serializeSafely(settings);
+        audit("UPDATE_EPP_SETTINGS", "EPP configuration updated", "CRITICAL", "Settings", KEY_EPP, prevJson, newJson);
         return settings;
     }
 
@@ -157,8 +162,10 @@ public class SettingsServiceImpl implements SettingsService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Both 'events' and 'channels' are required.");
         }
+        String prevJson = systemSettingRepository.findBySettingKey(KEY_NOTIFICATIONS).map(SystemSetting::getSettingValue).orElse(null);
         writeSetting(KEY_NOTIFICATIONS, settings);
-        audit("UPDATE_NOTIFICATION_SETTINGS", "Notification configuration updated");
+        String newJson = serializeSafely(settings);
+        audit("UPDATE_NOTIFICATION_SETTINGS", "Notification configuration updated", "CRITICAL", "Settings", KEY_NOTIFICATIONS, prevJson, newJson);
         return settings;
     }
 
@@ -188,8 +195,10 @@ public class SettingsServiceImpl implements SettingsService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "At least one upload format must be allowed.");
         }
+        String prevJson = systemSettingRepository.findBySettingKey(KEY_INSTITUTIONS).map(SystemSetting::getSettingValue).orElse(null);
         writeSetting(KEY_INSTITUTIONS, settings);
-        audit("UPDATE_INSTITUTION_SETTINGS", "Institution onboarding configuration updated");
+        String newJson = serializeSafely(settings);
+        audit("UPDATE_INSTITUTION_SETTINGS", "Institution onboarding configuration updated", "CRITICAL", "Settings", KEY_INSTITUTIONS, prevJson, newJson);
         return settings;
     }
 
@@ -253,9 +262,28 @@ public class SettingsServiceImpl implements SettingsService {
         systemSettingRepository.save(row);
     }
 
-    private void audit(String action, String target) {
+    private String serializeSafely(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (Exception e) {
+            return String.valueOf(value);
+        }
+    }
+
+    private void audit(String action, String target, String severity, String entity, String entityId, String prevValue, String newValue) {
         if (auditLogRepository != null) {
-            auditLogRepository.save(new AuditLog(null, ACTOR_TYPE, action, target));
+            UUID actorId = null;
+            String actorName = "system";
+            var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null) {
+                actorName = auth.getName();
+                if (auth.getPrincipal() instanceof com.tuitionnetwork.identity.security.SecurityUserPrincipal p) {
+                    actorId = p.userId();
+                }
+            }
+            auditLogRepository.save(new AuditLog(actorId, ACTOR_TYPE, action, target,
+                    severity != null ? severity : "INFO",
+                    entity, entityId, prevValue, newValue, null, actorName));
         }
     }
 

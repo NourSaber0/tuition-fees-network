@@ -212,6 +212,17 @@ class SettingsControllerTest {
     }
 
     @Test
+    @WithMockUser(username = "ops@cibeg.com", roles = {"BACK_OFFICE"})
+    void getFeeTypes_directPathAlias_returns200() throws Exception {
+        when(settingsService.getFeeTypes()).thenReturn(List.of(
+                new FeeTypeSettingDto(UUID.randomUUID(), "Tuition Fee", "TUITION", false, true)));
+
+        mockMvc.perform(get("/settings/fee-types"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].code").value("TUITION"));
+    }
+
+    @Test
     void unauthenticated_isUnauthorized() throws Exception {
         mockMvc.perform(get("/api/v1/settings/fee-types")).andExpect(status().isUnauthorized());
     }

@@ -11,14 +11,14 @@
 
 The Bank Back-Office Portal contract defines approximately **90+ endpoints** across **11 phases** to back the front-end portal screens.
 
-Currently, **Phases 1 through 10 are 100% complete and verified** (with 250 passing automated unit and integration tests).
+Currently, **Phases 1 through 11 are 100% complete and verified** (with 284 passing automated unit and integration tests).
 
 | Metric | Count | Percentage |
 |---|:---:|:---:|
-| **Total Contract Endpoints** | ~92 | 100% |
-| **Fully Implemented & Matching (Phases 1–10)** | 81 | ~88.0% |
+| **Total Contract Endpoints** | ~93 | 100% |
+| **Fully Implemented & Matching (Phases 1–11)** | 91 | ~97.8% |
 | **Excluded by Explicit Business Policy (No Refunds)** | 2 | ~2.2% |
-| **Remaining to Implement (Phases 11, 12)** | 9 | ~9.8% |
+| **Remaining to Implement (Phase 12 Deadline/Priority/Penalty)** | In Progress | — |
 
 ---
 
@@ -191,15 +191,17 @@ Currently, **Phases 1 through 10 are 100% complete and verified** (with 250 pass
 ---
 
 ### Phase 11 — System Settings
-**Source:** `Settings.tsx` | **Roles:** `bank-admin` only | **Total Endpoints:** 10
+**Source:** `Settings.tsx` | **Roles:** `bank-admin` only | **Total Endpoints:** 10 (100% DONE)
 
 | Endpoint | Method | Contract Purpose | Status | Current Code / Notes |
 |---|---|---|:---:|---|
-| `/settings/fee-types` | `GET`, `POST`, `PATCH` | Configurable fee categories | ❌ **NOT DONE** | Fee types are currently hardcoded in [`FeeType.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/billing/domain/FeeType.java). |
-| `/settings/payment-statuses`| `GET` | Reference payment statuses | ❌ **NOT DONE** | Static enum [`PaymentStatus.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/payments/domain/PaymentStatus.java). |
-| `/settings/epp` | `GET`, `PUT` | EPP tenors, interest rates, caps | ❌ **NOT DONE** | Hardcoded in `EppScheduleGenerator` (10%, 12%, 14%, 16%). |
-| `/settings/notifications` | `GET`, `PUT` | Event & channel toggles | ❌ **NOT DONE** | Not implemented. |
-| `/settings/institutions` | `GET`, `PUT` | Dual approval & upload limits | ❌ **NOT DONE** | Not implemented. |
+| `/settings/fee-types` | `GET` | Configurable fee categories list | ✅ **DONE** | [`SettingsController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/settings/web/SettingsController.java#L53-L56). Returns list of fee types `[ { id, name, code, taxable, active } ]`. Seeds standard fee types lazily. |
+| `/settings/fee-types` | `POST` | Add configurable fee type | ✅ **DONE** | [`SettingsController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/settings/web/SettingsController.java#L58-L61). Creates fee type, rejects duplicate code (409 Conflict), logs audit trail. |
+| `/settings/fee-types/{id}` | `PATCH` | Update fee type attributes | ✅ **DONE** | [`SettingsController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/settings/web/SettingsController.java#L63-L67). Updates fee type name, code, taxable, active; rejects collisions (409), logs audit trail. |
+| `/settings/payment-statuses` | `GET` | Reference payment statuses | ✅ **DONE** | [`SettingsController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/settings/web/SettingsController.java#L71-L74). Read-only reference data of 6 payment statuses with description and `terminal` boolean flag. |
+| `/settings/epp` | `GET`, `PUT` | EPP tenors, interest rates, caps | ✅ **DONE** | [`SettingsController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/settings/web/SettingsController.java#L78-L86). Manages EPP config (tenors, rates, admin fee, limits). Every PUT writes a **CRITICAL** audit entry. |
+| `/settings/notifications` | `GET`, `PUT` | Event & channel toggles | ✅ **DONE** | [`SettingsController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/settings/web/SettingsController.java#L90-L98). Manages notification triggers and delivery channels. Every PUT writes a **CRITICAL** audit entry. |
+| `/settings/institutions` | `GET`, `PUT` | Dual approval & upload limits | ✅ **DONE** | [`SettingsController.java`](file:///Users/nourahmed/downloads/demo/src/main/java/com/tuitionnetwork/settings/web/SettingsController.java#L102-L111). Manages institution onboarding gates and upload format limits. Every PUT writes a **CRITICAL** audit entry. |
 
 ---
 

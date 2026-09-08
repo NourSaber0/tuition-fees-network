@@ -215,7 +215,9 @@ class SettingsServiceImplTest {
     void updateEpp_valid_persistsAndAudits() {
         service.updateEpp(EppSettingsDto.defaults());
         verify(systemSettingRepository).save(any(SystemSetting.class));
-        verify(auditLogRepository).save(any(AuditLog.class));
+        org.mockito.ArgumentCaptor<AuditLog> captor = org.mockito.ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(captor.capture());
+        assertEquals("CRITICAL", captor.getValue().getSeverity());
     }
 
     // ── Notification / institution settings ─────────────────────────────────
@@ -232,6 +234,14 @@ class SettingsServiceImplTest {
     void updateNotifications_nullSection_badRequest() {
         NotificationSettingsDto bad = new NotificationSettingsDto(null, null);
         assertThrows(ResponseStatusException.class, () -> service.updateNotifications(bad));
+    }
+
+    @Test
+    void updateNotifications_valid_persistsAndAuditsCritical() {
+        service.updateNotifications(NotificationSettingsDto.defaults());
+        org.mockito.ArgumentCaptor<AuditLog> captor = org.mockito.ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(captor.capture());
+        assertEquals("CRITICAL", captor.getValue().getSeverity());
     }
 
     @Test
@@ -254,7 +264,9 @@ class SettingsServiceImplTest {
     void updateInstitutionSettings_valid_persistsAndAudits() {
         service.updateInstitutionSettings(InstitutionSettingsDto.defaults());
         verify(systemSettingRepository).save(any(SystemSetting.class));
-        verify(auditLogRepository).save(any(AuditLog.class));
+        org.mockito.ArgumentCaptor<AuditLog> captor = org.mockito.ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogRepository).save(captor.capture());
+        assertEquals("CRITICAL", captor.getValue().getSeverity());
     }
 
     private EppSettingsDto withDefaultsBut(java.util.function.Function<EppSettingsDto, EppSettingsDto> fn) {

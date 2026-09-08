@@ -28,7 +28,7 @@ public record EppSettingsDto(
         tenors.put(18, true);
 
         Map<Integer, Integer> rates = new LinkedHashMap<>();
-        rates.put(3, 0);
+        rates.put(3, 10);
         rates.put(6, 12);
         rates.put(12, 14);
         rates.put(18, 16);
