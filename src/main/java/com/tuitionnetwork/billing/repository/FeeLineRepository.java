@@ -6,6 +6,7 @@ import com.tuitionnetwork.billing.domain.FeeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -27,4 +28,6 @@ public interface FeeLineRepository extends JpaRepository<FeeLine, UUID> {
             UUID institutionId, UUID studentId, FeeType feeType, String collectionPeriod);
 
     Optional<FeeLine> findByRowIdempotencyKey(String rowIdempotencyKey);
+
+    List<FeeLine> findByRemainingAmountGreaterThanAndStatusNot(BigDecimal amount, FeeStatus status);
 }
