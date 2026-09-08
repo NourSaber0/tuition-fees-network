@@ -11,4 +11,10 @@ import java.util.UUID;
 public interface AuditLogRepository extends JpaRepository<AuditLog, UUID> {
     List<AuditLog> findByActorId(UUID actorId);
     List<AuditLog> findByAction(String action);
+
+    // Spring Data JPA derived query for actorType
+    List<AuditLog> findByActorType(String actorType);
+
+    // find within timestamp range
+    List<AuditLog> findByTimestampBetween(java.time.LocalDateTime from, java.time.LocalDateTime to);
 }
