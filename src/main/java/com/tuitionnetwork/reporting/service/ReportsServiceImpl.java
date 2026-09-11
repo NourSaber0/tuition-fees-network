@@ -3,6 +3,7 @@ package com.tuitionnetwork.reporting.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tuitionnetwork.billing.domain.FeeLine;
 import com.tuitionnetwork.billing.domain.FeeStatus;
+import com.tuitionnetwork.billing.domain.FeeType;
 import com.tuitionnetwork.billing.repository.FeeLineRepository;
 import com.tuitionnetwork.common.dto.PageResponse;
 import com.tuitionnetwork.common.util.CsvWriter;
@@ -50,8 +51,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import com.tuitionnetwork.reconciliation.domain.ReconciliationRun;
+import com.tuitionnetwork.reconciliation.repository.ReconciliationRunRepository;
 
 @Service
 public class ReportsServiceImpl implements ReportsService {
@@ -67,6 +72,7 @@ public class ReportsServiceImpl implements ReportsService {
     private final StudentRepository studentRepository;
     private final ObjectMapper objectMapper;
     private final AuditLogRepository auditLogRepository;
+    private final ReconciliationRunRepository reconciliationRunRepository;
 
     @Autowired
     public ReportsServiceImpl(GeneratedReportRepository generatedReportRepository,
@@ -76,7 +82,8 @@ public class ReportsServiceImpl implements ReportsService {
                               InstitutionRepository institutionRepository,
                               StudentRepository studentRepository,
                               ObjectMapper objectMapper,
-                              @Autowired(required = false) AuditLogRepository auditLogRepository) {
+                              @Autowired(required = false) AuditLogRepository auditLogRepository,
+                              @Autowired(required = false) ReconciliationRunRepository reconciliationRunRepository) {
         this.generatedReportRepository = generatedReportRepository;
         this.paymentRepository = paymentRepository;
         this.feeLineRepository = feeLineRepository;
@@ -85,6 +92,19 @@ public class ReportsServiceImpl implements ReportsService {
         this.studentRepository = studentRepository;
         this.objectMapper = objectMapper;
         this.auditLogRepository = auditLogRepository;
+        this.reconciliationRunRepository = reconciliationRunRepository;
+    }
+
+    public ReportsServiceImpl(GeneratedReportRepository generatedReportRepository,
+                              PaymentRepository paymentRepository,
+                              FeeLineRepository feeLineRepository,
+                              EPPScheduleRepository eppScheduleRepository,
+                              InstitutionRepository institutionRepository,
+                              StudentRepository studentRepository,
+                              ObjectMapper objectMapper,
+                              AuditLogRepository auditLogRepository) {
+        this(generatedReportRepository, paymentRepository, feeLineRepository, eppScheduleRepository,
+                institutionRepository, studentRepository, objectMapper, auditLogRepository, null);
     }
 
     public ReportsServiceImpl(GeneratedReportRepository generatedReportRepository,
@@ -95,7 +115,7 @@ public class ReportsServiceImpl implements ReportsService {
                               StudentRepository studentRepository,
                               ObjectMapper objectMapper) {
         this(generatedReportRepository, paymentRepository, feeLineRepository, eppScheduleRepository,
-                institutionRepository, studentRepository, objectMapper, null);
+                institutionRepository, studentRepository, objectMapper, null, null);
     }
 
     @Override
@@ -228,6 +248,8 @@ public class ReportsServiceImpl implements ReportsService {
             case "failed-transactions" -> failedTransactions(from, to, filters);
             case "epp-report" -> eppPortfolio(filters);
             case "outstanding-balances" -> outstandingBalances(filters);
+            case "reconciliation" -> reconciliationReport(from, to, filters);
+            case "daily-report" -> dailySummaryReport(from != null ? from : LocalDate.now());
             default -> throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED,
                     "No aggregation wired for report: " + reportId);
         };
@@ -430,6 +452,164 @@ public class ReportsServiceImpl implements ReportsService {
                 rows,
                 "EGP " + total.toPlainString() + " outstanding across " + rows.size() + " fee lines",
                 "Outstanding balances");
+    }
+
+    private ReportData reconciliationReport(LocalDate from, LocalDate to, ReportFilters filters) {
+        List<ReconciliationRun> runs;
+        if (reconciliationRunRepository != null) {
+            runs = reconciliationRunRepository.findAll().stream()
+                    .filter(r -> {
+                        LocalDate d = r.getRunDate() != null ? r.getRunDate()
+                                : (r.getCreatedAt() != null ? r.getCreatedAt().toLocalDate() : LocalDate.now());
+                        if (from != null && d.isBefore(from)) return false;
+                        if (to != null && d.isAfter(to)) return false;
+                        if (filters.reconStatus() != null && !filters.reconStatus().isBlank()) {
+                            return filters.reconStatus().equalsIgnoreCase(r.getStatus());
+                        }
+                        return true;
+                    })
+                    .sorted((a, b) -> {
+                        LocalDateTime ta = a.getCreatedAt() != null ? a.getCreatedAt() : LocalDateTime.MIN;
+                        LocalDateTime tb = b.getCreatedAt() != null ? b.getCreatedAt() : LocalDateTime.MIN;
+                        return tb.compareTo(ta);
+                    })
+                    .toList();
+        } else {
+            runs = List.of();
+        }
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        long totalMatched = 0;
+        long totalExceptions = 0;
+
+        for (ReconciliationRun r : runs) {
+            int matched = r.getMatchedCount() != null ? r.getMatchedCount() : 0;
+            int exceptions = r.getExceptionCount() != null ? r.getExceptionCount() : 0;
+            totalMatched += matched;
+            totalExceptions += exceptions;
+
+            LocalDate date = r.getRunDate() != null ? r.getRunDate()
+                    : (r.getCreatedAt() != null ? r.getCreatedAt().toLocalDate() : LocalDate.now());
+
+            rows.add(row(
+                    "runId", r.getId(),
+                    "institution", r.getInstitution() != null ? r.getInstitution() : "All Institutions",
+                    "type", r.getInstitutionType() != null ? r.getInstitutionType() : "—",
+                    "date", date.toString(),
+                    "totalTx", r.getTotalTransactions() != null ? r.getTotalTransactions() : 0,
+                    "matched", matched,
+                    "exceptions", exceptions,
+                    "bankAmountEGP", nz(BigDecimal.valueOf(r.getBankAmountEGP() != null ? r.getBankAmountEGP() : 0)),
+                    "systemAmountEGP", nz(BigDecimal.valueOf(r.getSystemAmountEGP() != null ? r.getSystemAmountEGP() : 0)),
+                    "schoolAmountEGP", nz(BigDecimal.valueOf(r.getSchoolAmountEGP() != null ? r.getSchoolAmountEGP() : 0)),
+                    "status", r.getStatus() != null ? r.getStatus() : "Completed"
+            ));
+        }
+
+        return new ReportData(
+                List.of(
+                        ReportColumn.of("runId", "Run ID"),
+                        ReportColumn.of("institution", "Institution"),
+                        ReportColumn.center("type", "Type"),
+                        ReportColumn.center("date", "Date"),
+                        ReportColumn.right("totalTx", "Total Tx"),
+                        ReportColumn.right("matched", "Matched"),
+                        ReportColumn.right("exceptions", "Exceptions"),
+                        ReportColumn.right("bankAmountEGP", "Bank (EGP)"),
+                        ReportColumn.right("systemAmountEGP", "System (EGP)"),
+                        ReportColumn.right("schoolAmountEGP", "School (EGP)"),
+                        ReportColumn.center("status", "Status")
+                ),
+                rows,
+                runs.size() + " reconciliation runs (" + totalMatched + " matched, " + totalExceptions + " exceptions)",
+                "Reconciliation report · " + (from != null ? from : "start") + " to " + (to != null ? to : "end")
+        );
+    }
+
+    private ReportData dailySummaryReport(LocalDate date) {
+        List<Payment> payments = paymentRepository
+                .findByStatusInAndCreatedAtBetweenOrderByCreatedAtDesc(
+                        CAPTURED_ONLY, startOf(date), endOf(date));
+
+        List<FeeLine> allFees = feeLineRepository.findAll();
+
+        Map<FeeType, Long> txCountByType = new LinkedHashMap<>();
+        Map<FeeType, BigDecimal> collectedByType = new LinkedHashMap<>();
+        Map<FeeType, BigDecimal> outstandingByType = new LinkedHashMap<>();
+        Map<FeeType, Set<UUID>> studentsByType = new LinkedHashMap<>();
+
+        for (FeeType t : FeeType.values()) {
+            txCountByType.put(t, 0L);
+            collectedByType.put(t, BigDecimal.ZERO);
+            outstandingByType.put(t, BigDecimal.ZERO);
+            studentsByType.put(t, new HashSet<>());
+        }
+
+        // Process payments collected on date
+        for (Payment p : payments) {
+            for (PaymentAllocation a : p.getAllocations()) {
+                FeeLine fl = a.getFeeLine();
+                if (fl != null && fl.getFeeType() != null) {
+                    FeeType ft = fl.getFeeType();
+                    txCountByType.merge(ft, 1L, Long::sum);
+                    collectedByType.merge(ft, nz(a.getAmountApplied()), BigDecimal::add);
+                    if (fl.getStudentId() != null) {
+                        studentsByType.get(ft).add(fl.getStudentId());
+                    }
+                }
+            }
+        }
+
+        // Process outstanding fee lines
+        for (FeeLine fl : allFees) {
+            if (fl.getFeeType() != null) {
+                FeeType ft = fl.getFeeType();
+                if (fl.getStatus() != FeeStatus.PAID && fl.getStatus() != FeeStatus.CANCELLED) {
+                    BigDecimal rem = fl.getRemainingAmount() != null ? fl.getRemainingAmount() : fl.getTotalAmount();
+                    outstandingByType.merge(ft, nz(rem), BigDecimal::add);
+                    if (fl.getStudentId() != null) {
+                        studentsByType.get(ft).add(fl.getStudentId());
+                    }
+                }
+            }
+        }
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        BigDecimal grandCollected = BigDecimal.ZERO;
+        BigDecimal grandOutstanding = BigDecimal.ZERO;
+        long grandTx = 0;
+
+        for (FeeType t : FeeType.values()) {
+            long tx = txCountByType.get(t);
+            BigDecimal col = collectedByType.get(t);
+            BigDecimal out = outstandingByType.get(t);
+            int studentCount = studentsByType.get(t).size();
+
+            grandTx += tx;
+            grandCollected = grandCollected.add(col);
+            grandOutstanding = grandOutstanding.add(out);
+
+            rows.add(row(
+                    "feeType", t.getDisplayName(),
+                    "txCount", tx,
+                    "collectedEGP", col,
+                    "outstandingEGP", out,
+                    "studentsBilled", studentCount
+            ));
+        }
+
+        return new ReportData(
+                List.of(
+                        ReportColumn.of("feeType", "Fee Type"),
+                        ReportColumn.right("txCount", "Transactions Today"),
+                        ReportColumn.right("collectedEGP", "Collected Today (EGP)"),
+                        ReportColumn.right("outstandingEGP", "Outstanding Balance (EGP)"),
+                        ReportColumn.right("studentsBilled", "Students Billed")
+                ),
+                rows,
+                "EGP " + grandCollected.toPlainString() + " collected across " + grandTx + " transactions on " + date,
+                "Daily summary report by fee type · " + date
+        );
     }
 
     // ── Shared helpers ───────────────────────────────────────────────────────

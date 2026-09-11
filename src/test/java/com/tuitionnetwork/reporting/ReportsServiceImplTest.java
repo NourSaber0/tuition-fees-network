@@ -15,6 +15,8 @@ import com.tuitionnetwork.payments.domain.PaymentMethod;
 import com.tuitionnetwork.payments.domain.PaymentStatus;
 import com.tuitionnetwork.payments.repository.EPPScheduleRepository;
 import com.tuitionnetwork.payments.repository.PaymentRepository;
+import com.tuitionnetwork.reconciliation.domain.ReconciliationRun;
+import com.tuitionnetwork.reconciliation.repository.ReconciliationRunRepository;
 import com.tuitionnetwork.reporting.domain.GeneratedReport;
 import com.tuitionnetwork.reporting.dto.GenerateReportRequest;
 import com.tuitionnetwork.reporting.dto.ReportHistoryEntry;
@@ -54,6 +56,7 @@ class ReportsServiceImplTest {
     private InstitutionRepository institutionRepository;
     private StudentRepository studentRepository;
     private com.tuitionnetwork.audit.repository.AuditLogRepository auditLogRepository;
+    private ReconciliationRunRepository reconciliationRunRepository;
     private ReportsServiceImpl service;
 
     private final GeneratedReport[] lastSaved = new GeneratedReport[1];
@@ -67,9 +70,11 @@ class ReportsServiceImplTest {
         institutionRepository = mock(InstitutionRepository.class);
         studentRepository = mock(StudentRepository.class);
         auditLogRepository = mock(com.tuitionnetwork.audit.repository.AuditLogRepository.class);
+        reconciliationRunRepository = mock(ReconciliationRunRepository.class);
 
         service = new ReportsServiceImpl(generatedReportRepository, paymentRepository, feeLineRepository,
-                eppScheduleRepository, institutionRepository, studentRepository, new ObjectMapper(), auditLogRepository);
+                eppScheduleRepository, institutionRepository, studentRepository, new ObjectMapper(),
+                auditLogRepository, reconciliationRunRepository);
 
         when(generatedReportRepository.save(any(GeneratedReport.class))).thenAnswer(inv -> {
             GeneratedReport r = inv.getArgument(0);
@@ -115,8 +120,10 @@ class ReportsServiceImplTest {
 
         List<com.tuitionnetwork.reporting.dto.ReportCatalogueEntry> cat = service.catalogue();
         assertEquals(10, cat.size());
-        assertTrue(cat.stream().anyMatch(e -> e.id().equals("reconciliation") && !e.available()));
+        assertTrue(cat.stream().anyMatch(e -> e.id().equals("reconciliation") && e.available()));
+        assertTrue(cat.stream().anyMatch(e -> e.id().equals("daily-report") && e.available()));
         assertTrue(cat.stream().anyMatch(e -> e.id().equals("collections-by-type") && e.available()));
+        assertTrue(cat.stream().allMatch(com.tuitionnetwork.reporting.dto.ReportCatalogueEntry::available));
 
         com.tuitionnetwork.reporting.dto.ReportCatalogueEntry daily = cat.stream()
                 .filter(e -> e.id().equals("daily-collections")).findFirst().orElseThrow();
@@ -171,11 +178,58 @@ class ReportsServiceImplTest {
         assertEquals(404, ex.getStatusCode().value());
     }
 
+
     @Test
-    void generate_unavailableReport_unprocessableEntity() {
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> service.generate(req("reconciliation", LocalDate.now(), LocalDate.now())));
-        assertEquals(422, ex.getStatusCode().value());
+    void generate_reconciliationReport_buildsRowsCsvAndPersists() {
+        ReconciliationRun run = new ReconciliationRun("Matched");
+        run.setId(UUID.randomUUID());
+        run.setInstitution("Nile International School");
+        run.setInstitutionType("School");
+        run.setRunDate(LocalDate.of(2026, 8, 15));
+        run.setTotalTransactions(10);
+        run.setMatchedCount(9);
+        run.setExceptionCount(1);
+        run.setBankAmountEGP(250000L);
+        run.setSystemAmountEGP(250000L);
+        run.setSchoolAmountEGP(250000L);
+        when(reconciliationRunRepository.findAll()).thenReturn(List.of(run));
+
+        ReportJobResponse resp = service.generate(
+                req("reconciliation", LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31)));
+
+        assertEquals("READY", resp.status());
+        assertEquals("reconciliation", resp.reportId());
+        assertTrue(resp.filename().contains("reconciliation"));
+        assertNotNull(lastSaved[0]);
+        assertTrue(lastSaved[0].getCsvContent().contains("Nile International School"));
+        assertTrue(lastSaved[0].getCsvContent().contains("Matched"));
+    }
+
+    @Test
+    void generate_dailyReport_buildsRowsCsvAndPersists() {
+        Institution inst = school("Nile International School");
+        FeeLine fl = new FeeLine(inst.getId(), UUID.randomUUID(), FeeType.TUITION,
+                new BigDecimal("25000.00"), new BigDecimal("25000.00"), "Term 2 · 2026", LocalDate.now());
+        fl.setId(UUID.randomUUID());
+
+        Payment p = new Payment(UUID.randomUUID(), new BigDecimal("25000.00"), PaymentMethod.CREDIT_CARD, "IDEMP-TEST");
+        p.setStatus(PaymentStatus.CAPTURED);
+        p.addAllocation(new PaymentAllocation(p, fl, new BigDecimal("25000.00")));
+
+        when(paymentRepository.findByStatusInAndCreatedAtBetweenOrderByCreatedAtDesc(any(), any(), any()))
+                .thenReturn(List.of(p));
+        when(feeLineRepository.findAll()).thenReturn(List.of(fl));
+
+        GenerateReportRequest r = new GenerateReportRequest(
+                "daily-report", null, null, LocalDate.now(), "CSV", null);
+
+        ReportJobResponse resp = service.generate(r);
+        assertEquals("READY", resp.status());
+        assertEquals("daily-report", resp.reportId());
+        assertTrue(resp.filename().contains("daily-report"));
+        assertNotNull(lastSaved[0]);
+        assertTrue(lastSaved[0].getCsvContent().contains("Tuition"));
+        assertTrue(lastSaved[0].getCsvContent().contains("25000"));
     }
 
     @Test

@@ -15,6 +15,8 @@ import com.tuitionnetwork.payments.domain.PaymentAllocation;
 import com.tuitionnetwork.payments.domain.PaymentMethod;
 import com.tuitionnetwork.payments.domain.PaymentStatus;
 import com.tuitionnetwork.payments.repository.PaymentRepository;
+import com.tuitionnetwork.reconciliation.domain.ReconciliationRun;
+import com.tuitionnetwork.reconciliation.repository.ReconciliationRunRepository;
 import com.tuitionnetwork.reporting.repository.GeneratedReportRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -68,6 +70,9 @@ class ReportsIntegrationTest {
     @Autowired
     private AuditLogRepository auditLogRepository;
 
+    @Autowired
+    private ReconciliationRunRepository reconciliationRunRepository;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -79,10 +84,11 @@ class ReportsIntegrationTest {
 
     @Test
     void endToEnd_reportLifecycle_catalogueGenerateDownloadHistoryAndAudit() throws Exception {
-        // 1. Initial catalogue check
+        // 1. Initial catalogue check - all 10 reports must be available
         mockMvc.perform(get("/api/v1/reports/catalogue"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(10)))
+                .andExpect(jsonPath("$[?(@.available == false)]", hasSize(0)))
                 .andExpect(jsonPath("$[0].id").value("network-collections"));
 
         // Seed an institution and payment in range
@@ -173,5 +179,60 @@ class ReportsIntegrationTest {
                         .content("{\"reportId\":\"payments\",\"dateFrom\":\"2026-08-01\",\"dateTo\":\"2026-08-31\",\"format\":\"PDF\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("unsupported_format_for_report"));
+    }
+
+    @Test
+    void generate_reconciliationReport_endToEnd() throws Exception {
+        ReconciliationRun run = new ReconciliationRun("Matched");
+        run.setInstitution("Nile International School");
+        run.setInstitutionType("School");
+        run.setRunDate(LocalDate.now());
+        run.setTotalTransactions(12);
+        run.setMatchedCount(11);
+        run.setExceptionCount(1);
+        run.setBankAmountEGP(350000L);
+        run.setSystemAmountEGP(350000L);
+        run.setSchoolAmountEGP(350000L);
+        reconciliationRunRepository.save(run);
+
+        String fromStr = LocalDate.now().minusDays(2).toString();
+        String toStr = LocalDate.now().plusDays(2).toString();
+        String body = "{\"reportId\":\"reconciliation\",\"dateFrom\":\"" + fromStr + "\",\"dateTo\":\"" + toStr + "\",\"format\":\"CSV\"}";
+
+        MvcResult result = mockMvc.perform(post("/api/v1/reports/generate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("READY"))
+                .andExpect(jsonPath("$.reportId").value("reconciliation"))
+                .andReturn();
+
+        String jobId = objectMapper.readTree(result.getResponse().getContentAsString()).get("jobId").asText();
+
+        mockMvc.perform(get("/api/v1/reports/jobs/{id}/download", jobId))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith("text/csv"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Nile International School")));
+    }
+
+    @Test
+    void generate_dailyReport_endToEnd() throws Exception {
+        String todayStr = LocalDate.now().toString();
+        String body = "{\"reportId\":\"daily-report\",\"date\":\"" + todayStr + "\",\"format\":\"CSV\"}";
+
+        MvcResult result = mockMvc.perform(post("/api/v1/reports/generate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("READY"))
+                .andExpect(jsonPath("$.reportId").value("daily-report"))
+                .andReturn();
+
+        String jobId = objectMapper.readTree(result.getResponse().getContentAsString()).get("jobId").asText();
+
+        mockMvc.perform(get("/api/v1/reports/jobs/{id}/download", jobId))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith("text/csv"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Tuition")));
     }
 }

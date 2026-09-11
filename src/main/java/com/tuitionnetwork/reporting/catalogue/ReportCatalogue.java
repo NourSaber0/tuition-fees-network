@@ -39,14 +39,12 @@ public final class ReportCatalogue {
             available("collections-by-type", "Collections by Institution Type",
                     "Schools vs Universities — side-by-side collection comparison",
                     "Collections", false, List.of()),
-            unavailable("reconciliation", "Reconciliation Report",
+            available("reconciliation", "Reconciliation Report",
                     "Matched and exception reconciliation records across the network",
-                    "Reconciliation", false, List.of("reconStatus"),
-                    "The reconciliation module (Phase 5) is not implemented yet."),
-            unavailable("daily-report", "Daily Summary Report",
-                    "Auto-generated end-of-day operational summary with all activity",
-                    "Daily", true, List.of(),
-                    "Composite end-of-day summary — pending upstream reports.")
+                    "Reconciliation", false, List.of("reconStatus")),
+            available("daily-report", "Daily Summary Report",
+                    "Auto-generated end-of-day operational summary with all activity by fee type",
+                    "Daily", true, List.of())
     );
 
     private ReportCatalogue() {

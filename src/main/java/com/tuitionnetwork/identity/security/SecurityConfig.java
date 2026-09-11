@@ -39,7 +39,9 @@ public class SecurityConfig {
                                 "/api/v1/auth/forgot-password", "/auth/forgot-password",
                                 "/api/v1/auth/reset-password", "/auth/reset-password",
                                 "/api/v1/auth/refresh", "/auth/refresh",
-                                "/api/v1/roles/**", "/roles/**"
+                                "/api/v1/roles/**", "/roles/**",
+                                "/swagger-ui/**", "/swagger-ui.html",
+                                "/v3/api-docs/**", "/swagger-resources/**", "/webjars/**"
                         ).permitAll()
                         .requestMatchers("/api/v1/**").authenticated()
                         .anyRequest().permitAll()

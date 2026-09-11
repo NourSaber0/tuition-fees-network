@@ -82,6 +82,7 @@ class CrossInstitutionBleedIntegrationTest {
         receiptRepository.deleteAll();
         jdbcTemplate.execute("DELETE FROM payment_allocation");
         jdbcTemplate.execute("DELETE FROM payment_state_log");
+        jdbcTemplate.execute("DELETE FROM epp_installment");
         jdbcTemplate.execute("DELETE FROM epp_schedule");
         paymentRepository.deleteAll();
         feeLineRepository.deleteAll();
