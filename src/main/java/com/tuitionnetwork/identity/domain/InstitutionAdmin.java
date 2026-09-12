@@ -6,6 +6,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -30,7 +31,28 @@ public class InstitutionAdmin {
     private String passwordHash;
 
     @Column(name = "role", nullable = false)
-    private String role; // e.g., Finance, IT, SuperAdmin
+    private String role; // e.g., Finance, IT, SuperAdmin, school-admin, school-finance
+
+    @Column(name = "status")
+    private String status = "Active";
+
+    @Column(name = "phone")
+    private String phone = "+20 10 0000 0000";
+
+    @Column(name = "last_login_at")
+    private LocalDateTime lastLoginAt;
+
+    @Column(name = "must_change_password")
+    private boolean mustChangePassword = false;
+
+    @Column(name = "failed_login_attempts")
+    private int failedLoginAttempts = 0;
+
+    @Column(name = "account_locked")
+    private boolean accountLocked = false;
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt = LocalDateTime.now();
 
     public InstitutionAdmin() {
     }
@@ -42,6 +64,8 @@ public class InstitutionAdmin {
         this.email = email;
         this.passwordHash = passwordHash;
         this.role = role;
+        this.status = "Active";
+        this.createdAt = LocalDateTime.now();
     }
 
     public UUID getId() {
@@ -90,6 +114,62 @@ public class InstitutionAdmin {
 
     public void setRole(String role) {
         this.role = role;
+    }
+
+    public String getStatus() {
+        return status != null ? status : "Active";
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public String getPhone() {
+        return phone != null ? phone : "+20 10 0000 0000";
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public LocalDateTime getLastLoginAt() {
+        return lastLoginAt;
+    }
+
+    public void setLastLoginAt(LocalDateTime lastLoginAt) {
+        this.lastLoginAt = lastLoginAt;
+    }
+
+    public boolean isMustChangePassword() {
+        return mustChangePassword;
+    }
+
+    public void setMustChangePassword(boolean mustChangePassword) {
+        this.mustChangePassword = mustChangePassword;
+    }
+
+    public int getFailedLoginAttempts() {
+        return failedLoginAttempts;
+    }
+
+    public void setFailedLoginAttempts(int failedLoginAttempts) {
+        this.failedLoginAttempts = failedLoginAttempts;
+    }
+
+    public boolean isAccountLocked() {
+        return accountLocked;
+    }
+
+    public void setAccountLocked(boolean accountLocked) {
+        this.accountLocked = accountLocked;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
     }
 
     @Override

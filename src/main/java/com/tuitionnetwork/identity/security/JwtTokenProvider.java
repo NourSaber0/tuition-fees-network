@@ -24,7 +24,8 @@ public class JwtTokenProvider {
      * Generates a signed token containing user ID, email, and mapped GrantedAuthority role.
      */
     public String generateToken(SecurityUserPrincipal principal) {
-        String payload = principal.userId() + ":" + principal.email() + ":" + principal.role();
+        String instIdStr = principal.institutionId() != null ? principal.institutionId().toString() : "";
+        String payload = principal.userId() + ":" + principal.email() + ":" + principal.role() + ":" + instIdStr;
         String encodedPayload = Base64.getUrlEncoder().withoutPadding().encodeToString(payload.getBytes(StandardCharsets.UTF_8));
         String signature = sign(encodedPayload);
         return encodedPayload + "." + signature;
@@ -50,13 +51,19 @@ public class JwtTokenProvider {
         try {
             String decoded = new String(Base64.getUrlDecoder().decode(payload), StandardCharsets.UTF_8);
             String[] userParts = decoded.split(":");
-            if (userParts.length != 3) {
+            if (userParts.length < 3) {
                 return Optional.empty();
             }
             UUID userId = UUID.fromString(userParts[0]);
             String email = userParts[1];
             String role = userParts[2];
-            return Optional.of(new SecurityUserPrincipal(userId, email, email, role));
+            UUID institutionId = null;
+            if (userParts.length >= 4 && !userParts[3].isBlank()) {
+                try {
+                    institutionId = UUID.fromString(userParts[3]);
+                } catch (IllegalArgumentException ignored) {}
+            }
+            return Optional.of(new SecurityUserPrincipal(userId, email, email, role, institutionId));
         } catch (Exception e) {
             return Optional.empty();
         }

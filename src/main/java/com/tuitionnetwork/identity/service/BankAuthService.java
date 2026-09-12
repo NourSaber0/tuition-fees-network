@@ -34,6 +34,8 @@ public interface BankAuthService {
 
     BankUserDto getMe(SecurityUserPrincipal principal);
 
+    MessageResponse trustDevice(String mfaToken);
+
     List<RolePermissionsDto> getRoles();
 
     List<String> getRolePermissions(String role);

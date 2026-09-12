@@ -80,9 +80,75 @@ public class Institution {
     @Column(name = "rejection_reason", length = 1024)
     private String rejectionReason;
 
+    @Column(name = "tax_registration_number")
+    private String taxRegistrationNumber;
+
+    @Column(name = "commercial_reg_number")
+    private String commercialRegNumber;
+
+    @Column(name = "bank_account_number")
+    private String bankAccountNumber;
+
+    @Column(name = "iban")
+    private String iban;
+
+    @Column(name = "notify_in_app")
+    private Boolean notifyInApp = true;
+
+    @Column(name = "notify_email")
+    private Boolean notifyEmail = true;
+
     @Version
     @Column(name = "version")
     private Long version;
+
+    public String getTaxRegistrationNumber() {
+        return taxRegistrationNumber;
+    }
+
+    public void setTaxRegistrationNumber(String taxRegistrationNumber) {
+        this.taxRegistrationNumber = taxRegistrationNumber;
+    }
+
+    public String getCommercialRegNumber() {
+        return commercialRegNumber;
+    }
+
+    public void setCommercialRegNumber(String commercialRegNumber) {
+        this.commercialRegNumber = commercialRegNumber;
+    }
+
+    public String getBankAccountNumber() {
+        return bankAccountNumber;
+    }
+
+    public void setBankAccountNumber(String bankAccountNumber) {
+        this.bankAccountNumber = bankAccountNumber;
+    }
+
+    public String getIban() {
+        return iban;
+    }
+
+    public void setIban(String iban) {
+        this.iban = iban;
+    }
+
+    public Boolean isNotifyInApp() {
+        return notifyInApp != null ? notifyInApp : true;
+    }
+
+    public void setNotifyInApp(Boolean notifyInApp) {
+        this.notifyInApp = notifyInApp;
+    }
+
+    public Boolean isNotifyEmail() {
+        return notifyEmail != null ? notifyEmail : true;
+    }
+
+    public void setNotifyEmail(Boolean notifyEmail) {
+        this.notifyEmail = notifyEmail;
+    }
 
     public Institution() {
     }

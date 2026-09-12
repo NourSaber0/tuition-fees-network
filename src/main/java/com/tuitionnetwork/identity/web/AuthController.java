@@ -57,6 +57,13 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/mfa/trust-device")
+    public ResponseEntity<MessageResponse> trustDevice(@RequestBody(required = false) com.tuitionnetwork.identity.dto.auth.TrustDeviceRequest request) {
+        String token = request != null ? request.mfaToken() : null;
+        MessageResponse response = authService.trustDevice(token);
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping("/forgot-password")
     public ResponseEntity<MessageResponse> forgotPassword(@RequestBody(required = false) ForgotPasswordRequest request) {
         MessageResponse response = authService.forgotPassword(request);

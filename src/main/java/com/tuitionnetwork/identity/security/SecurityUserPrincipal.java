@@ -12,17 +12,62 @@ public record SecurityUserPrincipal(
         UUID userId,
         String email,
         String name,
-        String role, // ROLE_BACK_OFFICE, ROLE_INSTITUTION_ADMIN, ROLE_GUARDIAN
+        String role, // ROLE_BACK_OFFICE, ROLE_INSTITUTION_ADMIN, ROLE_GUARDIAN, ROLE_SCHOOL_ADMIN, ROLE_SCHOOL_FINANCE
         Collection<String> authorities,
-        String password
+        String password,
+        UUID institutionId
 ) implements UserDetails {
 
     public SecurityUserPrincipal(UUID userId, String email, String name, String role) {
-        this(userId, email, name, role, List.of(role), "");
+        this(userId, email, name, role, List.of(role), "", null);
     }
 
     public SecurityUserPrincipal(UUID userId, String email, String name, String role, Collection<String> authorities) {
-        this(userId, email, name, role, authorities, "");
+        this(userId, email, name, role, authorities, "", null);
+    }
+
+    public SecurityUserPrincipal(UUID userId, String email, String name, String role, Collection<String> authorities, String password) {
+        this(userId, email, name, role, authorities, password, null);
+    }
+
+    public SecurityUserPrincipal(UUID userId, String email, String name, String role, UUID institutionId) {
+        this(userId, email, name, role, buildAuthorities(role), "", institutionId);
+    }
+
+    public SecurityUserPrincipal(UUID userId, String email, String name, String role, Collection<String> authorities, UUID institutionId) {
+        this(userId, email, name, role, authorities, "", institutionId);
+    }
+
+    private static Collection<String> buildAuthorities(String role) {
+        if (UserRole.ROLE_SCHOOL_ADMIN.equals(role) || UserRole.ROLE_SCHOOL_FINANCE.equals(role)) {
+            return List.of(role, UserRole.ROLE_INSTITUTION_ADMIN);
+        }
+        if (UserRole.ROLE_INSTITUTION_ADMIN.equals(role)) {
+            return List.of(UserRole.ROLE_INSTITUTION_ADMIN, UserRole.ROLE_SCHOOL_ADMIN);
+        }
+        return List.of(role);
+    }
+
+    public UUID id() {
+        return userId;
+    }
+
+    public boolean hasRole(String roleName) {
+        if (roleName == null) return false;
+        if (roleName.equals(this.role)) return true;
+        return authorities != null && authorities.contains(roleName);
+    }
+
+    public boolean isSchoolUser() {
+        return hasRole(UserRole.ROLE_SCHOOL_ADMIN) || hasRole(UserRole.ROLE_SCHOOL_FINANCE) || hasRole(UserRole.ROLE_INSTITUTION_ADMIN);
+    }
+
+    public boolean isSchoolAdmin() {
+        return hasRole(UserRole.ROLE_SCHOOL_ADMIN);
+    }
+
+    public boolean isSchoolFinance() {
+        return hasRole(UserRole.ROLE_SCHOOL_FINANCE);
     }
 
     @Override

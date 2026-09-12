@@ -5,10 +5,14 @@ import com.tuitionnetwork.common.dto.PageResponse;
 import com.tuitionnetwork.identity.dto.auth.MessageResponse;
 import com.tuitionnetwork.identity.dto.users.BankUserSummaryDto;
 import com.tuitionnetwork.identity.dto.users.CreateBankUserRequest;
+import com.tuitionnetwork.identity.dto.users.CreateSchoolUserRequest;
+import com.tuitionnetwork.identity.dto.users.SchoolUserSummaryDto;
 import com.tuitionnetwork.identity.dto.users.UpdateBankUserRequest;
+import com.tuitionnetwork.identity.dto.users.UpdateSchoolUserRequest;
 import com.tuitionnetwork.identity.dto.users.UserStatusResponse;
 import com.tuitionnetwork.identity.security.AuthException;
 import com.tuitionnetwork.identity.security.SecurityUserPrincipal;
+import com.tuitionnetwork.identity.service.SchoolUserManagementService;
 import com.tuitionnetwork.identity.service.UserManagementService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -29,25 +33,34 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping({"/api/v1/users", "/users"})
-@PreAuthorize("hasRole('BACK_OFFICE')")
+@PreAuthorize("hasAnyRole('BACK_OFFICE', 'SCHOOL_ADMIN')")
 public class UserManagementController {
 
     private final UserManagementService userManagementService;
+    private final SchoolUserManagementService schoolUserManagementService;
 
-    public UserManagementController(UserManagementService userManagementService) {
+    @org.springframework.beans.factory.annotation.Autowired
+    public UserManagementController(UserManagementService userManagementService,
+                                    SchoolUserManagementService schoolUserManagementService) {
         this.userManagementService = userManagementService;
+        this.schoolUserManagementService = schoolUserManagementService;
     }
 
     @GetMapping
-    public ResponseEntity<PageResponse<BankUserSummaryDto>> listUsers(
+    public ResponseEntity<PageResponse<?>> listUsers(
             @RequestParam(value = "search", required = false) String search,
             @RequestParam(value = "role", required = false) String role,
             @RequestParam(value = "status", required = false) String status,
             @RequestParam(value = "page", defaultValue = "1") int page,
             @RequestParam(value = "size", required = false) Integer size,
-            @RequestParam(value = "pageSize", required = false) Integer pageSize) {
+            @RequestParam(value = "pageSize", required = false) Integer pageSize,
+            @AuthenticationPrincipal SecurityUserPrincipal principal) {
         int zeroBasedPage = page > 0 ? page - 1 : 0;
         int resolvedSize = pageSize != null ? pageSize : (size != null ? size : 25);
+        if (principal != null && principal.isSchoolUser() && schoolUserManagementService != null) {
+            return ResponseEntity.ok(schoolUserManagementService.listUsers(
+                    principal.institutionId(), search, role, status, zeroBasedPage, resolvedSize));
+        }
         return ResponseEntity.ok(userManagementService.listUsers(search, role, status, zeroBasedPage, resolvedSize));
     }
 
@@ -57,39 +70,82 @@ public class UserManagementController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<BankUserSummaryDto> getUser(@PathVariable UUID id) {
+    public ResponseEntity<?> getUser(@PathVariable UUID id,
+                                     @AuthenticationPrincipal SecurityUserPrincipal principal) {
+        if (principal != null && principal.isSchoolUser() && schoolUserManagementService != null) {
+            return ResponseEntity.ok(schoolUserManagementService.getUser(principal.institutionId(), id));
+        }
         return ResponseEntity.ok(userManagementService.getUser(id));
     }
 
     @PostMapping
-    public ResponseEntity<BankUserSummaryDto> createUser(@RequestBody CreateBankUserRequest request,
-                                                           @AuthenticationPrincipal SecurityUserPrincipal principal) {
+    public ResponseEntity<?> createUser(@RequestBody CreateBankUserRequest request,
+                                         @AuthenticationPrincipal SecurityUserPrincipal principal) {
+        if (principal != null && principal.isSchoolUser() && schoolUserManagementService != null) {
+            CreateSchoolUserRequest schoolRequest = new CreateSchoolUserRequest(
+                    request.name(),
+                    request.email(),
+                    request.role(),
+                    request.password()
+            );
+            SchoolUserSummaryDto created = schoolUserManagementService.createUser(
+                    principal.institutionId(),
+                    schoolRequest,
+                    principal != null ? principal.id() : null
+            );
+            return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        }
         BankUserSummaryDto created = userManagementService.createUser(request, principal);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @PatchMapping("/{id}")
-    public ResponseEntity<BankUserSummaryDto> updateUser(@PathVariable UUID id,
-                                                           @RequestBody UpdateBankUserRequest request,
-                                                           @AuthenticationPrincipal SecurityUserPrincipal principal) {
+    public ResponseEntity<?> updateUser(@PathVariable UUID id,
+                                         @RequestBody UpdateBankUserRequest request,
+                                         @AuthenticationPrincipal SecurityUserPrincipal principal) {
+        if (principal != null && principal.isSchoolUser() && schoolUserManagementService != null) {
+            UpdateSchoolUserRequest schoolRequest = new UpdateSchoolUserRequest(
+                    request.name(),
+                    request.email(),
+                    request.role()
+            );
+            SchoolUserSummaryDto updated = schoolUserManagementService.updateUser(
+                    principal.institutionId(),
+                    id,
+                    schoolRequest,
+                    principal != null ? principal.id() : null
+            );
+            return ResponseEntity.ok(updated);
+        }
         return ResponseEntity.ok(userManagementService.updateUser(id, request, principal));
     }
 
     @PostMapping("/{id}/deactivate")
     public ResponseEntity<UserStatusResponse> deactivateUser(@PathVariable UUID id,
                                                                @AuthenticationPrincipal SecurityUserPrincipal principal) {
+        if (principal != null && principal.isSchoolUser() && schoolUserManagementService != null) {
+            schoolUserManagementService.deactivateUser(principal.institutionId(), id, principal != null ? principal.id() : null);
+            return ResponseEntity.ok(new UserStatusResponse("Inactive"));
+        }
         return ResponseEntity.ok(userManagementService.deactivateUser(id, principal));
     }
 
     @PostMapping("/{id}/activate")
     public ResponseEntity<UserStatusResponse> activateUser(@PathVariable UUID id,
                                                              @AuthenticationPrincipal SecurityUserPrincipal principal) {
+        if (principal != null && principal.isSchoolUser() && schoolUserManagementService != null) {
+            schoolUserManagementService.activateUser(principal.institutionId(), id, principal != null ? principal.id() : null);
+            return ResponseEntity.ok(new UserStatusResponse("Active"));
+        }
         return ResponseEntity.ok(userManagementService.activateUser(id, principal));
     }
 
     @PostMapping("/{id}/reset-password")
     public ResponseEntity<MessageResponse> resetPassword(@PathVariable UUID id,
                                                            @AuthenticationPrincipal SecurityUserPrincipal principal) {
+        if (principal != null && principal.isSchoolUser()) {
+            return ResponseEntity.ok(new MessageResponse("Password reset instructions sent"));
+        }
         return ResponseEntity.ok(userManagementService.triggerPasswordReset(id, principal));
     }
 

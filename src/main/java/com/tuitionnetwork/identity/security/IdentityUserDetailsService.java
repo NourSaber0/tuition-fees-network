@@ -67,11 +67,18 @@ public class IdentityUserDetailsService implements UserDetailsService {
         Optional<InstitutionAdmin> institutionAdmin = institutionAdminRepository.findByEmail(cleanEmail);
         if (institutionAdmin.isPresent()) {
             InstitutionAdmin admin = institutionAdmin.get();
+            if ("Inactive".equalsIgnoreCase(admin.getStatus()) || admin.isAccountLocked()) {
+                return Optional.empty();
+            }
+            String primaryRole = resolveSchoolRole(admin.getRole());
+            List<String> authorities = List.of(UserRole.ROLE_INSTITUTION_ADMIN, primaryRole);
             return Optional.of(new SecurityUserPrincipal(
                     admin.getId(),
                     admin.getEmail(),
                     admin.getName(),
-                    UserRole.ROLE_INSTITUTION_ADMIN
+                    UserRole.ROLE_INSTITUTION_ADMIN,
+                    authorities,
+                    admin.getInstitutionId()
             ));
         }
 
@@ -93,7 +100,7 @@ public class IdentityUserDetailsService implements UserDetailsService {
     /**
      * Resolves user by ID across distinct user domains and maps to appropriate Spring Security role:
      * - BankEmployee      -> ROLE_BACK_OFFICE
-     * - InstitutionAdmin  -> ROLE_INSTITUTION_ADMIN
+     * - InstitutionAdmin  -> ROLE_INSTITUTION_ADMIN, ROLE_SCHOOL_ADMIN / ROLE_SCHOOL_FINANCE
      * - Guardian          -> ROLE_GUARDIAN
      */
     public Optional<SecurityUserPrincipal> loadUserById(UUID userId) {
@@ -120,11 +127,18 @@ public class IdentityUserDetailsService implements UserDetailsService {
         Optional<InstitutionAdmin> institutionAdmin = institutionAdminRepository.findById(userId);
         if (institutionAdmin.isPresent()) {
             InstitutionAdmin admin = institutionAdmin.get();
+            if ("Inactive".equalsIgnoreCase(admin.getStatus()) || admin.isAccountLocked()) {
+                return Optional.empty();
+            }
+            String primaryRole = resolveSchoolRole(admin.getRole());
+            List<String> authorities = List.of(primaryRole, UserRole.ROLE_INSTITUTION_ADMIN);
             return Optional.of(new SecurityUserPrincipal(
                     admin.getId(),
                     admin.getEmail(),
                     admin.getName(),
-                    UserRole.ROLE_INSTITUTION_ADMIN
+                    primaryRole,
+                    authorities,
+                    admin.getInstitutionId()
             ));
         }
 
@@ -141,5 +155,16 @@ public class IdentityUserDetailsService implements UserDetailsService {
         }
 
         return Optional.empty();
+    }
+
+    private String resolveSchoolRole(String role) {
+        if (role == null) {
+            return UserRole.ROLE_SCHOOL_ADMIN;
+        }
+        String r = role.trim().toLowerCase();
+        if (r.contains("finance")) {
+            return UserRole.ROLE_SCHOOL_FINANCE;
+        }
+        return UserRole.ROLE_SCHOOL_ADMIN;
     }
 }
