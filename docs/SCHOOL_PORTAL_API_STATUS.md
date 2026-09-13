@@ -105,15 +105,15 @@ Currently, **Milestone 1 (Phases 1 & 10)**, **Milestone 2 (Phases 2 & 11)**, and
 
 ### Milestone 3: Student Roster & Guardians Management (Phase 3)
 **Status:** ✅ **100% COMPLETE** (10 / 10 Endpoints Implemented and Tested)  
-**Test Suite:** [`SchoolStudentIntegrationTest.java`](file:///F:/tuition-fees-network-main%20(1)/tuition-fees-network-main/src/test/java/com/tuitionnetwork/students/SchoolStudentIntegrationTest.java) (15 tests)
+**Test Suite:** [`SchoolStudentIntegrationTest.java`](file:///Users/nourahmed/Downloads/demo/src/test/java/com/tuitionnetwork/students/SchoolStudentIntegrationTest.java) (15 tests)
 
 #### Phase 3 — Student Management
 **Source:** `Students.tsx`, S07–S09, US-16 to US-25 | **Roles:** Read (`school-admin`, `school-finance`), Write (`school-admin` only)
 
 | Endpoint | Method | Contract Purpose | Status | Target Component / Notes |
 |---|---|---|:---:|---|
-| `/students` | `GET` | Paginated search & list with grade, section, status, and fee status filters | ✅ **DONE** | [`SchoolStudentController.java`](file:///F:/tuition-fees-network-main%20(1)/tuition-fees-network-main/src/main/java/com/tuitionnetwork/students/web/SchoolStudentController.java) via [`SchoolStudentServiceImpl.java`](file:///F:/tuition-fees-network-main%20(1)/tuition-fees-network-main/src/main/java/com/tuitionnetwork/students/service/SchoolStudentServiceImpl.java). Filters: `search`, `grade`, `page`, `pageSize`. Dynamically aggregates `totalFeesEGP`, `paidEGP`, and `outstandingEGP`. Omits National ID. |
-| `/students/deactivated` | `GET` | List deactivated/withdrawn students with date-range filter | ✅ **DONE** | [`SchoolStudentController.java`](file:///F:/tuition-fees-network-main%20(1)/tuition-fees-network-main/src/main/java/com/tuitionnetwork/students/web/SchoolStudentController.java). Filters: `search`, `deactivatedFrom`, `deactivatedTo`, `page`, `pageSize`. |
+| `/students` | `GET` | Paginated search & list with grade, section, status, and fee status filters | ✅ **DONE** | [`SchoolStudentController.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/students/web/SchoolStudentController.java) via [`SchoolStudentServiceImpl.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/students/service/SchoolStudentServiceImpl.java). Filters: `search`, `grade`, `page`, `pageSize`. Dynamically aggregates `totalFeesEGP`, `paidEGP`, and `outstandingEGP`. Omits National ID. |
+| `/students/deactivated` | `GET` | List deactivated/withdrawn students with date-range filter | ✅ **DONE** | [`SchoolStudentController.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/students/web/SchoolStudentController.java). Filters: `search`, `deactivatedFrom`, `deactivatedTo`, `page`, `pageSize`. |
 | `/students/{id}` | `GET` | Student profile detail with masked National ID, guardians, and fee summary | ✅ **DONE** | Returns complete student record with `nationalIdMasked` (`299*******4567`), parent contact, and fee roll-up totals. Blocks cross-school access (`403 Forbidden`). |
 | `/students` | `POST` | Enroll new student with studentRef uniqueness check | ✅ **DONE** | School-admin only. Validates `studentRef` uniqueness within school (`409 Conflict`), validates 14-digit National ID, hashes with HMAC-SHA256, links parent, and writes audit trail. |
 | `/students/{id}` | `PATCH` | Update student demographic or academic info | ✅ **DONE** | School-admin only. Updates name, grade, section, contact info, and verifies studentRef collisions. |
