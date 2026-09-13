@@ -1,18 +1,25 @@
 package com.tuitionnetwork.reporting.web;
 
 import com.tuitionnetwork.common.dto.PageResponse;
+import com.tuitionnetwork.identity.domain.Institution;
+import com.tuitionnetwork.identity.repository.InstitutionRepository;
+import com.tuitionnetwork.identity.security.SecurityUserPrincipal;
 import com.tuitionnetwork.reporting.dto.GenerateReportRequest;
 import com.tuitionnetwork.reporting.dto.ReportCatalogueEntry;
 import com.tuitionnetwork.reporting.dto.ReportHistoryEntry;
 import com.tuitionnetwork.reporting.dto.ReportJobResponse;
 import com.tuitionnetwork.reporting.service.ReportsService;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -31,39 +38,73 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Reporting module (Phase 7). {@code POST /generate} is synchronous: it returns a
- * {@code READY} job with an inline preview; the client can still poll
- * {@code GET /jobs/{id}} and pull the file from {@code /jobs/{id}/download}.
+ * Reporting module (Phase 7 Bank Back-Office & Phase 8 School Portal).
  */
 @RestController
-@RequestMapping("/api/v1/reports")
-@PreAuthorize("hasRole('BACK_OFFICE')")
+@RequestMapping({"/api/v1/reports", "/reports"})
+@PreAuthorize("hasAnyRole('BACK_OFFICE', 'SCHOOL_ADMIN', 'SCHOOL_FINANCE', 'INSTITUTION_ADMIN')")
 public class ReportsController {
 
     private final ReportsService reportsService;
+    private final InstitutionRepository institutionRepository;
 
-    public ReportsController(ReportsService reportsService) {
+    public ReportsController(
+            ReportsService reportsService,
+            @Autowired(required = false) InstitutionRepository institutionRepository) {
         this.reportsService = reportsService;
+        this.institutionRepository = institutionRepository;
     }
 
-    @GetMapping("/catalogue")
-    public ResponseEntity<List<ReportCatalogueEntry>> catalogue() {
+    @GetMapping({"/catalogue", "/templates"})
+    public ResponseEntity<List<ReportCatalogueEntry>> catalogue(
+            @RequestParam(value = "institutionId", required = false) UUID requestedInstitutionId,
+            @AuthenticationPrincipal SecurityUserPrincipal principal) {
+        if (isSchoolRole()) {
+            UUID schoolId = resolveAndValidateSchoolId(requestedInstitutionId, principal);
+            return ResponseEntity.ok(reportsService.catalogue(schoolId));
+        }
         return ResponseEntity.ok(reportsService.catalogue());
     }
 
     @PostMapping("/generate")
-    public ResponseEntity<ReportJobResponse> generate(@Valid @RequestBody GenerateReportRequest request) {
+    public ResponseEntity<ReportJobResponse> generate(
+            @Valid @RequestBody GenerateReportRequest request,
+            @RequestParam(value = "institutionId", required = false) UUID requestedInstitutionId,
+            @AuthenticationPrincipal SecurityUserPrincipal principal) {
+        if (isSchoolRole()) {
+            UUID schoolId = resolveAndValidateSchoolId(requestedInstitutionId, principal);
+            ReportJobResponse job = reportsService.generateForSchool(request, schoolId);
+            return ResponseEntity.status(HttpStatus.ACCEPTED).body(job);
+        }
         return ResponseEntity.ok(reportsService.generate(request));
     }
 
     @GetMapping("/jobs/{jobId}")
-    public ResponseEntity<ReportJobResponse> getJob(@PathVariable("jobId") UUID jobId) {
+    public ResponseEntity<ReportJobResponse> getJob(
+            @PathVariable("jobId") String jobIdStr,
+            @RequestParam(value = "institutionId", required = false) UUID requestedInstitutionId,
+            @AuthenticationPrincipal SecurityUserPrincipal principal) {
+        UUID jobId = parseJobId(jobIdStr);
+        if (isSchoolRole()) {
+            UUID schoolId = resolveAndValidateSchoolId(requestedInstitutionId, principal);
+            return ResponseEntity.ok(reportsService.getJobForSchool(jobId, schoolId));
+        }
         return ResponseEntity.ok(reportsService.getJob(jobId));
     }
 
     @GetMapping("/jobs/{jobId}/download")
-    public ResponseEntity<byte[]> download(@PathVariable("jobId") UUID jobId) {
-        ReportsService.DownloadPayload payload = reportsService.download(jobId);
+    public ResponseEntity<byte[]> download(
+            @PathVariable("jobId") String jobIdStr,
+            @RequestParam(value = "institutionId", required = false) UUID requestedInstitutionId,
+            @AuthenticationPrincipal SecurityUserPrincipal principal) {
+        UUID jobId = parseJobId(jobIdStr);
+        ReportsService.DownloadPayload payload;
+        if (isSchoolRole()) {
+            UUID schoolId = resolveAndValidateSchoolId(requestedInstitutionId, principal);
+            payload = reportsService.downloadForSchool(jobId, schoolId);
+        } else {
+            payload = reportsService.download(jobId);
+        }
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=\"" + payload.filename() + "\"")
@@ -76,9 +117,65 @@ public class ReportsController {
             @RequestParam(value = "reportId", required = false) String reportId,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", required = false) Integer size,
-            @RequestParam(value = "pageSize", required = false) Integer pageSize) {
+            @RequestParam(value = "pageSize", required = false) Integer pageSize,
+            @RequestParam(value = "institutionId", required = false) UUID requestedInstitutionId,
+            @AuthenticationPrincipal SecurityUserPrincipal principal) {
         int resolvedSize = pageSize != null ? pageSize : (size != null ? size : 25);
+        if (isSchoolRole()) {
+            UUID schoolId = resolveAndValidateSchoolId(requestedInstitutionId, principal);
+            return ResponseEntity.ok(reportsService.historyForSchool(schoolId, reportId, page, resolvedSize));
+        }
         return ResponseEntity.ok(reportsService.history(reportId, page, resolvedSize));
+    }
+
+    private UUID parseJobId(String jobIdStr) {
+        try {
+            return UUID.fromString(jobIdStr);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Report job not found: " + jobIdStr);
+        }
+    }
+
+    private UUID resolveAndValidateSchoolId(UUID requestedInstitutionId, SecurityUserPrincipal principal) {
+        UUID principalSchoolId = (principal != null) ? principal.institutionId() : null;
+
+        if (principalSchoolId != null) {
+            if (requestedInstitutionId != null && !requestedInstitutionId.equals(principalSchoolId)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "cross_school_access: Access denied to other school's report");
+            }
+            return principalSchoolId;
+        }
+
+        if (requestedInstitutionId != null) {
+            return requestedInstitutionId;
+        }
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getAuthorities() != null && auth.getAuthorities().stream().anyMatch(a ->
+                a.getAuthority().equals("ROLE_SCHOOL_ADMIN") ||
+                a.getAuthority().equals("ROLE_SCHOOL_FINANCE") ||
+                a.getAuthority().equals("ROLE_INSTITUTION_ADMIN"))) {
+            if (institutionRepository != null) {
+                return institutionRepository.findAll().stream()
+                        .filter(i -> i.getAccountStatus() != null && i.getAccountStatus().name().equalsIgnoreCase("ACTIVE"))
+                        .map(Institution::getId)
+                        .findFirst()
+                        .orElse(null);
+            }
+        }
+        return null;
+    }
+
+    private boolean isSchoolRole() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getAuthorities() == null) {
+            return false;
+        }
+        return auth.getAuthorities().stream().anyMatch(a ->
+                a.getAuthority().equals("ROLE_SCHOOL_ADMIN") ||
+                a.getAuthority().equals("ROLE_SCHOOL_FINANCE") ||
+                a.getAuthority().equals("ROLE_INSTITUTION_ADMIN"));
     }
 
     // ── Error mapping ────────────────────────────────────────────────────────

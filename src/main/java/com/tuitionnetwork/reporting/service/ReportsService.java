@@ -18,13 +18,23 @@ public interface ReportsService {
 
     List<ReportCatalogueEntry> catalogue();
 
+    List<ReportCatalogueEntry> catalogue(UUID schoolId);
+
     ReportJobResponse generate(GenerateReportRequest request);
+
+    ReportJobResponse generateForSchool(GenerateReportRequest request, UUID schoolId);
 
     ReportJobResponse getJob(UUID jobId);
 
+    ReportJobResponse getJobForSchool(UUID jobId, UUID schoolId);
+
     DownloadPayload download(UUID jobId);
 
+    DownloadPayload downloadForSchool(UUID jobId, UUID schoolId);
+
     PageResponse<ReportHistoryEntry> history(String reportId, int page, int size);
+
+    PageResponse<ReportHistoryEntry> historyForSchool(UUID schoolId, String reportId, int page, int size);
 
     /** File bytes + filename for {@code GET /reports/jobs/{jobId}/download}. */
     record DownloadPayload(String filename, byte[] content, String contentType) {

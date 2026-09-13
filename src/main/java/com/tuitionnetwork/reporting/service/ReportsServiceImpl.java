@@ -136,6 +136,25 @@ public class ReportsServiceImpl implements ReportsService {
     }
 
     @Override
+    public List<ReportCatalogueEntry> catalogue(UUID schoolId) {
+        return ReportCatalogue.schoolEntries().stream()
+                .map(e -> {
+                    LocalDateTime lastGen = schoolId != null
+                            ? generatedReportRepository
+                            .findFirstByInstitutionIdAndReportIdOrderByCreatedAtDesc(schoolId, e.id())
+                            .map(GeneratedReport::getCreatedAt)
+                            .orElse(null)
+                            : null;
+                    return new ReportCatalogueEntry(
+                            e.id(), e.title(), e.description(), e.category(),
+                            e.formats(), e.singleDate(), e.contextFilters(),
+                            e.available(), e.unavailableReason(), lastGen
+                    );
+                })
+                .toList();
+    }
+
+    @Override
     @Transactional
     public ReportJobResponse generate(GenerateReportRequest request) {
         ReportCatalogueEntry entry = ReportCatalogue.find(request.reportId())
@@ -206,6 +225,85 @@ public class ReportsServiceImpl implements ReportsService {
     }
 
     @Override
+    @Transactional
+    public ReportJobResponse generateForSchool(GenerateReportRequest request, UUID schoolId) {
+        if (schoolId == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "cross_school_access: No school associated with user");
+        }
+
+        ReportCatalogueEntry entry = ReportCatalogue.find(request.reportId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Unknown report type: " + request.reportId()));
+
+        if (!ReportCatalogue.isSchoolReport(request.reportId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "cross_school_access: School users can only generate school reports");
+        }
+
+        if (!entry.available()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, entry.unavailableReason());
+        }
+
+        String format = request.formatOrDefault();
+        if (!"CSV".equals(format)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "unsupported_format_for_report");
+        }
+
+        LocalDate from;
+        LocalDate to;
+        if (entry.singleDate()) {
+            from = request.date() != null ? request.date() : LocalDate.now();
+            to = from;
+        } else {
+            from = request.dateFrom();
+            to = request.dateTo();
+            if (from != null && to != null && from.isAfter(to)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "date_from_after_date_to");
+            }
+        }
+
+        ReportFilters filters = request.filtersOrEmpty().withInstitutionId(schoolId);
+
+        ReportData data = buildData(entry.id(), from, to, filters);
+        String csv = CsvWriter.toCsv(data.columns(), data.rows());
+
+        List<Map<String, Object>> previewRows = data.rows().size() > PREVIEW_LIMIT
+                ? data.rows().subList(0, PREVIEW_LIMIT)
+                : data.rows();
+        ReportPreview preview = new ReportPreview(data.columns(), previewRows, data.total(), data.note());
+
+        String range = (from != null && to != null) ? (from + "_" + to) : (from != null ? from.toString() : "all");
+        String filename = "report_" + entry.id() + "_" + range + "." + format.toLowerCase();
+
+        GeneratedReport report = new GeneratedReport();
+        report.setReportId(entry.id());
+        report.setFormat(format);
+        report.setInstitutionId(schoolId);
+        report.setParamsJson(describeParams(request, from, to));
+        report.setFilename(filename);
+        report.setCsvContent(csv);
+        report.setPreviewJson(writeJson(preview));
+        report.setRowCount(data.rows().size());
+        report.setTotalLabel(data.total());
+        report.setNoteLabel(data.note());
+        report.setStatus(ReportStatus.READY);
+
+        GeneratedReport saved = generatedReportRepository.save(report);
+
+        if (auditLogRepository != null) {
+            auditLogRepository.save(new AuditLog(
+                    null,
+                    "SCHOOL",
+                    "GENERATE_REPORT",
+                    "Report " + entry.id() + " generated (" + format + ") with " + data.rows().size() + " rows for school " + schoolId
+            ));
+        }
+
+        return toSchoolJobResponse(saved, preview);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public ReportJobResponse getJob(UUID jobId) {
         GeneratedReport report = requireReport(jobId);
@@ -215,8 +313,48 @@ public class ReportsServiceImpl implements ReportsService {
 
     @Override
     @Transactional(readOnly = true)
+    public ReportJobResponse getJobForSchool(UUID jobId, UUID schoolId) {
+        GeneratedReport report = requireReport(jobId);
+        if (schoolId != null && report.getInstitutionId() != null && !schoolId.equals(report.getInstitutionId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "cross_school_access: Access denied to other school's report");
+        }
+        if (report.getInstitutionId() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "cross_school_access: Access denied to bank report");
+        }
+        ReportPreview preview = readPreview(report);
+        return new ReportJobResponse(
+                report.getId(),
+                report.getReportId(),
+                report.getStatus().name(),
+                report.getFilename(),
+                "/reports/jobs/" + report.getId() + "/download",
+                preview,
+                report.getCreatedAt());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public DownloadPayload download(UUID jobId) {
         GeneratedReport report = requireReport(jobId);
+        byte[] bytes = (report.getCsvContent() == null ? "" : report.getCsvContent())
+                .getBytes(StandardCharsets.UTF_8);
+        return new DownloadPayload(report.getFilename(), bytes, "text/csv");
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DownloadPayload downloadForSchool(UUID jobId, UUID schoolId) {
+        GeneratedReport report = requireReport(jobId);
+        if (schoolId != null && report.getInstitutionId() != null && !schoolId.equals(report.getInstitutionId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "cross_school_access: Access denied to other school's report");
+        }
+        if (report.getInstitutionId() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "cross_school_access: Access denied to bank report");
+        }
         byte[] bytes = (report.getCsvContent() == null ? "" : report.getCsvContent())
                 .getBytes(StandardCharsets.UTF_8);
         return new DownloadPayload(report.getFilename(), bytes, "text/csv");
@@ -237,6 +375,25 @@ public class ReportsServiceImpl implements ReportsService {
                 r.getId(), r.getReportId(), r.getFormat(), r.getFilename(), r.getRowCount(), r.getCreatedAt()));
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<ReportHistoryEntry> historyForSchool(UUID schoolId, String reportId, int page, int size) {
+        if (schoolId == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "cross_school_access: No school associated with user");
+        }
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), 100);
+        PageRequest pr = PageRequest.of(safePage, safeSize);
+
+        Page<GeneratedReport> result = (reportId == null || reportId.isBlank())
+                ? generatedReportRepository.findByInstitutionIdOrderByCreatedAtDesc(schoolId, pr)
+                : generatedReportRepository.findByInstitutionIdAndReportIdOrderByCreatedAtDesc(schoolId, reportId.trim(), pr);
+
+        return PageResponse.from(result, r -> new ReportHistoryEntry(
+                r.getId(), r.getReportId(), r.getFormat(), r.getFilename(), r.getRowCount(), r.getCreatedAt()));
+    }
+
     // ── Aggregation ───────────────────────────────────────────────────────────
 
     private ReportData buildData(String reportId, LocalDate from, LocalDate to, ReportFilters filters) {
@@ -250,6 +407,10 @@ public class ReportsServiceImpl implements ReportsService {
             case "outstanding-balances" -> outstandingBalances(filters);
             case "reconciliation" -> reconciliationReport(from, to, filters);
             case "daily-report" -> dailySummaryReport(from != null ? from : LocalDate.now());
+            case "school-collections" -> schoolCollections(from, to, filters);
+            case "school-payments" -> schoolPayments(from, to, filters);
+            case "school-outstanding-fees" -> schoolOutstandingFees(from, to, filters);
+            case "school-partial-payments" -> schoolPartialPayments(from, to, filters);
             default -> throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED,
                     "No aggregation wired for report: " + reportId);
         };
@@ -698,6 +859,17 @@ public class ReportsServiceImpl implements ReportsService {
                 report.getCreatedAt());
     }
 
+    private ReportJobResponse toSchoolJobResponse(GeneratedReport report, ReportPreview preview) {
+        return new ReportJobResponse(
+                report.getId(),
+                report.getReportId(),
+                "processing",
+                report.getFilename(),
+                "/reports/jobs/" + report.getId() + "/download",
+                preview,
+                report.getCreatedAt());
+    }
+
     private String writeJson(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
@@ -784,5 +956,246 @@ public class ReportsServiceImpl implements ReportsService {
     @SuppressWarnings("unused")
     private static <T> Optional<T> firstOf(List<T> list) {
         return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+    }
+
+    private ReportData schoolCollections(LocalDate from, LocalDate to, ReportFilters filters) {
+        UUID schoolId = filters.institutionId();
+        Map<UUID, Student> students = studentIndex();
+        List<Payment> payments = capturedPaymentsForSchool(schoolId, from, to, filters);
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        BigDecimal grandTotal = BigDecimal.ZERO;
+
+        for (Payment p : payments) {
+            for (PaymentAllocation a : p.getAllocations()) {
+                FeeLine fl = a.getFeeLine();
+                if (fl != null && (schoolId == null || schoolId.equals(fl.getInstitutionId()))) {
+                    Student s = fl.getStudentId() != null ? students.get(fl.getStudentId()) : null;
+                    BigDecimal amount = nz(a.getAmountApplied());
+                    grandTotal = grandTotal.add(amount);
+
+                    rows.add(row(
+                            "date", p.getCreatedAt() != null ? p.getCreatedAt().toLocalDate().toString() : "",
+                            "paymentId", p.getId() != null ? p.getId().toString() : "",
+                            "student", s != null ? s.getFullName() : "—",
+                            "studentRef", s != null && s.getStudentRef() != null ? s.getStudentRef() : "—",
+                            "feeType", fl.getFeeType() != null ? fl.getFeeType().getDisplayName() : "—",
+                            "amountEGP", amount,
+                            "method", methodLabel(p.getPaymentMethod()),
+                            "status", statusLabel(p.getStatus())
+                    ));
+                }
+            }
+        }
+
+        return new ReportData(
+                List.of(
+                        ReportColumn.center("date", "Date"),
+                        ReportColumn.of("paymentId", "Payment ID"),
+                        ReportColumn.of("student", "Student"),
+                        ReportColumn.of("studentRef", "Student Ref"),
+                        ReportColumn.of("feeType", "Fee Type"),
+                        ReportColumn.right("amountEGP", "Amount (EGP)"),
+                        ReportColumn.center("method", "Method"),
+                        ReportColumn.center("status", "Status")
+                ),
+                rows,
+                "EGP " + grandTotal.toPlainString() + " across " + rows.size() + " collections",
+                "Collection Report" + (from != null && to != null ? " · " + from + " to " + to : "")
+        );
+    }
+
+    private ReportData schoolPayments(LocalDate from, LocalDate to, ReportFilters filters) {
+        UUID schoolId = filters.institutionId();
+        Map<UUID, Student> students = studentIndex();
+        List<Payment> payments = allPaymentsForSchool(schoolId, from, to, filters);
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        BigDecimal grandTotal = BigDecimal.ZERO;
+
+        for (Payment p : payments) {
+            for (PaymentAllocation a : p.getAllocations()) {
+                FeeLine fl = a.getFeeLine();
+                if (fl != null && (schoolId == null || schoolId.equals(fl.getInstitutionId()))) {
+                    Student s = fl.getStudentId() != null ? students.get(fl.getStudentId()) : null;
+                    BigDecimal amount = nz(a.getAmountApplied());
+                    grandTotal = grandTotal.add(amount);
+
+                    rows.add(row(
+                            "paymentId", p.getId() != null ? p.getId().toString() : "",
+                            "date", p.getCreatedAt() != null ? p.getCreatedAt().toLocalDate().toString() : "",
+                            "student", s != null ? s.getFullName() : "—",
+                            "studentRef", s != null && s.getStudentRef() != null ? s.getStudentRef() : "—",
+                            "feeType", fl.getFeeType() != null ? fl.getFeeType().getDisplayName() : "—",
+                            "amountEGP", amount,
+                            "method", methodLabel(p.getPaymentMethod()),
+                            "status", statusLabel(p.getStatus())
+                    ));
+                }
+            }
+        }
+
+        return new ReportData(
+                List.of(
+                        ReportColumn.of("paymentId", "Payment ID"),
+                        ReportColumn.center("date", "Date"),
+                        ReportColumn.of("student", "Student"),
+                        ReportColumn.of("studentRef", "Student Ref"),
+                        ReportColumn.of("feeType", "Fee Type"),
+                        ReportColumn.right("amountEGP", "Amount (EGP)"),
+                        ReportColumn.center("method", "Method"),
+                        ReportColumn.center("status", "Status")
+                ),
+                rows,
+                rows.size() + " payments · EGP " + grandTotal.toPlainString() + " total",
+                "Payment History" + (from != null && to != null ? " · " + from + " to " + to : "")
+        );
+    }
+
+    private ReportData schoolOutstandingFees(LocalDate from, LocalDate to, ReportFilters filters) {
+        UUID schoolId = filters.institutionId();
+        Map<UUID, Student> students = studentIndex();
+
+        List<FeeLine> feeLines = (schoolId != null)
+                ? feeLineRepository.findByInstitutionIdAndStatusNot(schoolId, FeeStatus.CANCELLED)
+                : feeLineRepository.findAll();
+
+        feeLines = feeLines.stream()
+                .filter(f -> f.getRemainingAmount() != null && f.getRemainingAmount().compareTo(BigDecimal.ZERO) > 0)
+                .filter(f -> f.getStatus() != FeeStatus.PAID)
+                .filter(f -> {
+                    if (from != null && f.getDueDate() != null && f.getDueDate().isBefore(from)) return false;
+                    if (to != null && f.getDueDate() != null && f.getDueDate().isAfter(to)) return false;
+                    return true;
+                })
+                .filter(f -> filters.feeType() == null || filters.feeType().isBlank()
+                        || (f.getFeeType() != null && f.getFeeType().getDisplayName().equalsIgnoreCase(filters.feeType().trim())))
+                .toList();
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        BigDecimal totalOutstanding = BigDecimal.ZERO;
+
+        for (FeeLine f : feeLines) {
+            Student s = f.getStudentId() != null ? students.get(f.getStudentId()) : null;
+            BigDecimal remaining = nz(f.getRemainingAmount());
+            totalOutstanding = totalOutstanding.add(remaining);
+
+            rows.add(row(
+                    "feeId", f.getId() != null ? f.getId().toString() : "",
+                    "student", s != null ? s.getFullName() : "—",
+                    "studentRef", s != null && s.getStudentRef() != null ? s.getStudentRef() : "—",
+                    "grade", s != null && s.getGrade() != null ? s.getGrade() : "—",
+                    "feeType", f.getFeeType() != null ? f.getFeeType().getDisplayName() : "—",
+                    "totalAmountEGP", nz(f.getTotalAmount()),
+                    "paidAmountEGP", nz(f.getPaidAmount()),
+                    "outstandingEGP", remaining,
+                    "dueDate", f.getDueDate() != null ? f.getDueDate().toString() : "",
+                    "status", f.getStatus() != null ? f.getStatus().name() : ""
+            ));
+        }
+
+        return new ReportData(
+                List.of(
+                        ReportColumn.of("feeId", "Fee ID"),
+                        ReportColumn.of("student", "Student"),
+                        ReportColumn.of("studentRef", "Student Ref"),
+                        ReportColumn.center("grade", "Grade"),
+                        ReportColumn.of("feeType", "Fee Type"),
+                        ReportColumn.right("totalAmountEGP", "Total (EGP)"),
+                        ReportColumn.right("paidAmountEGP", "Paid (EGP)"),
+                        ReportColumn.right("outstandingEGP", "Outstanding (EGP)"),
+                        ReportColumn.center("dueDate", "Due Date"),
+                        ReportColumn.center("status", "Status")
+                ),
+                rows,
+                "EGP " + totalOutstanding.toPlainString() + " outstanding across " + rows.size() + " fee lines",
+                "Outstanding Fees Report"
+        );
+    }
+
+    private ReportData schoolPartialPayments(LocalDate from, LocalDate to, ReportFilters filters) {
+        UUID schoolId = filters.institutionId();
+        Map<UUID, Student> students = studentIndex();
+
+        List<FeeLine> feeLines = (schoolId != null)
+                ? feeLineRepository.findByInstitutionIdAndStatusNot(schoolId, FeeStatus.CANCELLED)
+                : feeLineRepository.findAll();
+
+        feeLines = feeLines.stream()
+                .filter(f -> (f.getStatus() == FeeStatus.PARTIALLY_PAID)
+                        || (f.getPaidAmount() != null && f.getPaidAmount().compareTo(BigDecimal.ZERO) > 0
+                        && f.getRemainingAmount() != null && f.getRemainingAmount().compareTo(BigDecimal.ZERO) > 0))
+                .filter(f -> {
+                    if (from != null && f.getDueDate() != null && f.getDueDate().isBefore(from)) return false;
+                    if (to != null && f.getDueDate() != null && f.getDueDate().isAfter(to)) return false;
+                    return true;
+                })
+                .filter(f -> filters.feeType() == null || filters.feeType().isBlank()
+                        || (f.getFeeType() != null && f.getFeeType().getDisplayName().equalsIgnoreCase(filters.feeType().trim())))
+                .toList();
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        BigDecimal totalRemaining = BigDecimal.ZERO;
+
+        for (FeeLine f : feeLines) {
+            Student s = f.getStudentId() != null ? students.get(f.getStudentId()) : null;
+            BigDecimal remaining = nz(f.getRemainingAmount());
+            totalRemaining = totalRemaining.add(remaining);
+
+            rows.add(row(
+                    "feeId", f.getId() != null ? f.getId().toString() : "",
+                    "student", s != null ? s.getFullName() : "—",
+                    "studentRef", s != null && s.getStudentRef() != null ? s.getStudentRef() : "—",
+                    "feeType", f.getFeeType() != null ? f.getFeeType().getDisplayName() : "—",
+                    "totalAmountEGP", nz(f.getTotalAmount()),
+                    "paidAmountEGP", nz(f.getPaidAmount()),
+                    "remainingAmountEGP", remaining,
+                    "dueDate", f.getDueDate() != null ? f.getDueDate().toString() : "",
+                    "collectionPeriod", f.getCollectionPeriod() != null ? f.getCollectionPeriod() : "—"
+            ));
+        }
+
+        return new ReportData(
+                List.of(
+                        ReportColumn.of("feeId", "Fee ID"),
+                        ReportColumn.of("student", "Student"),
+                        ReportColumn.of("studentRef", "Student Ref"),
+                        ReportColumn.of("feeType", "Fee Type"),
+                        ReportColumn.right("totalAmountEGP", "Total (EGP)"),
+                        ReportColumn.right("paidAmountEGP", "Paid (EGP)"),
+                        ReportColumn.right("remainingAmountEGP", "Remaining (EGP)"),
+                        ReportColumn.center("dueDate", "Due Date"),
+                        ReportColumn.center("collectionPeriod", "Period")
+                ),
+                rows,
+                "EGP " + totalRemaining.toPlainString() + " remaining across " + rows.size() + " partial payments",
+                "Partial Payments Report"
+        );
+    }
+
+    private List<Payment> capturedPaymentsForSchool(UUID schoolId, LocalDate from, LocalDate to, ReportFilters filters) {
+        LocalDateTime start = (from != null) ? startOf(from) : LocalDateTime.of(2000, 1, 1, 0, 0);
+        LocalDateTime end = (to != null) ? endOf(to) : LocalDateTime.of(2099, 12, 31, 23, 59);
+
+        return paymentRepository.findByStatusInAndCreatedAtBetweenOrderByCreatedAtDesc(
+                        CAPTURED_ONLY, start, end).stream()
+                .filter(p -> p.getAllocations().stream().anyMatch(a -> a.getFeeLine() != null
+                        && (schoolId == null || schoolId.equals(a.getFeeLine().getInstitutionId()))))
+                .filter(p -> matchesMethod(p, filters))
+                .filter(p -> matchesFeeType(p, filters))
+                .toList();
+    }
+
+    private List<Payment> allPaymentsForSchool(UUID schoolId, LocalDate from, LocalDate to, ReportFilters filters) {
+        LocalDateTime start = (from != null) ? startOf(from) : LocalDateTime.of(2000, 1, 1, 0, 0);
+        LocalDateTime end = (to != null) ? endOf(to) : LocalDateTime.of(2099, 12, 31, 23, 59);
+
+        return paymentRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(start, end).stream()
+                .filter(p -> p.getAllocations().stream().anyMatch(a -> a.getFeeLine() != null
+                        && (schoolId == null || schoolId.equals(a.getFeeLine().getInstitutionId()))))
+                .filter(p -> matchesMethod(p, filters))
+                .filter(p -> matchesStatus(p, filters))
+                .filter(p -> matchesFeeType(p, filters))
+                .toList();
     }
 }
