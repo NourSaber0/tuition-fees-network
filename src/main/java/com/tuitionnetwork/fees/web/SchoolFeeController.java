@@ -135,4 +135,14 @@ public class SchoolFeeController {
         }
         return principal.institutionId();
     }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Map<String, Object>> handleResponseStatus(ResponseStatusException ex) {
+        org.springframework.http.HttpStatusCode status = ex.getStatusCode();
+        String code = (status instanceof HttpStatus hs) ? hs.name() : String.valueOf(status.value());
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("error", ex.getReason() != null ? ex.getReason() : code);
+        body.put("message", ex.getReason() != null ? ex.getReason() : code);
+        return ResponseEntity.status(status).body(body);
+    }
 }

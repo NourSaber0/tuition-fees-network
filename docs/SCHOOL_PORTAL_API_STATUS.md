@@ -13,14 +13,14 @@
 
 The School Portal contract defines approximately **64 client-callable endpoints** and **2 automated system engines** across **11 phases** to back the front-end portal screens (`Login.tsx`, `Dashboard.tsx`, `Students.tsx`, `Fees.tsx`, `Upload.tsx`, `Payments.tsx`, `Reconciliation.tsx`, `Reports.tsx`, `Notifications.tsx`, `Users.tsx`, and `Settings.tsx`).
 
-Currently, **Milestone 1 (Phases 1 & 10)**, **Milestone 2 (Phases 2 & 11)**, **Milestone 3 (Phase 3)**, **Milestone 4 (Phase 4)**, and **Milestone 5 (Phase 5)** are **100% complete, verified, and passing 400 automated unit and integration tests** (387 prior tests + 13 fee upload & ingestion tests, 0 failures, 0 errors).
+Currently, **Milestone 1 (Phases 1 & 10)**, **Milestone 2 (Phases 2 & 11)**, **Milestone 3 (Phase 3)**, **Milestone 4 (Phase 4)**, and **Milestone 5 (Phase 5)** are **100% complete, verified, and passing 407 automated unit and integration tests** (387 prior tests + 13 fee upload & ingestion tests + 7 comprehensive master multi-stage E2E journey tests, 0 failures, 0 errors).
 
 | Metric | Count | Percentage |
 |---|:---:|:---:|
 | **Total Contract Endpoints & Jobs** | 66 (64 endpoints + 2 engines) | 100% |
 | **Milestones 1, 2, 3, 4 & 5 Implemented & Verified** (Phases 1, 2, 3, 4, 5, 10, 11) | 51 (49 endpoints + 2 engines) | 77.3% |
 | **Pending Implementation** (Milestones 6–9 / Phases 6–9) | 15 endpoints | 22.7% |
-| **Automated Test Suite Health** | 400 / 400 Tests Green | 100% Pass Rate |
+| **Automated Test Suite Health** | 407 / 407 Tests Green | 100% Pass Rate |
 
 ---
 
@@ -259,3 +259,7 @@ To maintain absolute security and architectural integrity, the following operati
 | **2026-09-11** | OpenApiConfig, Seeder, Recon Scheduler Enhancements | 319 / 319 | 0 | ✅ Clean |
 | **2026-09-11** | **Milestone 1:** School Auth & School User Management (Phases 1 & 10) | **336 / 336** | **0** | ✅ **Clean** |
 | **2026-09-11** | **Milestone 2:** School Dashboard & Settings Profile (Phases 2 & 11) | **352 / 352** | **0** | ✅ **Clean** |
+| **2026-09-12** | **Milestone 3:** Student Roster & Guardians (Phase 3) | **364 / 364** | **0** | ✅ **Clean** |
+| **2026-09-12** | **Milestone 4:** Fee Structure & Penalty Automation (Phase 4) | **387 / 387** | **0** | ✅ **Clean** |
+| **2026-09-13** | **Milestone 5:** Fee Upload & Ingestion Pipeline (Phase 5) | **400 / 400** | **0** | ✅ **Clean** |
+| **2026-09-13** | **Master E2E:** School Portal Master End-to-End Test Suite (Stages 1–7) | **407 / 407** | **0** | ✅ **Clean** |
