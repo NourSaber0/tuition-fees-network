@@ -87,6 +87,9 @@ class SchoolStudentIntegrationTest {
     private JwtTokenProvider jwtTokenProvider;
 
     @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     private MockMvc mockMvc;
@@ -107,6 +110,13 @@ class SchoolStudentIntegrationTest {
         mockMvc = MockMvcBuilders.webAppContextSetup(context)
                 .apply(springSecurity())
                 .build();
+
+        try {
+            jdbcTemplate.execute("DELETE FROM epp_installment");
+            jdbcTemplate.execute("DELETE FROM epp_schedule");
+            jdbcTemplate.execute("DELETE FROM receipt");
+            jdbcTemplate.execute("DELETE FROM payment_state_log");
+        } catch (Exception ignored) {}
 
         paymentAllocationRepository.deleteAll();
         paymentRepository.deleteAll();
