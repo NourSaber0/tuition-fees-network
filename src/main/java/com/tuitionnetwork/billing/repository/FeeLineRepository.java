@@ -32,6 +32,8 @@ public interface FeeLineRepository extends JpaRepository<FeeLine, UUID> {
 
     List<FeeLine> findByInstitutionId(UUID institutionId);
 
+    List<FeeLine> findByInstitutionIdAndStatusNot(UUID institutionId, FeeStatus status);
+
     List<FeeLine> findByInstitutionIdAndStudentId(UUID institutionId, UUID studentId);
 
     Optional<FeeLine> findByInstitutionIdAndStudentIdAndFeeTypeAndCollectionPeriod(

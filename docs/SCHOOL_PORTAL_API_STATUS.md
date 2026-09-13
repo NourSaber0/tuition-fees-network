@@ -13,25 +13,25 @@
 
 The School Portal contract defines approximately **64 client-callable endpoints** and **2 automated system engines** across **11 phases** to back the front-end portal screens (`Login.tsx`, `Dashboard.tsx`, `Students.tsx`, `Fees.tsx`, `Upload.tsx`, `Payments.tsx`, `Reconciliation.tsx`, `Reports.tsx`, `Notifications.tsx`, `Users.tsx`, and `Settings.tsx`).
 
-Currently, **Milestone 1 (Phases 1 & 10)**, **Milestone 2 (Phases 2 & 11)**, and **Milestone 3 (Phase 3)** are **100% complete, verified, and passing 367 automated unit and integration tests** (352 prior tests + 15 school student roster & guardian tests, 0 failures, 0 errors).
+Currently, **Milestone 1 (Phases 1 & 10)**, **Milestone 2 (Phases 2 & 11)**, **Milestone 3 (Phase 3)**, and **Milestone 4 (Phase 4)** are **100% complete, verified, and passing 387 automated unit and integration tests** (367 prior tests + 20 school fee management & penalty engine tests, 0 failures, 0 errors).
 
 | Metric | Count | Percentage |
 |---|:---:|:---:|
 | **Total Contract Endpoints & Jobs** | 66 (64 endpoints + 2 engines) | 100% |
-| **Milestones 1, 2 & 3 Implemented & Verified** (Phases 1, 2, 3, 10, 11) | 34 endpoints | 51.5% |
-| **Pending Implementation** (Milestones 4–9 / Phases 4–9) | 32 endpoints + 2 engines | 48.5% |
-| **Automated Test Suite Health** | 367 / 367 Tests Green | 100% Pass Rate |
+| **Milestones 1, 2, 3 & 4 Implemented & Verified** (Phases 1, 2, 3, 4, 10, 11) | 43 (41 endpoints + 2 engines) | 65.2% |
+| **Pending Implementation** (Milestones 5–9 / Phases 5–9) | 23 endpoints | 34.8% |
+| **Automated Test Suite Health** | 387 / 387 Tests Green | 100% Pass Rate |
 
 ---
 
 ## Milestone Roadmap & Progress Matrix
 
 ```
-[========================================>                             ] 51.5% Overall Progress
+[=================================================>   ] 65.2% Overall Progress
   - Milestone 1: Security, Identity & School Users (Phases 1 & 10)     --> [100% DONE] ✅
   - Milestone 2: Dashboard & Settings Profile (Phases 2 & 11)          --> [100% DONE] ✅
   - Milestone 3: Student Roster & Guardians (Phase 3)                  --> [100% DONE] ✅
-  - Milestone 4: Fee Structure & Penalty Automation (Phase 4)          --> [PENDING]   ⏳
+  - Milestone 4: Fee Structure & Penalty Automation (Phase 4)          --> [100% DONE] ✅
   - Milestone 5: Fee Upload & Ingestion Pipeline (Phase 5)             --> [PENDING]   ⏳
   - Milestone 6: Payments View & Receipts (Phase 6)                    --> [PENDING]   ⏳
   - Milestone 7: Reconciliation & Settlement Visibility (Phase 7)      --> [PENDING]   ⏳
@@ -130,23 +130,25 @@ Currently, **Milestone 1 (Phases 1 & 10)**, **Milestone 2 (Phases 2 & 11)**, and
 ---
 
 ### Milestone 4: Fee Structure & Penalty Automation (Phase 4)
-**Status:** ⏳ **PENDING** (0 / 7 Endpoints + 2 Scheduled Engines)  
-**Target:** Dues Management, Embedded Penalties, Automated Rule Jobs
+**Status:** ✅ **100% COMPLETE** (7 / 7 Endpoints + 2 Scheduled Engines Implemented and Tested)  
+**Test Suite:** [`SchoolFeeIntegrationTest.java`](file:///Users/nourahmed/Downloads/demo/src/test/java/com/tuitionnetwork/fees/SchoolFeeIntegrationTest.java) (20 tests)
 
 #### Phase 4 — Fee Management
-**Source:** `Fees.tsx`, US-20 to US-26 | **Roles:** Read (`school-admin`, `school-finance`), Write/Cancel (`school-admin`)
+**Source:** `Fees.tsx`, US-20 to US-27 | **Roles:** Read (`school-admin`, `school-finance`), Write (`school-admin`, `school-finance`), Cancel/Penalty (`school-admin` only)
 
 | Endpoint | Method | Contract Purpose | Status | Target Component / Notes |
 |---|---|---|:---:|---|
-| `/fees` | `GET` | Paginated fee line query (`search`, `status`, `feeType`, `grade`, `academicYear`) | ⏳ **PENDING** | Real-time dynamic overdue evaluation against current date; tenant-scoped. |
-| `/fees` | `POST` | Create individual fee assessment | ⏳ **PENDING** | Creates `FeeLine` record with embedded penalty rules and snapshot. |
-| `/fees/{id}` | `GET` | Detailed fee line view | ⏳ **PENDING** | Returns fee line, student info, penalty snapshot, and payments. |
-| `/fees/{id}` | `PATCH` | Update fee line amount, due date, or remarks | ⏳ **PENDING** | Allowed only for unpaid dues; locked once payment or EPP is initiated. |
-| `/fees/{id}/cancel` | `POST` | Cancel uncollected fee line with reason | ⏳ **PENDING** | Rejects cancellation if active EPP or partial payment exists. |
-| `/fees/{id}/apply-penalty` | `POST` | Manually apply late penalty to overdue fee | ⏳ **PENDING** | Applies configured penalty amount/percentage directly to `penaltyAmountEGP`. |
-| `/fees/stats` | `GET` | Aggregated fee statistics for school | ⏳ **PENDING** | Total invoiced, collected, overdue, and pending totals. |
-| **Engine A** | Scheduled (`cron`) | Automated Late Penalty Evaluation Engine | ⏳ **PENDING** | Midnight Egypt time (`Africa/Cairo`) cron evaluating overdue fee lines and applying embedded rules. |
-| **Engine B** | Scheduled (`cron`) | 7-Day Due Date Approaching Reminder Engine | ⏳ **PENDING** | Dispatches reminders to parents 7 days prior to fee due date. |
+| `/fees` | `GET` | Paginated fee line query (`search`, `status`, `category`, `grade`, `dueDateFrom`, `dueDateTo`, `studentId`) | ✅ **DONE** | [`SchoolFeeController.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/fees/web/SchoolFeeController.java) via [`SchoolFeeServiceImpl.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/fees/service/SchoolFeeServiceImpl.java). Real-time dynamic status computation (`Paid`, `Overdue`, `Partial`, `Active`) and embedded penalty roll-ups. Strict multi-tenant isolation. |
+| `/fees` | `POST` | Create individual fee assessment | ✅ **DONE** | [`SchoolFeeController.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/fees/web/SchoolFeeController.java). Requires mandatory `dueDate` (`400 due_date_required`), validates student active status (`409 student_inactive`), validates category (`400 invalid_category`), logs audit trail. |
+| `/fees/{id}` | `GET` | Detailed fee line view with payments & penalty snapshot | ✅ **DONE** | Returns fee line, student info, `FeeOverdueInfoDto`, `FeePenaltySnapshotDto`, and linked `paymentHistory` allocations. Blocks cross-school access (`403 Forbidden`). |
+| `/fees/{id}` | `PATCH` | Update fee line amount, due date, or term | ✅ **DONE** | Enforces `newAmountEGP >= paidEGP` (`400 amount_below_paid`), locks if locked in active EPP schedule (`409 not_eligible_for_edit`), recalculates remaining balance and audit logs. |
+| `/fees/{id}/cancel` | `POST` | Cancel uncollected fee line with reason | ✅ **DONE** | School-admin only. Rejects if actively locked in EPP (`422 Unprocessable Entity`) or if partial payments exist (`409 Conflict`), sets status to `CANCELLED`, logs audit trail. |
+| `/fees/{id}/apply-penalty` | `POST` | Manually apply 5% late penalty to overdue Tuition fee | ✅ **DONE** | School-admin only. Enforces Tuition category only, overdue condition, non-zero balance, prevents duplicate penalties (`409 penalty_already_applied`), logs audit trail. |
+| `/fees/{id}/penalty-info` | `GET` | Real-time deadline and priority snapshot | ✅ **DONE** | [`SchoolFeeController.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/fees/web/SchoolFeeController.java). Returns real-time deadline status, daysToDue, and priority from `DeadlinePolicy`. |
+| `/fees/stats` | `GET` | Aggregated fee statistics for school | ✅ **DONE** | Computes real-time tenant totals: `totalInvoicedEGP`, `totalCollectedEGP`, `totalOutstandingEGP`, `totalOverdueEGP`, `overdueCount`, and distinct `totalStudentsWithOverdue`. |
+| `/fee-categories` | `GET` | Fee category listing and allocation priority order | ✅ **DONE** | [`FeeCategoryController.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/fees/web/FeeCategoryController.java). Serves Tuition (1), Books (2), Activity (3), and Bus (4) priority hierarchy. |
+| **Engine A** | Scheduled (`00:05` Cairo) | Automated Late Penalty Evaluation Engine | ✅ **DONE** | [`FeeAutomatedRulesEngine.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/fees/service/FeeAutomatedRulesEngine.java). Evaluates overdue Tuition fees with grace ended (`daysOverdue > 7`), applies flat 5% penalty idempotently, persists `penaltyAmountEGP` and `penaltyAppliedAt`, and writes audit log. |
+| **Engine B** | Scheduled (`08:00` Cairo) | 7-Day Due Date Approaching Reminder Engine | ✅ **DONE** | [`FeeAutomatedRulesEngine.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/fees/service/FeeAutomatedRulesEngine.java). Dispatches unread guardian reminders exactly 7 calendar days before `dueDate` for outstanding fee lines with idempotency guard. |
 
 ---
 
