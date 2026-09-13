@@ -35,11 +35,26 @@ public class CsvUpload {
     @Column(name = "failed_rows", nullable = false)
     private int failedRows;
 
+    @Column(name = "accepted_rows", nullable = false)
+    private int acceptedRows = 0;
+
+    @Column(name = "status", nullable = false)
+    private String status = "Completed";
+
+    @Column(name = "file_hash")
+    private String fileHash;
+
+    @Column(name = "format")
+    private String format;
+
     @Column(name = "uploaded_at", nullable = false)
     private LocalDateTime uploadedAt;
 
     @OneToMany(mappedBy = "csvUpload", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<UploadError> uploadErrors = new ArrayList<>();
+
+    @OneToMany(mappedBy = "csvUpload", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<UploadRow> uploadRows = new ArrayList<>();
 
     public CsvUpload() {
     }
@@ -49,7 +64,32 @@ public class CsvUpload {
         this.fileName = fileName;
         this.totalRows = totalRows;
         this.failedRows = failedRows;
+        this.acceptedRows = Math.max(0, totalRows - failedRows);
+        this.status = computeStatus(totalRows, this.acceptedRows, failedRows);
         this.uploadedAt = LocalDateTime.now();
+    }
+
+    public CsvUpload(UUID institutionId, String fileName, String fileHash, String format,
+                     int totalRows, int acceptedRows, int failedRows, String status) {
+        this.institutionId = institutionId;
+        this.fileName = fileName;
+        this.fileHash = fileHash;
+        this.format = format;
+        this.totalRows = totalRows;
+        this.acceptedRows = acceptedRows;
+        this.failedRows = failedRows;
+        this.status = status != null ? status : computeStatus(totalRows, acceptedRows, failedRows);
+        this.uploadedAt = LocalDateTime.now();
+    }
+
+    private static String computeStatus(int total, int accepted, int failed) {
+        if (total == 0 || failed == 0) {
+            return "Completed";
+        }
+        if (accepted > 0 && failed > 0) {
+            return "Completed with Errors";
+        }
+        return "Failed";
     }
 
     @PrePersist
@@ -57,11 +97,19 @@ public class CsvUpload {
         if (this.uploadedAt == null) {
             this.uploadedAt = LocalDateTime.now();
         }
+        if (this.status == null) {
+            this.status = computeStatus(totalRows, acceptedRows, failedRows);
+        }
     }
 
     public void addError(UploadError error) {
         uploadErrors.add(error);
         error.setCsvUpload(this);
+    }
+
+    public void addUploadRow(UploadRow row) {
+        uploadRows.add(row);
+        row.setCsvUpload(this);
     }
 
     public UUID getId() {
@@ -104,6 +152,38 @@ public class CsvUpload {
         this.failedRows = failedRows;
     }
 
+    public int getAcceptedRows() {
+        return acceptedRows;
+    }
+
+    public void setAcceptedRows(int acceptedRows) {
+        this.acceptedRows = acceptedRows;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public String getFileHash() {
+        return fileHash;
+    }
+
+    public void setFileHash(String fileHash) {
+        this.fileHash = fileHash;
+    }
+
+    public String getFormat() {
+        return format;
+    }
+
+    public void setFormat(String format) {
+        this.format = format;
+    }
+
     public LocalDateTime getUploadedAt() {
         return uploadedAt;
     }
@@ -118,6 +198,14 @@ public class CsvUpload {
 
     public void setUploadErrors(List<UploadError> uploadErrors) {
         this.uploadErrors = uploadErrors;
+    }
+
+    public List<UploadRow> getUploadRows() {
+        return uploadRows;
+    }
+
+    public void setUploadRows(List<UploadRow> uploadRows) {
+        this.uploadRows = uploadRows;
     }
 
     @Override
