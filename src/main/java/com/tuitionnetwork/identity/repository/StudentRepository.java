@@ -13,4 +13,7 @@ public interface StudentRepository extends JpaRepository<Student, UUID> {
     Optional<Student> findByNationalIdHash(String nationalIdHash);
     List<Student> findByGuardianId(UUID guardianId);
     List<Student> findByInstitutionId(UUID institutionId);
+    Optional<Student> findByInstitutionIdAndStudentRef(UUID institutionId, String studentRef);
+    boolean existsByInstitutionIdAndStudentRef(UUID institutionId, String studentRef);
+    List<Student> findByInstitutionIdAndStatus(UUID institutionId, String status);
 }

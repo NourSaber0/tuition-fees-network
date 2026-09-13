@@ -13,24 +13,24 @@
 
 The School Portal contract defines approximately **64 client-callable endpoints** and **2 automated system engines** across **11 phases** to back the front-end portal screens (`Login.tsx`, `Dashboard.tsx`, `Students.tsx`, `Fees.tsx`, `Upload.tsx`, `Payments.tsx`, `Reconciliation.tsx`, `Reports.tsx`, `Notifications.tsx`, `Users.tsx`, and `Settings.tsx`).
 
-Currently, **Milestone 1 (Phases 1 & 10)** and **Milestone 2 (Phases 2 & 11)** are **100% complete, verified, and passing 352 automated unit and integration tests** (319 existing bank back-office tests + 17 school security tests + 16 school dashboard and settings tests, 0 failures, 0 errors).
+Currently, **Milestone 1 (Phases 1 & 10)**, **Milestone 2 (Phases 2 & 11)**, and **Milestone 3 (Phase 3)** are **100% complete, verified, and passing 367 automated unit and integration tests** (352 prior tests + 15 school student roster & guardian tests, 0 failures, 0 errors).
 
 | Metric | Count | Percentage |
 |---|:---:|:---:|
 | **Total Contract Endpoints & Jobs** | 66 (64 endpoints + 2 engines) | 100% |
-| **Milestones 1 & 2 Implemented & Verified** (Phases 1, 2, 10, 11) | 24 endpoints | 36.4% |
-| **Pending Implementation** (Milestones 3–9 / Phases 3–9) | 42 endpoints + 2 engines | 63.6% |
-| **Automated Test Suite Health** | 352 / 352 Tests Green | 100% Pass Rate |
+| **Milestones 1, 2 & 3 Implemented & Verified** (Phases 1, 2, 3, 10, 11) | 34 endpoints | 51.5% |
+| **Pending Implementation** (Milestones 4–9 / Phases 4–9) | 32 endpoints + 2 engines | 48.5% |
+| **Automated Test Suite Health** | 367 / 367 Tests Green | 100% Pass Rate |
 
 ---
 
 ## Milestone Roadmap & Progress Matrix
 
 ```
-[=============================>                                        ] 36.4% Overall Progress
+[========================================>                             ] 51.5% Overall Progress
   - Milestone 1: Security, Identity & School Users (Phases 1 & 10)     --> [100% DONE] ✅
   - Milestone 2: Dashboard & Settings Profile (Phases 2 & 11)          --> [100% DONE] ✅
-  - Milestone 3: Student Roster & Guardians (Phase 3)                  --> [PENDING]   ⏳
+  - Milestone 3: Student Roster & Guardians (Phase 3)                  --> [100% DONE] ✅
   - Milestone 4: Fee Structure & Penalty Automation (Phase 4)          --> [PENDING]   ⏳
   - Milestone 5: Fee Upload & Ingestion Pipeline (Phase 5)             --> [PENDING]   ⏳
   - Milestone 6: Payments View & Receipts (Phase 6)                    --> [PENDING]   ⏳
@@ -104,24 +104,28 @@ Currently, **Milestone 1 (Phases 1 & 10)** and **Milestone 2 (Phases 2 & 11)** a
 ---
 
 ### Milestone 3: Student Roster & Guardians Management (Phase 3)
-**Status:** ⏳ **PENDING** (0 / 10 Endpoints)  
-**Target:** Student CRUD, Guardian linkages, Fee balance roll-ups, Statements
+**Status:** ✅ **100% COMPLETE** (10 / 10 Endpoints Implemented and Tested)  
+**Test Suite:** [`SchoolStudentIntegrationTest.java`](file:///F:/tuition-fees-network-main%20(1)/tuition-fees-network-main/src/test/java/com/tuitionnetwork/students/SchoolStudentIntegrationTest.java) (15 tests)
 
 #### Phase 3 — Student Management
-**Source:** `Students.tsx`, S07–S09, US-16 to US-18 | **Roles:** Read (`school-admin`, `school-finance`), Write (`school-admin`)
+**Source:** `Students.tsx`, S07–S09, US-16 to US-25 | **Roles:** Read (`school-admin`, `school-finance`), Write (`school-admin` only)
 
 | Endpoint | Method | Contract Purpose | Status | Target Component / Notes |
 |---|---|---|:---:|---|
-| `/students` | `GET` | Paginated search & list with grade, section, status, and fee status filters | ⏳ **PENDING** | Dynamic JPA Specification scoped by `institutionId`. Computes `totalFeesEGP`, `paidEGP`, `remainingEGP`, and fee status. |
-| `/students` | `POST` | Enroll new student with student ID uniqueness check | ⏳ **PENDING** | Checks student ID uniqueness within the school, validates National ID if present. |
-| `/students/{id}` | `GET` | Student profile detail with guardians and fee summary | ⏳ **PENDING** | Detail view asserting school ownership. |
-| `/students/{id}` | `PATCH` | Update student demographic or academic info | ⏳ **PENDING** | Partial update asserting school ownership. |
-| `/students/{id}/fees` | `GET` | Detailed fee lines for the student | ⏳ **PENDING** | Returns tuition/bus/supplies fee lines with due dates and balances. |
-| `/students/{id}/payments` | `GET` | Payment history and receipts for the student | ⏳ **PENDING** | Returns all successful and pending payments for the student's fee lines. |
-| `/students/{id}/guardians` | `GET` | List linked guardians with relationships and primary flags | ⏳ **PENDING** | Retrieves guardians linked to the student. |
-| `/students/{id}/guardians` | `POST` | Link or create guardian for student | ⏳ **PENDING** | Links existing or provisions new guardian with contact info and relationship. |
-| `/students/{id}/guardians/{guardianId}` | `DELETE` | Unlink guardian from student | ⏳ **PENDING** | Removes link while preserving primary guardian invariant. |
-| `/students/{id}/statement` | `GET` | Official account statement with running balance | ⏳ **PENDING** | Chronological ledger of fee assessments and payment credits. |
+| `/students` | `GET` | Paginated search & list with grade, section, status, and fee status filters | ✅ **DONE** | [`SchoolStudentController.java`](file:///F:/tuition-fees-network-main%20(1)/tuition-fees-network-main/src/main/java/com/tuitionnetwork/students/web/SchoolStudentController.java) via [`SchoolStudentServiceImpl.java`](file:///F:/tuition-fees-network-main%20(1)/tuition-fees-network-main/src/main/java/com/tuitionnetwork/students/service/SchoolStudentServiceImpl.java). Filters: `search`, `grade`, `page`, `pageSize`. Dynamically aggregates `totalFeesEGP`, `paidEGP`, and `outstandingEGP`. Omits National ID. |
+| `/students/deactivated` | `GET` | List deactivated/withdrawn students with date-range filter | ✅ **DONE** | [`SchoolStudentController.java`](file:///F:/tuition-fees-network-main%20(1)/tuition-fees-network-main/src/main/java/com/tuitionnetwork/students/web/SchoolStudentController.java). Filters: `search`, `deactivatedFrom`, `deactivatedTo`, `page`, `pageSize`. |
+| `/students/{id}` | `GET` | Student profile detail with masked National ID, guardians, and fee summary | ✅ **DONE** | Returns complete student record with `nationalIdMasked` (`299*******4567`), parent contact, and fee roll-up totals. Blocks cross-school access (`403 Forbidden`). |
+| `/students` | `POST` | Enroll new student with studentRef uniqueness check | ✅ **DONE** | School-admin only. Validates `studentRef` uniqueness within school (`409 Conflict`), validates 14-digit National ID, hashes with HMAC-SHA256, links parent, and writes audit trail. |
+| `/students/{id}` | `PATCH` | Update student demographic or academic info | ✅ **DONE** | School-admin only. Updates name, grade, section, contact info, and verifies studentRef collisions. |
+| `/students/{id}/deactivate` | `POST` | Deactivate student with withdrawal reason | ✅ **DONE** | School-admin only. Sets `status = Inactive`, records `deactivatedDate`, rejects already inactive (`409 Conflict`), writes audit trail. |
+| `/students/{id}/reactivate` | `POST` | Reactivate inactive student to active status | ✅ **DONE** | School-admin only. Clears deactivation metadata, sets `status = Active`, writes audit trail. |
+| `/students/{id}/fees` | `GET` | Detailed fee lines for the student (active & historical) | ✅ **DONE** | Returns all tuition, bus, books, and activity fee lines for student with due dates, balances, and totals. |
+| `/students/{id}/payments` | `GET` | Payment history and allocated dues for the student | ✅ **DONE** | Returns payment transactions and allocations matching student's dues (`dateFrom`, `dateTo` filters). |
+| `/students/search` | `GET` | Fast typed student search picker for Add-Fee screen | ✅ **DONE** | Returns active matching students (`q=`); strictly excludes deactivated students. |
+| `/students/{id}/guardians` | `GET` | List linked guardians with relationships and primary flags | ✅ **DONE** | Retrieves linked guardians and parent contacts for student. |
+| `/students/{id}/guardians` | `POST` | Link or create guardian for student | ✅ **DONE** | School-admin only. Provisions or links guardian with contact details and writes audit trail. |
+| `/students/{id}/guardians/{guardianId}` | `DELETE` | Unlink guardian from student | ✅ **DONE** | School-admin only. Unlinks guardian association from student and writes audit trail. |
+| `/students/{id}/statement` | `GET` | Official account statement with running balance | ✅ **DONE** | Chronological ledger of fee assessments (debits) and payment allocations (credits) with computed running balance. |
 
 ---
 
