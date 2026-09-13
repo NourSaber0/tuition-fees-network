@@ -14,6 +14,11 @@ import org.springframework.data.repository.query.Param;
 public interface PaymentAllocationRepository extends JpaRepository<PaymentAllocation, UUID> {
     List<PaymentAllocation> findByFeeLineId(UUID feeLineId);
 
+    List<PaymentAllocation> findByPaymentId(UUID paymentId);
+
     @Query("select pa from PaymentAllocation pa where pa.feeLine.institutionId = :institutionId order by pa.payment.createdAt desc")
     List<PaymentAllocation> findByInstitutionId(@Param("institutionId") UUID institutionId);
+
+    @Query("select count(pa) > 0 from PaymentAllocation pa where pa.payment.id = :paymentId and pa.feeLine.institutionId = :institutionId")
+    boolean existsByPaymentIdAndInstitutionId(@Param("paymentId") UUID paymentId, @Param("institutionId") UUID institutionId);
 }

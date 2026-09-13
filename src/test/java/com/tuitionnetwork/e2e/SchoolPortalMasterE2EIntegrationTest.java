@@ -30,6 +30,11 @@ import com.tuitionnetwork.ingestion.repository.UploadErrorRepository;
 import com.tuitionnetwork.ingestion.repository.UploadRowRepository;
 import com.tuitionnetwork.ingestion.util.XlsxParser;
 import com.tuitionnetwork.notifications.repository.NotificationRepository;
+import com.tuitionnetwork.payments.domain.Payment;
+import com.tuitionnetwork.payments.domain.PaymentAllocation;
+import com.tuitionnetwork.payments.domain.PaymentMethod;
+import com.tuitionnetwork.payments.domain.PaymentStatus;
+import com.tuitionnetwork.payments.domain.Receipt;
 import com.tuitionnetwork.payments.repository.PaymentAllocationRepository;
 import com.tuitionnetwork.payments.repository.PaymentRepository;
 import com.tuitionnetwork.settings.dto.ChangePasswordRequest;
@@ -107,6 +112,9 @@ public class SchoolPortalMasterE2EIntegrationTest {
     private PaymentAllocationRepository paymentAllocationRepository;
 
     @Autowired
+    private com.tuitionnetwork.payments.repository.ReceiptRepository receiptRepository;
+
+    @Autowired
     private NotificationRepository notificationRepository;
 
     @Autowired
@@ -147,6 +155,7 @@ public class SchoolPortalMasterE2EIntegrationTest {
         uploadErrorRepository.deleteAll();
         csvUploadRepository.deleteAll();
         paymentAllocationRepository.deleteAll();
+        receiptRepository.deleteAll();
         paymentRepository.deleteAll();
         notificationRepository.deleteAll();
         feeLineRepository.deleteAll();
@@ -761,5 +770,99 @@ public class SchoolPortalMasterE2EIntegrationTest {
 
         mockMvc.perform(get("/api/v1/dashboard/summary"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("Stage 8: Payments View, Allocated Dues Breakdown & Crypto-Signed Receipts (Phase 6 / Milestone 6)")
+    void testStage8_PaymentsViewAndCryptoSignedReceipts() throws Exception {
+        // 8.1 Seed Student, FeeLine, Payment and Allocation in School A
+        Student student = new Student(
+                null, schoolA.getId(), "hash_p8", "enc_p8", "Tarek El-Sayed",
+                LocalDate.of(2010, 4, 10), "STU-0888", "Grade 11", "A",
+                "El-Sayed Tarek", "+20 10 9999 8888", "elsayed@example.com"
+        );
+        student.setStatus("Active");
+        student = studentRepository.save(student);
+
+        FeeLine fee = new FeeLine(schoolA.getId(), student.getId(), FeeType.TUITION,
+                new BigDecimal("20000.00"), new BigDecimal("10000.00"), "Term 1 2026/27", LocalDate.now().plusMonths(1));
+        fee.setPaidAmount(new BigDecimal("10000.00"));
+        fee.setStatus(FeeStatus.PARTIALLY_PAID);
+        fee = feeLineRepository.save(fee);
+
+        Payment payment = new Payment(UUID.randomUUID(), new BigDecimal("10000.00"), PaymentMethod.CREDIT_CARD, "idemp-m6-stage8");
+        payment.setTransactionReference("TX-20260913-0888");
+        payment.setStatus(PaymentStatus.CAPTURED);
+        payment.setCreatedAt(LocalDateTime.now().minusHours(2));
+        payment = paymentRepository.save(payment);
+
+        PaymentAllocation alloc = new PaymentAllocation(payment, fee, new BigDecimal("10000.00"));
+        paymentAllocationRepository.save(alloc);
+
+        Receipt receipt = new Receipt(payment, "SIG-SHA256-STAGE8TESTSIG9999", "https://cdn.tuitionnetwork.eg/receipts/receipt-" + payment.getId() + ".pdf");
+        receipt.setIssuedAt(LocalDateTime.now().minusHours(2));
+        receiptRepository.save(receipt);
+
+        // 8.2 Query School Payments list (Phase 6.1)
+        mockMvc.perform(get("/api/v1/payments")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].id").value("TX-20260913-0888"))
+                .andExpect(jsonPath("$.data[0].studentName").value("Tarek El-Sayed"))
+                .andExpect(jsonPath("$.data[0].amountEGP").value(10000.00))
+                .andExpect(jsonPath("$.data[0].status").value("Successful"))
+                .andExpect(jsonPath("$.data[0].isPartial").value(true));
+
+        // 8.3 Query Payment Detail with Allocated Dues Breakdown (Phase 6.2)
+        mockMvc.perform(get("/api/v1/payments/" + payment.getId())
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("TX-20260913-0888"))
+                .andExpect(jsonPath("$.amountEGP").value(10000.00))
+                .andExpect(jsonPath("$.allocation", hasSize(1)))
+                .andExpect(jsonPath("$.allocation[0].feeCategory").value("Tuition"))
+                .andExpect(jsonPath("$.allocation[0].allocatedEGP").value(10000.00))
+                .andExpect(jsonPath("$.allocation[0].remainingAfterEGP").value(10000.00));
+
+        // 8.4 Query Crypto-Signed Receipt JSON
+        mockMvc.perform(get("/api/v1/payments/" + payment.getId() + "/receipt")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cryptoSignature").value("SIG-SHA256-STAGE8TESTSIG9999"))
+                .andExpect(jsonPath("$.amount").value(10000.00));
+
+        // 8.5 Download Crypto-Signed PDF Receipt
+        mockMvc.perform(get("/api/v1/payments/" + payment.getId() + "/receipt?format=pdf")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "application/pdf"))
+                .andExpect(header().string("Content-Disposition", containsString("receipt-")));
+
+        // 8.6 Export Payments CSV (Phase 6.3)
+        mockMvc.perform(get("/api/v1/payments/export")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", containsString("text/csv")))
+                .andExpect(header().string("Content-Disposition", containsString("payments-export.csv")));
+
+        // 8.7 Cross-School Payment Isolation (School B blocked from School A payment)
+        mockMvc.perform(get("/api/v1/payments/" + payment.getId())
+                        .header("Authorization", "Bearer " + tokenAdminB))
+                .andExpect(status().isForbidden());
+
+        // 8.8 Bank-Only Guardrail: School Admin cannot execute payment
+        mockMvc.perform(post("/api/v1/payments")
+                        .header("Authorization", "Bearer " + tokenAdminA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "nationalId": "29501011234567",
+                                    "feeIds": ["%s"],
+                                    "amountEGP": 1000.00,
+                                    "method": "Card"
+                                }
+                                """.formatted(fee.getId())))
+                .andExpect(status().isForbidden());
     }
 }

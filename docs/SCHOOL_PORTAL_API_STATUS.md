@@ -13,27 +13,27 @@
 
 The School Portal contract defines approximately **64 client-callable endpoints** and **2 automated system engines** across **11 phases** to back the front-end portal screens (`Login.tsx`, `Dashboard.tsx`, `Students.tsx`, `Fees.tsx`, `Upload.tsx`, `Payments.tsx`, `Reconciliation.tsx`, `Reports.tsx`, `Notifications.tsx`, `Users.tsx`, and `Settings.tsx`).
 
-Currently, **Milestone 1 (Phases 1 & 10)**, **Milestone 2 (Phases 2 & 11)**, **Milestone 3 (Phase 3)**, **Milestone 4 (Phase 4)**, and **Milestone 5 (Phase 5)** are **100% complete, verified, and passing 407 automated unit and integration tests** (387 prior tests + 13 fee upload & ingestion tests + 7 comprehensive master multi-stage E2E journey tests, 0 failures, 0 errors).
+Currently, **Milestone 1 (Phases 1 & 10)**, **Milestone 2 (Phases 2 & 11)**, **Milestone 3 (Phase 3)**, **Milestone 4 (Phase 4)**, **Milestone 5 (Phase 5)**, and **Milestone 6 (Phase 6)** are **100% complete, verified, and passing 424 automated unit and integration tests** (407 prior tests + 17 payment view, receipts & E2E tests, 0 failures, 0 errors).
 
 | Metric | Count | Percentage |
 |---|:---:|:---:|
 | **Total Contract Endpoints & Jobs** | 66 (64 endpoints + 2 engines) | 100% |
-| **Milestones 1, 2, 3, 4 & 5 Implemented & Verified** (Phases 1, 2, 3, 4, 5, 10, 11) | 51 (49 endpoints + 2 engines) | 77.3% |
-| **Pending Implementation** (Milestones 6–9 / Phases 6–9) | 15 endpoints | 22.7% |
-| **Automated Test Suite Health** | 407 / 407 Tests Green | 100% Pass Rate |
+| **Milestones 1, 2, 3, 4, 5 & 6 Implemented & Verified** (Phases 1, 2, 3, 4, 5, 6, 10, 11) | 55 (53 endpoints + 2 engines) | 83.3% |
+| **Pending Implementation** (Milestones 7–9 / Phases 7–9) | 11 endpoints | 16.7% |
+| **Automated Test Suite Health** | 424 / 424 Tests Green | 100% Pass Rate |
 
 ---
 
 ## Milestone Roadmap & Progress Matrix
 
 ```
-[=========================================================> ] 77.3% Overall Progress
+[=============================================================>] 83.3% Overall Progress
   - Milestone 1: Security, Identity & School Users (Phases 1 & 10)     --> [100% DONE] ✅
   - Milestone 2: Dashboard & Settings Profile (Phases 2 & 11)          --> [100% DONE] ✅
   - Milestone 3: Student Roster & Guardians (Phase 3)                  --> [100% DONE] ✅
   - Milestone 4: Fee Structure & Penalty Automation (Phase 4)          --> [100% DONE] ✅
   - Milestone 5: Fee Upload & Ingestion Pipeline (Phase 5)             --> [100% DONE] ✅
-  - Milestone 6: Payments View & Receipts (Phase 6)                    --> [PENDING]   ⏳
+  - Milestone 6: Payments View & Receipts (Phase 6)                    --> [100% DONE] ✅
   - Milestone 7: Reconciliation & Settlement Visibility (Phase 7)      --> [PENDING]   ⏳
   - Milestone 8: Reports & Asynchronous Generation Pipeline (Phase 8)  --> [PENDING]   ⏳
   - Milestone 9: In-App & Email Notifications (Phase 9)                --> [PENDING]   ⏳
@@ -174,17 +174,18 @@ Currently, **Milestone 1 (Phases 1 & 10)**, **Milestone 2 (Phases 2 & 11)**, **M
 ---
 
 ### Milestone 6: Payments View & Receipts (Phase 6)
-**Status:** ⏳ **PENDING** (0 / 3 Endpoints)  
-**Target:** Read-only payment tracking, Channel breakdown, Crypto-signed receipts
+**Status:** ✅ **100% COMPLETE** (4 / 4 Endpoints Implemented and Tested)  
+**Test Suite:** [`SchoolPaymentIntegrationTest.java`](file:///Users/nourahmed/Downloads/demo/src/test/java/com/tuitionnetwork/payments/SchoolPaymentIntegrationTest.java) (16 tests) & [`SchoolPortalMasterE2EIntegrationTest.java`](file:///Users/nourahmed/Downloads/demo/src/test/java/com/tuitionnetwork/e2e/SchoolPortalMasterE2EIntegrationTest.java) (Stage 8)
 
 #### Phase 6 — Payments (view-only)
-**Source:** `Payments.tsx`, US-33 to US-36 | **Roles:** `school-admin`, `school-finance` (read-only)
+**Source:** `Payments.tsx`, S22–S23, US-33 to US-36 | **Roles:** `school-admin`, `school-finance` (read-only) | **Status:** 4 / 4 DONE
 
-| Endpoint | Method | Contract Purpose | Status | Target Component / Notes |
+| Endpoint | Method | Contract Purpose | Status | Implementation Details |
 |---|---|---|:---:|---|
-| `/payments` | `GET` | Paginated payment transactions list for the school | ⏳ **PENDING** | Scoped to school dues; filter by date range, channel (`card`, `debit`, `epp`), student. |
-| `/payments/{id}` | `GET` | Payment detail view with allocated dues breakdown | ⏳ **PENDING** | Returns payment details, bank transaction reference, and fee allocations. |
-| `/payments/{id}/receipt` | `GET` | Download crypto-signed official payment receipt (PDF) | ⏳ **PENDING** | Returns receipt verification signature and downloadable PDF. |
+| `/payments` | `GET` | Paginated payment transactions list for the school | ✅ **DONE** | [`BackOfficePaymentController.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/payments/web/BackOfficePaymentController.java) via [`SchoolPaymentService.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/payments/service/SchoolPaymentService.java). Scoped strictly to school's dues; filters by `search`, `dateFrom`, `dateTo`, `status`, `feeCategory`, `studentId`, `method`. Returns Phase 6.1 contract shape with `data`, `total`, `page`, `pageSize`, `totalPages`. |
+| `/payments/{id}` | `GET` | Payment detail view with allocated dues breakdown | ✅ **DONE** | [`BackOfficePaymentController.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/payments/web/BackOfficePaymentController.java). Accepts UUID or transaction reference string (`TX-2026...`). Enforces tenant isolation (blocks cross-school access with `403 Forbidden`). Returns Phase 6.2 structure with `allocation` array (`feeId`, `feeName`, `feeCategory`, `dueDate`, `originalAmountEGP`, `previouslyPaidEGP`, `outstandingEGP`, `allocatedEGP`, `remainingAfterEGP`, `feeStatus`, `priority`, `isOverdue`). |
+| `/payments/{id}/receipt` | `GET` | Download official crypto-signed payment receipt (PDF or JSON) | ✅ **DONE** | Dual format support: returns JSON metadata (`ReceiptDetailDto` with `cryptoSignature`, `receiptReference`, etc.) or downloadable official `%PDF-1.4` binary receipt when `?format=pdf` or `Accept: application/pdf` is supplied. Enforces school tenant access. |
+| `/payments/export` | `GET` | Export filtered payments as CSV (`GET /payments/export?format=csv`) | ✅ **DONE** | Streams downloadable UTF-8 CSV with BOM for current filtered view with transaction ID, student details, fee name, amount, method, status, and remaining fee balance. |
 
 ---
 
@@ -263,3 +264,4 @@ To maintain absolute security and architectural integrity, the following operati
 | **2026-09-12** | **Milestone 4:** Fee Structure & Penalty Automation (Phase 4) | **387 / 387** | **0** | ✅ **Clean** |
 | **2026-09-13** | **Milestone 5:** Fee Upload & Ingestion Pipeline (Phase 5) | **400 / 400** | **0** | ✅ **Clean** |
 | **2026-09-13** | **Master E2E:** School Portal Master End-to-End Test Suite (Stages 1–7) | **407 / 407** | **0** | ✅ **Clean** |
+| **2026-09-13** | **Milestone 6:** Payments View, Receipts & Master E2E Stage 8 (Phase 6) | **424 / 424** | **0** | ✅ **Clean** |

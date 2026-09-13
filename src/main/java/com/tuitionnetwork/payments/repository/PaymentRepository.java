@@ -22,6 +22,8 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID>, JpaSpec
 
     Optional<Payment> findByIdempotencyKey(String idempotencyKey);
 
+    Optional<Payment> findByTransactionReference(String transactionReference);
+
     Page<Payment> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
     List<Payment> findByCreatedAtBetweenOrderByCreatedAtDesc(LocalDateTime from, LocalDateTime to);
