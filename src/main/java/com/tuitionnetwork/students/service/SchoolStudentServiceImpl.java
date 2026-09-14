@@ -31,6 +31,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -124,16 +125,16 @@ public class SchoolStudentServiceImpl implements SchoolStudentService {
     public StudentDetailDto enrollStudent(UUID institutionId, EnrollStudentRequest request, UUID actorId) {
         validateInstitution(institutionId);
 
-        if (request.studentRef() == null || request.studentRef().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "studentRef is required");
-        }
         if (request.name() == null || request.name().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "name is required");
         }
 
-        String studentRef = request.studentRef().trim();
-        if (studentRepository.findByInstitutionIdAndStudentRef(institutionId, studentRef).isPresent()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "duplicate_student_ref: " + studentRef);
+        String studentRef;
+        if (request.studentRef() == null || request.studentRef().isBlank() ||
+                studentRepository.findByInstitutionIdAndStudentRef(institutionId, request.studentRef().trim()).isPresent()) {
+            studentRef = generateUniqueStudentRef(institutionId);
+        } else {
+            studentRef = request.studentRef().trim();
         }
 
         String nationalId = request.nationalId() != null ? request.nationalId().trim() : null;
@@ -695,10 +696,49 @@ public class SchoolStudentServiceImpl implements SchoolStudentService {
     }
 
     private boolean matchesGrade(Student s, String grade) {
-        if (grade == null || grade.isBlank()) {
+        if (grade == null || grade.isBlank() || "All Grades".equalsIgnoreCase(grade.trim())) {
             return true;
         }
-        return s.getGrade() != null && s.getGrade().equalsIgnoreCase(grade.trim());
+        if (s.getGrade() == null || s.getGrade().isBlank()) {
+            return false;
+        }
+        String sGrade = s.getGrade().trim();
+        String qGrade = grade.trim();
+        if (sGrade.equalsIgnoreCase(qGrade)) {
+            return true;
+        }
+
+        // Normalize by removing case-insensitive "grade" / "gr" and extra non-alphanumeric characters
+        String sNorm = sGrade.replaceAll("(?i)\\bgrade\\b|\\bgr\\b", "").replaceAll("[^a-zA-Z0-9]", "").trim();
+        String qNorm = qGrade.replaceAll("(?i)\\bgrade\\b|\\bgr\\b", "").replaceAll("[^a-zA-Z0-9]", "").trim();
+
+        if (!sNorm.isEmpty() && !qNorm.isEmpty()) {
+            if (sNorm.matches("\\d+") && qNorm.matches("\\d+")) {
+                try {
+                    return Integer.parseInt(sNorm) == Integer.parseInt(qNorm);
+                } catch (NumberFormatException ignored) {
+                }
+            }
+            return sNorm.equalsIgnoreCase(qNorm);
+        }
+        return sGrade.equalsIgnoreCase(qGrade);
+    }
+
+    private String generateUniqueStudentRef(UUID institutionId) {
+        List<Student> all = studentRepository.findByInstitutionId(institutionId);
+        Set<String> existing = all.stream()
+                .map(Student::getStudentRef)
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .collect(Collectors.toSet());
+
+        for (int i = 1; i <= 9999; i++) {
+            String candidate = String.format("STU-%03d", i);
+            if (!existing.contains(candidate)) {
+                return candidate;
+            }
+        }
+        return "STU-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
     }
 
     private boolean matchesDateRange(LocalDate target, LocalDate from, LocalDate to) {

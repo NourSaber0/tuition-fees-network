@@ -85,7 +85,7 @@ public class SchoolStudentController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
+    @PreAuthorize("hasAnyRole('SCHOOL_ADMIN', 'SCHOOL_FINANCE', 'INSTITUTION_ADMIN')")
     public ResponseEntity<StudentDetailDto> enrollStudent(
             @Valid @RequestBody EnrollStudentRequest request,
             @AuthenticationPrincipal SecurityUserPrincipal principal) {
@@ -97,7 +97,7 @@ public class SchoolStudentController {
     }
 
     @PatchMapping("/{id}")
-    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
+    @PreAuthorize("hasAnyRole('SCHOOL_ADMIN', 'SCHOOL_FINANCE', 'INSTITUTION_ADMIN')")
     public ResponseEntity<StudentDetailDto> updateStudent(
             @PathVariable("id") UUID studentId,
             @RequestBody UpdateStudentRequest request,
@@ -109,7 +109,7 @@ public class SchoolStudentController {
     }
 
     @PostMapping("/{id}/deactivate")
-    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
+    @PreAuthorize("hasAnyRole('SCHOOL_ADMIN', 'SCHOOL_FINANCE', 'INSTITUTION_ADMIN')")
     public ResponseEntity<StudentSummaryDto> deactivateStudent(
             @PathVariable("id") UUID studentId,
             @RequestBody(required = false) DeactivateStudentRequest request,
@@ -122,7 +122,7 @@ public class SchoolStudentController {
     }
 
     @PostMapping("/{id}/reactivate")
-    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
+    @PreAuthorize("hasAnyRole('SCHOOL_ADMIN', 'SCHOOL_FINANCE', 'INSTITUTION_ADMIN')")
     public ResponseEntity<StudentSummaryDto> reactivateStudent(
             @PathVariable("id") UUID studentId,
             @AuthenticationPrincipal SecurityUserPrincipal principal) {
@@ -164,7 +164,7 @@ public class SchoolStudentController {
     }
 
     @PostMapping("/{id}/guardians")
-    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
+    @PreAuthorize("hasAnyRole('SCHOOL_ADMIN', 'SCHOOL_FINANCE', 'INSTITUTION_ADMIN')")
     public ResponseEntity<StudentGuardianDto> linkGuardian(
             @PathVariable("id") UUID studentId,
             @Valid @RequestBody LinkGuardianRequest request,
@@ -177,7 +177,7 @@ public class SchoolStudentController {
     }
 
     @DeleteMapping("/{id}/guardians/{guardianId}")
-    @PreAuthorize("hasRole('SCHOOL_ADMIN')")
+    @PreAuthorize("hasAnyRole('SCHOOL_ADMIN', 'SCHOOL_FINANCE', 'INSTITUTION_ADMIN')")
     public ResponseEntity<Void> unlinkGuardian(
             @PathVariable("id") UUID studentId,
             @PathVariable("guardianId") UUID guardianId,

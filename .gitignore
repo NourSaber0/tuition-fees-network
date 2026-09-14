@@ -32,6 +32,10 @@ build/
 ### VS Code ###
 .vscode/
 
-### macOS ###
-.DS_Store
 *.swp
+
+# Node / Frontend
+node_modules/
+.pnpm-store/
+.turbo/
+.next/

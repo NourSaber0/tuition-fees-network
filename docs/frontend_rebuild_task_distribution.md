@@ -194,13 +194,13 @@ Each portal's `layout.tsx` also re-checks the role on every load (not just at lo
 - [ ] Recent payments table (6 rows).
 - [ ] 6 quick-action tiles (Students, Fees, Upload, Payments, Reports, Notifications).
 
-### SP-P3 - Student Management
+### SP-P3 - Student Management [COMPLETED]
 **Screen:** `apps/portal/src/app/school/students/`
-**Endpoints:** `/students` (list/get/create/patch), `/students/deactivated`, `/{id}/deactivate|reactivate`, `/{id}/fees`, `/{id}/payments`, `/students/search` | **Size:** L
-- [ ] Active roster (search + grade filter), student detail (masked national ID), fees + payment history sub-views.
-- [ ] Deactivated-students list with a date-range filter.
-- [ ] Add/Edit student form (school-admin only), Deactivate/Reactivate with confirmation modal.
-- [ ] Typed search picker that only ever returns active students.
+**Endpoints:** `/students` (list/get/create/patch), `/students/deactivated`, `/{id}/deactivate|reactivate`, `/{id}/fees`, `/{id}/payments`, `/students/search` | **Size:** L | **Status:** ✅ Complete
+- [x] Active roster (search + grade filter), student detail (masked national ID), fees + payment history sub-views.
+- [x] Deactivated-students list with a date-range filter.
+- [x] Add/Edit student form (school-admin only), Deactivate/Reactivate with confirmation modal.
+- [x] Typed search picker that only ever returns active students.
 
 ### SP-P4 - Fee Management
 **Screen:** `apps/portal/src/app/school/fee-management/`
@@ -286,7 +286,7 @@ Each portal's `layout.tsx` also re-checks the role on every load (not just at lo
 | **BO-P11** | Bank | Settings | M | Ready | Fee types, payment statuses, system settings |
 | **BO-P12** | Bank | Deadline / Priority / Penalty | S | Ready | UI priority badges in place; integrate in transaction lists |
 | **SP-P2** | School | Dashboard | S | ⏳ In Progress | Shell & routing ready; dashboard widgets next |
-| **SP-P3** | School | Student Management | L | Ready | Active & deactivated roster, guardian linking |
+| **SP-P3** | School | Student Management | L | ✅ Complete | Active & deactivated roster, guardian linking |
 | **SP-P4** | School | Fee Management | L | Ready | Categorized fees, penalty snapshot, create/edit |
 | **SP-P5** | School | Fee Upload | M | Ready | CSV drag-drop, validation error export, resubmit |
 | **SP-P6** | School | Payments (view) | S | Ready | Read-only payment ledger & allocation breakdown |
