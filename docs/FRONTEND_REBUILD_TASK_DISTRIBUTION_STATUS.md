@@ -25,10 +25,10 @@ The frontend rebuild unifies both the **Bank Back-Office Portal** and the **Scho
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | **Shared Foundation & Auth** | 2 | 2 | 0 | 0 | 100% |
 | **Bank Back-Office Portal** | 11 | 2 | 0 | 9 | 27.3% |
-| **School Portal** | 10 | 0 | 1 | 9 | 10.0% |
-| **Total** | **22** | **4** | **1** | **17** | **27.3%** |
+| **School Portal** | 10 | 1 | 0 | 9 | 10.0% |
+| **Total** | **22** | **5** | **0** | **17** | **22.7%** |
 
-> **Milestone Note:** Phase 0 (monorepo & foundation), AUTH (shared sign-in & role routing), BO-P2 (Bank Dashboard), and **BO-P4 (Transactions & Payment Workflow)** are **100% complete and merged**. All developers can branch off `main` and build their assigned screens concurrently.
+> **Milestone Note:** Phase 0 (monorepo & foundation), AUTH (shared sign-in & role routing), BO-P2 (Bank Dashboard with Figma pieces restored), **BO-P4 (Transactions & Payment Workflow)**, and **SP-P2 (School Dashboard)** are **100% complete and merged on `main`**. All developers can branch off `main` and build their assigned screens concurrently.
 
 ---
 
@@ -72,7 +72,7 @@ Specification: [`docs/School-Portal-API-Contract.md`](file:///Users/nourahmed/Do
 
 | Ticket ID | Screen / Feature | Route / File Target | Backend Endpoints | Size | Status | Notes |
 | :--- | :--- | :--- | :--- | :---: | :---: | :--- |
-| **SP-P2** | **School Dashboard** | [`apps/portal/src/app/school/dashboard/page.tsx`](file:///Users/nourahmed/Downloads/demo/frontend/apps/portal/src/app/school/dashboard/page.tsx) | `/dashboard/summary`<br>`/dashboard/recent-payments`<br>`/dashboard/quick-links` | S | ⏳ **In Progress** | Layout shell ready; 4 KPI cards, recent payments table, quick links tiles to build |
+| **SP-P2** | **School Dashboard** | [`apps/portal/src/app/school/dashboard/page.tsx`](file:///Users/nourahmed/Downloads/demo/frontend/apps/portal/src/app/school/dashboard/page.tsx) | `/dashboard/summary`<br>`/dashboard/recent-payments`<br>`/dashboard/quick-links` | S | ✅ **DONE** | 4 KPI cards, recent payments table, quick links tiles, fee uploads preview |
 | **SP-P3** | **Student Management** | `apps/portal/src/app/school/students/page.tsx` | `/students`<br>`/students/{id}`<br>`/students/deactivated`<br>`/students/{id}/fees`<br>`/students/{id}/payments`<br>`/students/search` | L | 📋 **Ready** | Active roster, deactivated archive, student detail drawer, guardian link/unlink |
 | **SP-P4** | **Fee Management** | `apps/portal/src/app/school/fee-management/page.tsx` | `/fees`<br>`/fees/{id}`<br>`/fee-categories`<br>`/fees/{id}/penalty-info` | L | 📋 **Ready** | Categorized fees list, overdue/due status badges, fee creation modal |
 | **SP-P5** | **Fee Upload** | `apps/portal/src/app/school/fee-upload/page.tsx` | `/fee-uploads/template`<br>`/fee-uploads`<br>`/fee-uploads/{id}/rows`<br>`/fee-uploads/{id}/errors`<br>`/fee-uploads/{id}/resubmit` | M | 📋 **Ready** | Drag-and-drop CSV uploader, row validation error table, error CSV export, resubmit flow |
