@@ -3,6 +3,7 @@ package com.tuitionnetwork.payments.service;
 import com.tuitionnetwork.billing.domain.FeeLine;
 import com.tuitionnetwork.billing.domain.FeeStatus;
 import com.tuitionnetwork.billing.repository.FeeLineRepository;
+import com.tuitionnetwork.common.exceptions.PendingBusinessRuleException;
 import com.tuitionnetwork.payments.domain.EPPSchedule;
 import com.tuitionnetwork.payments.domain.Payment;
 import com.tuitionnetwork.payments.domain.PaymentAllocation;
@@ -18,15 +19,30 @@ import com.tuitionnetwork.payments.repository.PaymentRepository;
 import com.tuitionnetwork.payments.spi.EppPlanResponse;
 import com.tuitionnetwork.payments.spi.GatewayResponse;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Transactional building blocks of a payment. The settlement flow is:
+ * <ol>
+ *   <li>{@link #reserveFeeLines} - lock the fee lines, validate, and decrement the
+ *       balance <em>before</em> the card is charged. A concurrent payer blocks on the
+ *       lock, then fails the overpayment check here and never reaches the gateway.</li>
+ *   <li>charge the card (outside any transaction, done by the caller)</li>
+ *   <li>{@link #finalizeCapturedPayment} on success - records the Payment; no balance change</li>
+ *   <li>{@link #releaseFeeLines} on charge failure - restores the reserved amount</li>
+ * </ol>
+ */
 @Service
 public class PaymentTransactionExecutor {
 
@@ -42,17 +58,117 @@ public class PaymentTransactionExecutor {
         this.eventPublisher = eventPublisher;
     }
 
+    /**
+     * Claims the paid amount against each fee line under a pessimistic write lock.
+     * Throws (and rolls back) on overpayment or a post-deadline partial payment,
+     * leaving the balance untouched.
+     */
     @Transactional
-    public PaymentSettleResponse executeCapturedPayment(PaymentSettleRequest request,
-                                                        String idempotencyKey,
-                                                        GatewayResponse gatewayResponse,
-                                                        EppPlanResponse eppPlan,
-                                                        Map<UUID, FeeLine> feeLinesById) {
+    public Map<UUID, FeeLine> reserveFeeLines(List<SelectedDueDto> dues) {
+        Map<UUID, FeeLine> reserved = new LinkedHashMap<>();
+        if (dues == null || dues.isEmpty()) {
+            return reserved;
+        }
+
+        List<UUID> ids = dues.stream().map(SelectedDueDto::feeLineId).toList();
+        Map<UUID, FeeLine> locked = new LinkedHashMap<>();
+        for (FeeLine fl : feeLineRepository.lockAllById(ids)) {
+            locked.put(fl.getId(), fl);
+        }
+
+        for (SelectedDueDto due : dues) {
+            FeeLine feeLine = locked.get(due.feeLineId());
+            if (feeLine == null) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Fee line not found with ID: " + due.feeLineId());
+            }
+
+            BigDecimal amountToApply = due.amountToPay();
+            BigDecimal currentRemaining = feeLine.getRemainingAmount() != null
+                    ? feeLine.getRemainingAmount() : feeLine.getTotalAmount();
+
+            if (amountToApply.compareTo(currentRemaining) > 0) {
+                throw new PendingBusinessRuleException(
+                        "Overpayment Guardrail: Payment amount (" + amountToApply + " EGP) " +
+                        "exceeds remaining fee balance (" + currentRemaining + " EGP) for FeeLine ID " + feeLine.getId() + ".");
+            }
+
+            boolean isPartialPayment = amountToApply.compareTo(currentRemaining) < 0;
+            boolean isPastDue = feeLine.getDueDate() != null && feeLine.getDueDate().isBefore(LocalDate.now());
+            if (isPartialPayment && isPastDue) {
+                throw new PendingBusinessRuleException(
+                        "Pending Business Rule: Post-Deadline Partial Payments are undefined for overdue fee line " +
+                        "(FeeLine ID: " + feeLine.getId() + ", Due Date: " + feeLine.getDueDate() + ").");
+            }
+
+            BigDecimal currentPaid = feeLine.getPaidAmount() != null ? feeLine.getPaidAmount() : BigDecimal.ZERO;
+            BigDecimal updatedRemaining = currentRemaining.subtract(amountToApply);
+            if (updatedRemaining.compareTo(BigDecimal.ZERO) < 0) {
+                updatedRemaining = BigDecimal.ZERO;
+            }
+
+            feeLine.setPaidAmount(currentPaid.add(amountToApply));
+            feeLine.setRemainingAmount(updatedRemaining);
+            feeLine.setStatus(updatedRemaining.compareTo(BigDecimal.ZERO) == 0
+                    ? FeeStatus.PAID : FeeStatus.PARTIALLY_PAID);
+
+            feeLineRepository.save(feeLine);
+            reserved.put(feeLine.getId(), feeLine);
+        }
+        return reserved;
+    }
+
+    /** Compensating action: give the reserved amount back if the card charge failed. */
+    @Transactional
+    public void releaseFeeLines(List<SelectedDueDto> dues) {
+        if (dues == null || dues.isEmpty()) {
+            return;
+        }
+        List<UUID> ids = dues.stream().map(SelectedDueDto::feeLineId).toList();
+        Map<UUID, FeeLine> locked = new LinkedHashMap<>();
+        for (FeeLine fl : feeLineRepository.lockAllById(ids)) {
+            locked.put(fl.getId(), fl);
+        }
+
+        for (SelectedDueDto due : dues) {
+            FeeLine feeLine = locked.get(due.feeLineId());
+            if (feeLine == null) {
+                continue;
+            }
+            BigDecimal amount = due.amountToPay();
+            BigDecimal restoredPaid = (feeLine.getPaidAmount() != null ? feeLine.getPaidAmount() : BigDecimal.ZERO)
+                    .subtract(amount);
+            if (restoredPaid.compareTo(BigDecimal.ZERO) < 0) {
+                restoredPaid = BigDecimal.ZERO;
+            }
+            BigDecimal restoredRemaining = (feeLine.getRemainingAmount() != null ? feeLine.getRemainingAmount() : BigDecimal.ZERO)
+                    .add(amount);
+            if (feeLine.getTotalAmount() != null && restoredRemaining.compareTo(feeLine.getTotalAmount()) > 0) {
+                restoredRemaining = feeLine.getTotalAmount();
+            }
+
+            feeLine.setPaidAmount(restoredPaid);
+            feeLine.setRemainingAmount(restoredRemaining);
+            feeLine.setStatus(restoredPaid.compareTo(BigDecimal.ZERO) == 0
+                    ? FeeStatus.OUTSTANDING : FeeStatus.PARTIALLY_PAID);
+            feeLineRepository.save(feeLine);
+        }
+    }
+
+    /**
+     * Records the successful payment: Payment aggregate, allocations, state log,
+     * optional EPP schedule, and the {@code PaymentCapturedEvent}. Fee-line
+     * balances were already decremented by {@link #reserveFeeLines}.
+     */
+    @Transactional
+    public PaymentSettleResponse finalizeCapturedPayment(PaymentSettleRequest request,
+                                                         String idempotencyKey,
+                                                         GatewayResponse gatewayResponse,
+                                                         EppPlanResponse eppPlan) {
         UUID guardianId = request.guardianId() != null
                 ? request.guardianId()
                 : UUID.fromString("11111111-1111-1111-1111-111111111111");
 
-        // 1. Create Payment Aggregate
         Payment payment = new Payment(guardianId, request.totalAmount(), request.paymentMethod(), idempotencyKey);
         payment.setStatus(gatewayResponse.status());
         payment.setAuthCode(gatewayResponse.authCode());
@@ -61,55 +177,24 @@ public class PaymentTransactionExecutor {
         List<UUID> affectedFeeLineIds = new ArrayList<>();
         List<PaymentAllocationResultDto> allocationResults = new ArrayList<>();
 
-        // 2. Update FeeLine status & Save PaymentAllocation records
         if (request.selectedDues() != null) {
             for (SelectedDueDto due : request.selectedDues()) {
-                FeeLine feeLine = feeLinesById.get(due.feeLineId());
-                if (feeLine == null) {
-                    feeLine = feeLineRepository.findById(due.feeLineId())
-                            .orElseThrow(() -> new IllegalArgumentException("Fee line not found: " + due.feeLineId()));
-                }
-
-                BigDecimal amountToApply = due.amountToPay();
-                BigDecimal currentPaid = feeLine.getPaidAmount() != null ? feeLine.getPaidAmount() : BigDecimal.ZERO;
-                BigDecimal currentRemaining = feeLine.getRemainingAmount() != null ? feeLine.getRemainingAmount() : feeLine.getTotalAmount();
-
-                BigDecimal updatedPaid = currentPaid.add(amountToApply);
-                BigDecimal updatedRemaining = currentRemaining.subtract(amountToApply);
-                if (updatedRemaining.compareTo(BigDecimal.ZERO) < 0) {
-                    updatedRemaining = BigDecimal.ZERO;
-                }
-
-                feeLine.setPaidAmount(updatedPaid);
-                feeLine.setRemainingAmount(updatedRemaining);
-
-                if (updatedRemaining.compareTo(BigDecimal.ZERO) == 0) {
-                    feeLine.setStatus(FeeStatus.PAID);
-                } else {
-                    feeLine.setStatus(FeeStatus.PARTIALLY_PAID);
-                }
-
-                feeLineRepository.save(feeLine);
+                FeeLine feeLine = feeLineRepository.findById(due.feeLineId())
+                        .orElseThrow(() -> new IllegalArgumentException("Fee line not found: " + due.feeLineId()));
                 affectedFeeLineIds.add(feeLine.getId());
-
-                PaymentAllocation allocation = new PaymentAllocation(payment, feeLine, amountToApply);
-                payment.addAllocation(allocation);
+                payment.addAllocation(new PaymentAllocation(payment, feeLine, due.amountToPay()));
             }
         }
 
-        // 3. Write to PaymentStateLog
-        PaymentStateLog stateLog = new PaymentStateLog(
+        payment.addStateLog(new PaymentStateLog(
                 payment,
                 PaymentStatus.PENDING,
                 gatewayResponse.status(),
                 gatewayResponse.responseCode(),
-                gatewayResponse.message()
-        );
-        payment.addStateLog(stateLog);
+                gatewayResponse.message()));
 
-        // Optional: Save EPPSchedule if EPP payment method
         if (request.paymentMethod() == PaymentMethod.EPP_INSTALMENTS && eppPlan != null) {
-            EPPSchedule eppSchedule = new EPPSchedule(
+            payment.setEppSchedule(new EPPSchedule(
                     payment,
                     eppPlan.tenorMonths(),
                     eppPlan.principal(),
@@ -117,9 +202,7 @@ public class PaymentTransactionExecutor {
                     eppPlan.interestAmount(),
                     eppPlan.adminFee(),
                     eppPlan.totalPayable(),
-                    eppPlan.monthlyInstalment()
-            );
-            payment.setEppSchedule(eppSchedule);
+                    eppPlan.monthlyInstalment()));
         }
 
         Payment savedPayment = paymentRepository.save(payment);
@@ -128,8 +211,7 @@ public class PaymentTransactionExecutor {
             allocationResults.add(new PaymentAllocationResultDto(
                     allocation.getId(),
                     allocation.getFeeLine().getId(),
-                    allocation.getAmountApplied()
-            ));
+                    allocation.getAmountApplied()));
         }
 
         Integer eppTenor = null;
@@ -139,8 +221,7 @@ public class PaymentTransactionExecutor {
             eppTenor = request.eppSelection().tenorMonths();
         }
 
-        // 4. Publish Spring Application Event (PaymentCapturedEvent)
-        PaymentCapturedEvent event = new PaymentCapturedEvent(
+        eventPublisher.publishEvent(new PaymentCapturedEvent(
                 savedPayment.getId(),
                 savedPayment.getGuardianId(),
                 savedPayment.getTotalAmount(),
@@ -150,9 +231,7 @@ public class PaymentTransactionExecutor {
                 savedPayment.getAuthCode(),
                 affectedFeeLineIds,
                 eppTenor,
-                savedPayment.getCreatedAt()
-        );
-        eventPublisher.publishEvent(event);
+                savedPayment.getCreatedAt()));
 
         return new PaymentSettleResponse(
                 savedPayment.getId(),
@@ -163,7 +242,21 @@ public class PaymentTransactionExecutor {
                 savedPayment.getPaymentMethod(),
                 savedPayment.getIdempotencyKey(),
                 allocationResults,
-                savedPayment.getCreatedAt()
-        );
+                savedPayment.getCreatedAt());
+    }
+
+    /**
+     * @deprecated superseded by {@link #reserveFeeLines} + {@link #finalizeCapturedPayment}.
+     * Kept as a thin wrapper so any external caller still compiles.
+     */
+    @Deprecated
+    @Transactional
+    public PaymentSettleResponse executeCapturedPayment(PaymentSettleRequest request,
+                                                        String idempotencyKey,
+                                                        GatewayResponse gatewayResponse,
+                                                        EppPlanResponse eppPlan,
+                                                        Map<UUID, FeeLine> feeLinesById) {
+        reserveFeeLines(request.selectedDues());
+        return finalizeCapturedPayment(request, idempotencyKey, gatewayResponse, eppPlan);
     }
 }

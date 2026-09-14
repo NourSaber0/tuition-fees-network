@@ -260,7 +260,10 @@ public class PaymentSettlementIntegrationTest {
         }
 
         assertEquals(1, successCount, "Exactly one concurrent payment should succeed");
-        assertEquals(1, failureCount, "Second concurrent payment should fail due to optimistic locking");
+        assertEquals(1, failureCount, "The second concurrent payment must be rejected");
+
+        // The losing payer must NEVER have been charged - the card gateway is hit exactly once.
+        verify(bankGatewayAdapter, times(1)).chargeCard(any(), any());
 
         // Verify FeeLine status and balance in DB
         FeeLine updatedFeeLine = feeLineRepository.findById(feeLineId).orElseThrow();
