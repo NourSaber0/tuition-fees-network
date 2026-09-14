@@ -21,12 +21,16 @@ export interface ApiClientHooks {
   onSessionExpired: () => void
 }
 
+export interface RequestOptions {
+  headers?: Record<string, string>
+}
+
 export interface ApiClient {
-  get<T>(path: string): Promise<T>
-  post<T>(path: string, body?: unknown): Promise<T>
-  put<T>(path: string, body?: unknown): Promise<T>
-  patch<T>(path: string, body?: unknown): Promise<T>
-  delete<T>(path: string): Promise<T>
+  get<T>(path: string, options?: RequestOptions): Promise<T>
+  post<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T>
+  put<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T>
+  patch<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T>
+  delete<T>(path: string, options?: RequestOptions): Promise<T>
 }
 
 /** Normalizes the two error shapes currently in use across backend controllers (see types.ts). */
@@ -59,10 +63,16 @@ export async function parseErrorBody(res: Response): Promise<ApiError> {
 }
 
 export function createApiClient(baseUrl: string, hooks: ApiClientHooks): ApiClient {
-  async function request<T>(method: string, path: string, body?: unknown, isRetry = false): Promise<T> {
+  async function request<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    options?: RequestOptions,
+    isRetry = false
+  ): Promise<T> {
     const token = hooks.getAccessToken()
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-    if (token) headers.Authorization = `Bearer ${token}`
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(options?.headers ?? {}) }
+    if (token && !headers.Authorization) headers.Authorization = `Bearer ${token}`
 
     const res = await fetch(`${baseUrl}${path}`, {
       method,
@@ -73,7 +83,7 @@ export function createApiClient(baseUrl: string, hooks: ApiClientHooks): ApiClie
     if (res.status === 401 && !isRetry) {
       const newToken = await hooks.refreshAccessToken()
       if (newToken) {
-        return request<T>(method, path, body, true)
+        return request<T>(method, path, body, options, true)
       }
       hooks.onSessionExpired()
       throw new ApiClientError({ status: 401, code: 'SESSION_EXPIRED', message: 'Session expired' })
@@ -88,10 +98,10 @@ export function createApiClient(baseUrl: string, hooks: ApiClientHooks): ApiClie
   }
 
   return {
-    get: (path) => request('GET', path),
-    post: (path, body) => request('POST', path, body),
-    put: (path, body) => request('PUT', path, body),
-    patch: (path, body) => request('PATCH', path, body),
-    delete: (path) => request('DELETE', path),
+    get: (path, options) => request('GET', path, undefined, options),
+    post: (path, body, options) => request('POST', path, body, options),
+    put: (path, body, options) => request('PUT', path, body, options),
+    patch: (path, body, options) => request('PATCH', path, body, options),
+    delete: (path, options) => request('DELETE', path, undefined, options),
   }
 }
