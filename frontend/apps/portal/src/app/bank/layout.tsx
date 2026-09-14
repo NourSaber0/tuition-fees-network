@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth, isBankRole } from "@tuition/api-client";
+import { useAuth, isBankRole, useApiClient } from "@tuition/api-client";
 import {
   PortalShell,
   LoadingSpinner,
@@ -19,7 +19,7 @@ import {
   type PortalNavItem,
 } from "@tuition/ui";
 
-const NAV_ITEMS: PortalNavItem[] = [
+const BASE_NAV_ITEMS: PortalNavItem[] = [
   { id: "dashboard", label: "Dashboard", href: "/bank/dashboard", Icon: DashboardIcon },
   { id: "schools", label: "Institution Management", href: "/bank/schools", Icon: SchoolIcon },
   { id: "transactions", label: "Transactions", href: "/bank/transactions", Icon: TransactionIcon },
@@ -42,6 +42,10 @@ const ROLE_LABELS: Record<string, string> = {
 export default function BankLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { status, user, logout } = useAuth();
+  const apiClient = useApiClient();
+
+  const [pendingExceptions, setPendingExceptions] = useState(0);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -53,6 +57,18 @@ export default function BankLayout({ children }: { children: React.ReactNode }) 
     }
   }, [status, user, router]);
 
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    apiClient
+      .get<{ pendingExceptions: number }>("/reconciliation/summary")
+      .then((r) => setPendingExceptions(r.pendingExceptions))
+      .catch(() => {});
+    apiClient
+      .get<{ count: number }>("/notifications/unread-count")
+      .then((r) => setUnreadNotifications(r.count))
+      .catch(() => {});
+  }, [status, apiClient]);
+
   if (status !== "authenticated" || !user || !isBankRole(user.role)) {
     return (
       <div className="flex flex-1 items-center justify-center">
@@ -61,7 +77,11 @@ export default function BankLayout({ children }: { children: React.ReactNode }) 
     );
   }
 
-  const navItems = NAV_ITEMS.filter((item) => user.permissions.includes(item.id));
+  const navItems = BASE_NAV_ITEMS.filter((item) => user.permissions.includes(item.id)).map((item) => {
+    if (item.id === "reconciliation") return { ...item, badge: pendingExceptions };
+    if (item.id === "notifications") return { ...item, badge: unreadNotifications };
+    return item;
+  });
 
   return (
     <PortalShell
@@ -72,6 +92,8 @@ export default function BankLayout({ children }: { children: React.ReactNode }) 
         logout();
         router.replace("/login");
       }}
+      notificationsHref="/bank/notifications"
+      unreadNotifications={unreadNotifications}
     >
       {children}
     </PortalShell>
