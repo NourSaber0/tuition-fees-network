@@ -36,6 +36,19 @@ const STATUS_STYLE: Record<string, string> = {
   Failed: "bg-red-50 text-red-700 border-red-200",
 };
 
+/**
+ * The backend's /dashboard/institution-status only ever returns these 4
+ * fixed labels (see DashboardServiceImpl.getInstitutionStatus) - safe to
+ * map colors by exact label, unlike the priority/status maps above which
+ * key off enum-backed values.
+ */
+const INSTITUTION_STATUS_COLOR: Record<string, string> = {
+  Active: "#22C55E",
+  "Pending Approval": "#60A5FA",
+  "Under Review": "#FBBF24",
+  Suspended: "#F87171",
+};
+
 function money(n: number): string {
   return Math.round(n).toLocaleString();
 }
@@ -70,6 +83,7 @@ export default function BankDashboardPage() {
   const [institutionStatus, setInstitutionStatus] = useState<InstitutionStatusResponse | null>(null);
   const [recentTx, setRecentTx] = useState<RecentTransactionsResponse | null>(null);
   const [deadlines, setDeadlines] = useState<DeadlineSummaryResponse | null>(null);
+  const [pendingExceptions, setPendingExceptions] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [hoveredDay, setHoveredDay] = useState<number | null>(null);
 
@@ -80,13 +94,15 @@ export default function BankDashboardPage() {
       apiClient.get<InstitutionStatusResponse>("/dashboard/institution-status"),
       apiClient.get<RecentTransactionsResponse>("/dashboard/recent-transactions?limit=6"),
       apiClient.get<DeadlineSummaryResponse>("/dashboard/deadline-summary"),
+      apiClient.get<{ pendingExceptions: number }>("/reconciliation/summary"),
     ])
-      .then(([s, w, i, r, d]) => {
+      .then(([s, w, i, r, d, recon]) => {
         setSummary(s);
         setWeekly(w);
         setInstitutionStatus(i);
         setRecentTx(r);
         setDeadlines(d);
+        setPendingExceptions(recon.pendingExceptions);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load dashboard"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -214,14 +230,27 @@ export default function BankDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-[17px] font-semibold" style={{ color: "var(--cib-text)" }}>
-          {greeting}, {firstName}
-        </h1>
-        <p className="text-sm mt-0.5" style={{ color: "var(--cib-text-muted)" }}>
-          Here&apos;s a network-wide summary for today,{" "}
-          {new Date(summary.asOf).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-[17px] font-semibold" style={{ color: "var(--cib-text)" }}>
+            {greeting}, {firstName}
+          </h1>
+          <p className="text-sm mt-0.5" style={{ color: "var(--cib-text-muted)" }}>
+            Here&apos;s a network-wide summary for today,{" "}
+            {new Date(summary.asOf).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
+          </p>
+        </div>
+        {pendingExceptions > 0 && (
+          <div className="flex items-center gap-2 rounded-lg px-3 py-1.5" style={{ background: "#FEF3E6", border: "1px solid #FDBA74" }}>
+            <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: "var(--cib-orange)" }} />
+            <span className="text-xs font-semibold" style={{ color: "var(--cib-orange-dark)" }}>
+              {pendingExceptions} reconciliation exception{pendingExceptions !== 1 ? "s" : ""} need attention
+            </span>
+            <Link href="/bank/reconciliation" style={{ color: "var(--cib-orange-dark)" }} className="transition-colors hover:opacity-70">
+              <ChevronRightIcon className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-3 gap-4">
@@ -452,7 +481,7 @@ export default function BankDashboardPage() {
                   <span className="text-xs font-bold text-gray-700">{item.count}</span>
                 </div>
                 <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${item.pct}%`, background: "var(--cib-blue)" }} />
+                  <div className="h-full rounded-full" style={{ width: `${item.pct}%`, background: INSTITUTION_STATUS_COLOR[item.label] ?? "var(--cib-blue)" }} />
                 </div>
               </div>
             ))}
@@ -483,7 +512,7 @@ export default function BankDashboardPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[#F8FAFD]">
-                  {["Institution", "Student", "Fee", "Amount", "Method", "Time", "Status"].map((h) => (
+                  {["Transaction ID", "Institution", "Student", "Fee", "Amount", "Method", "Time", "Status"].map((h) => (
                     <th key={h} className="text-left px-5 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
                       {h}
                     </th>
@@ -493,6 +522,7 @@ export default function BankDashboardPage() {
               <tbody className="divide-y divide-gray-50">
                 {recentTx.data.map((tx) => (
                   <tr key={tx.id} className="hover:bg-[#F8FAFD] transition-colors">
+                    <td className="px-5 py-3.5 font-mono text-xs text-[var(--cib-blue)] font-medium whitespace-nowrap">TXN-{tx.id.slice(0, 8).toUpperCase()}</td>
                     <td className="px-5 py-3.5 text-xs text-gray-700 whitespace-nowrap">{tx.institution}</td>
                     <td className="px-5 py-3.5 text-xs text-gray-600 whitespace-nowrap">{tx.student}</td>
                     <td className="px-5 py-3.5 text-xs text-gray-500 whitespace-nowrap">{tx.feeType}</td>
