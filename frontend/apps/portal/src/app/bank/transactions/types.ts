@@ -90,10 +90,15 @@ export interface TransactionTabCountsDto {
 }
 
 export interface CustomerDto {
-  nationalId: string;
-  fullName: string;
+  name?: string;
+  fullName?: string;
+  nationalId?: string;
+  nationalIdMasked?: string;
+  institution?: string;
+  institutionType?: string;
+  grade?: string;
   mobileNumber?: string;
-  cibCustomer: boolean;
+  cibCustomer?: boolean;
 }
 
 export interface CustomerFeeItemDto {

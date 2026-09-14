@@ -47,8 +47,8 @@ function formatMoney(amount: number | undefined): string {
   return Math.round(amount).toLocaleString("en-US");
 }
 
-function maskNID(nid: string): string {
-  if (!nid || nid.length < 7) return nid;
+function maskNID(nid?: string): string {
+  if (!nid || nid.length < 7) return nid || "—";
   return nid.slice(0, 3) + "•••••••" + nid.slice(-4);
 }
 
@@ -307,7 +307,7 @@ export default function TransactionsPage() {
 
     const idempKey = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `idemp-${Date.now()}`;
     const payload: BackOfficePaymentRequest = {
-      nationalId: customerData.customer.nationalId,
+      nationalId: customerData.customer.nationalId || nationalIdInput.trim(),
       feeIds: selectedFeeIds,
       amountEGP: amt,
       method: payMethod,
@@ -805,18 +805,26 @@ export default function TransactionsPage() {
               {/* Customer card */}
               <div className="bg-[#F4F6F9] rounded-xl border border-[#E8EDF5] p-4 flex items-center gap-4">
                 <div className="w-10 h-10 rounded-full bg-[#003087] text-white flex items-center justify-center font-bold text-sm shrink-0">
-                  {customerData.customer.fullName
-                    .split(" ")
+                  {((customerData.customer.name || customerData.customer.fullName || "Customer")
+                    .trim()
+                    .split(/\s+/)
                     .map((n) => n[0])
                     .join("")
-                    .slice(0, 2)}
+                    .slice(0, 2)
+                    .toUpperCase()) || "CU"}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-[#1B2A4A] text-sm">
-                    {customerData.customer.fullName}
+                    {customerData.customer.name || customerData.customer.fullName || "Customer"}
                   </div>
                   <div className="text-xs text-gray-400">
-                    {customerData.customer.cibCustomer ? "Verified CIB Customer" : "Non-CIB Customer"}
+                    {customerData.customer.institution
+                      ? `${customerData.customer.institution}${
+                          customerData.customer.grade ? ` · ${customerData.customer.grade}` : ""
+                        }`
+                      : customerData.customer.cibCustomer
+                      ? "Verified CIB Customer"
+                      : "Educational Dues Account"}
                     {customerData.customer.mobileNumber && ` · ${customerData.customer.mobileNumber}`}
                   </div>
                 </div>
@@ -825,7 +833,8 @@ export default function TransactionsPage() {
                     National ID
                   </div>
                   <div className="text-xs font-mono text-[#003087]">
-                    {maskNID(customerData.customer.nationalId)}
+                    {customerData.customer.nationalIdMasked ||
+                      maskNID(customerData.customer.nationalId || nationalIdInput)}
                   </div>
                 </div>
               </div>
@@ -1079,7 +1088,7 @@ export default function TransactionsPage() {
                     Customer
                   </span>
                   <span className="text-sm font-semibold text-[#1B2A4A]">
-                    {customerData.customer.fullName}
+                    {customerData.customer.name || customerData.customer.fullName || "Customer"}
                   </span>
                 </div>
                 {customerData.fees
@@ -1250,8 +1259,12 @@ export default function TransactionsPage() {
                       "Date / Time",
                       receiptDate || "Just now",
                     ],
-                    ["Customer", customerData.customer.fullName],
-                    ["National ID", maskNID(customerData.customer.nationalId)],
+                    ["Customer", customerData.customer.name || customerData.customer.fullName || "Customer"],
+                    [
+                      "National ID",
+                      customerData.customer.nationalIdMasked ||
+                        maskNID(customerData.customer.nationalId || nationalIdInput),
+                    ],
                     [
                       "Payment Method",
                       payMethod === "CARD" && isEpp
