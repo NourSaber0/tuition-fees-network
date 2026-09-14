@@ -1,19 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth, isBankRole, isSchoolRole } from "@tuition/api-client";
-import {
-  LockIcon,
-  MailIcon,
-  EyeIcon,
-  XCircleIcon,
-  CheckCircleIcon,
-  KeyIcon,
-  ChevronLeftIcon,
-  CheckIcon,
-  BankIcon,
-} from "@tuition/ui";
+import { LockIcon, MailIcon, EyeIcon, XCircleIcon, CheckCircleIcon, KeyIcon, ChevronLeftIcon, CheckIcon } from "@tuition/ui";
 
 type LoginState = "credentials" | "mfa" | "forgot" | "sent" | "reset" | "reset-success";
 
@@ -26,6 +17,9 @@ const PASS_REQS = [
 ];
 const STRENGTH_LABEL = ["", "Weak", "Weak", "Fair", "Good", "Strong"];
 const STRENGTH_COLOR = ["", "#EF4444", "#EF4444", "#F59E0B", "#22C55E", "#003087"];
+
+const S_BASE = { borderColor: "#DDE4EE", background: "#FAFBFD" };
+const S_FOCUS = { borderColor: "#003087", background: "#FAFBFD", boxShadow: "0 0 0 3px rgba(0,48,135,0.10)" };
 
 function InputField({
   type = "text",
@@ -44,6 +38,7 @@ function InputField({
   icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   right?: React.ReactNode;
 }) {
+  const [focused, setFocused] = useState(false);
   return (
     <div className="relative">
       {Icon && <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300 pointer-events-none" />}
@@ -53,8 +48,10 @@ function InputField({
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={onKeyDown}
-        className={`w-full border rounded-lg text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:border-[var(--cib-blue)] focus:ring-2 focus:ring-[var(--cib-blue)]/10 transition-colors py-2.5 ${Icon ? "pl-9" : "px-3"} ${right ? "pr-10" : "pr-4"}`}
-        style={{ borderColor: "var(--cib-border)", background: "#FAFBFD" }}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        className={`w-full border rounded-lg text-sm text-gray-700 placeholder-gray-300 focus:outline-none transition-colors py-2.5 ${Icon ? "pl-9" : "px-3"} ${right ? "pr-10" : "pr-4"}`}
+        style={focused ? S_FOCUS : S_BASE}
       />
       {right && <div className="absolute right-3 top-1/2 -translate-y-1/2">{right}</div>}
     </div>
@@ -81,7 +78,13 @@ function PrimaryBtn({
       onClick={onClick}
       disabled={off}
       className="w-full font-semibold py-2.5 rounded-lg text-sm text-white transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-      style={{ background: "var(--cib-blue)" }}
+      style={{ background: "#003087" }}
+      onMouseEnter={(e) => {
+        if (!off) (e.currentTarget as HTMLButtonElement).style.background = "#002060";
+      }}
+      onMouseLeave={(e) => {
+        if (!off) (e.currentTarget as HTMLButtonElement).style.background = "#003087";
+      }}
     >
       {loading ? (
         <>
@@ -97,10 +100,7 @@ function PrimaryBtn({
 
 function ErrorBanner({ msg }: { msg: string }) {
   return (
-    <div
-      className="flex items-center gap-2 rounded-lg px-3 py-2.5 mb-4 text-sm"
-      style={{ background: "#FEF2F2", border: "1px solid #FCA5A5", color: "#B91C1C" }}
-    >
+    <div className="flex items-center gap-2 rounded-lg px-3 py-2.5 mb-4 text-sm" style={{ background: "#FEF2F2", border: "1px solid #FCA5A5", color: "#B91C1C" }}>
       <XCircleIcon className="w-4 h-4 shrink-0" />
       {msg}
     </div>
@@ -109,10 +109,7 @@ function ErrorBanner({ msg }: { msg: string }) {
 
 function SuccessBanner({ msg }: { msg: string }) {
   return (
-    <div
-      className="flex items-center gap-2 rounded-lg px-3 py-2.5 mb-4 text-sm"
-      style={{ background: "#ECFDF5", border: "1px solid #6EE7B7", color: "#065F46" }}
-    >
+    <div className="flex items-center gap-2 rounded-lg px-3 py-2.5 mb-4 text-sm" style={{ background: "#ECFDF5", border: "1px solid #6EE7B7", color: "#065F46" }}>
       <CheckCircleIcon className="w-4 h-4 shrink-0" />
       {msg}
     </div>
@@ -121,10 +118,7 @@ function SuccessBanner({ msg }: { msg: string }) {
 
 function AuthCard({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      className="rounded-2xl p-8"
-      style={{ background: "#FFFFFF", border: "1px solid var(--cib-border)", boxShadow: "0 4px 24px rgba(0,48,135,0.07)" }}
-    >
+    <div className="rounded-2xl p-8" style={{ background: "#FFFFFF", border: "1px solid #DDE4EE", boxShadow: "0 4px 24px rgba(0,48,135,0.07)" }}>
       {children}
     </div>
   );
@@ -132,7 +126,7 @@ function AuthCard({ children }: { children: React.ReactNode }) {
 
 function FieldLabel({ children }: { children: string }) {
   return (
-    <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--cib-text-muted)" }}>
+    <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "#6B7A8D" }}>
       {children}
     </label>
   );
@@ -140,9 +134,30 @@ function FieldLabel({ children }: { children: string }) {
 
 function BackButton({ onClick, label = "Back to sign in" }: { onClick: () => void; label?: string }) {
   return (
-    <button onClick={onClick} className="flex items-center gap-1 text-xs mb-6 transition-colors" style={{ color: "#aab5c4" }}>
+    <button
+      onClick={onClick}
+      className="flex items-center gap-1 text-xs mb-6 transition-colors"
+      style={{ color: "#aab5c4" }}
+      onMouseEnter={(e) => (e.currentTarget.style.color = "#6B7A8D")}
+      onMouseLeave={(e) => (e.currentTarget.style.color = "#aab5c4")}
+    >
       <ChevronLeftIcon className="w-3.5 h-3.5" />
       {label}
+    </button>
+  );
+}
+
+function EyeToggle({ shown, onClick }: { shown: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{ color: "#aab5c4" }}
+      onMouseEnter={(e) => (e.currentTarget.style.color = "#6B7A8D")}
+      onMouseLeave={(e) => (e.currentTarget.style.color = "#aab5c4")}
+    >
+      <EyeIcon className="w-4 h-4" />
+      <span className="sr-only">{shown ? "Hide password" : "Show password"}</span>
     </button>
   );
 }
@@ -152,9 +167,14 @@ export default function LoginPage() {
   const { login, verifyMfa, resendMfa, trustDevice, forgotPassword, resetPassword } = useAuth();
 
   const [state, setState] = useState<LoginState>("credentials");
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState(() =>
+    typeof window !== "undefined" ? window.localStorage.getItem("tuition.auth.rememberedUsername") ?? "" : ""
+  );
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() =>
+    typeof window !== "undefined" ? window.localStorage.getItem("tuition.auth.rememberedUsername") !== null : false
+  );
   const [rememberDevice, setRememberDevice] = useState(false);
 
   const [forgotEmail, setForgotEmail] = useState("");
@@ -214,6 +234,11 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const res = await login(username, password);
+      if (rememberMe) {
+        window.localStorage.setItem("tuition.auth.rememberedUsername", username);
+      } else {
+        window.localStorage.removeItem("tuition.auth.rememberedUsername");
+      }
       setMfaToken(res.mfaToken);
       setOtpHint(res.otpDestinationHint);
       setResendMsg("");
@@ -342,24 +367,74 @@ export default function LoginPage() {
     }
   }
 
+  const otpDigitBoxes = otp.map((digit, i) => (
+    <input
+      key={i}
+      ref={(el) => {
+        otpRefs.current[i] = el;
+      }}
+      type="text"
+      inputMode="numeric"
+      maxLength={1}
+      value={digit}
+      onChange={(e) => handleOtpChange(i, e.target.value)}
+      onKeyDown={(e) => handleOtpKeyDown(i, e)}
+      onPaste={(e) => handleOtpPaste(e, i)}
+      disabled={otpExpired}
+      className="w-full h-12 text-center text-lg font-bold border rounded-lg focus:outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+      style={{
+        borderColor: digit ? "#003087" : "#DDE4EE",
+        color: "#003087",
+        background: digit ? "#EBF1FB" : "#FAFBFD",
+        boxShadow: digit ? "0 0 0 2px rgba(0,48,135,0.12)" : "none",
+      }}
+    />
+  ));
+
   return (
-    <div className="min-h-full flex flex-1" style={{ background: "var(--cib-bg)" }}>
-      <div className="hidden lg:flex w-[44%] flex-col relative overflow-hidden" style={{ background: "var(--cib-blue)" }}>
+    <div className="min-h-full flex flex-1" style={{ background: "#F4F6F9" }}>
+      {/* Left branding panel - ported from the Figma export's Login.tsx */}
+      <div className="hidden lg:flex w-[44%] flex-col relative overflow-hidden" style={{ background: "#003087" }}>
+        <div
+          className="absolute inset-0 opacity-[0.035]"
+          style={{
+            backgroundImage: "repeating-linear-gradient(45deg,#F7941D 0,#F7941D 1px,transparent 0,transparent 50%)",
+            backgroundSize: "28px 28px",
+          }}
+        />
+        <div className="absolute bottom-0 left-0 right-0 h-2/5" style={{ background: "linear-gradient(to top, #002060, transparent)" }} />
         <div className="relative z-10 flex flex-col h-full p-12">
-          <div className="mb-auto flex items-center gap-2">
-            <BankIcon className="w-9 h-9 text-white" />
-            <span className="text-white font-bold text-lg">CIB Tuition Network</span>
+          <div className="mb-auto" style={{ width: "fit-content" }}>
+            <Image src="/cib-logo.png" alt="CIB" width={220} height={92} style={{ height: 48, width: "auto", objectFit: "contain" }} priority />
           </div>
           <div className="mb-auto mt-12">
             <h1 className="text-[2.1rem] font-light text-white leading-tight mb-4">
-              One sign-in.
+              School Payments
               <br />
-              <span className="font-bold" style={{ color: "var(--cib-orange)" }}>Two portals.</span>
+              <span className="font-bold" style={{ color: "#F7941D" }}>
+                Tuition Network Portal
+              </span>
             </h1>
             <p className="text-sm leading-relaxed max-w-xs" style={{ color: "rgba(255,255,255,0.52)" }}>
-              Bank Back-Office staff and School Portal admins sign in here - your account decides where you land, not a
-              screen you pick.
+              One sign-in for CIB Back-Office staff and School Portal admins alike - your account decides which portal
+              you land in, not a screen you pick.
             </p>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: "Active Institutions", value: "61" },
+              { label: "Daily Collection", value: "EGP 2.4M" },
+              { label: "Success Rate", value: "98.2%" },
+            ].map((s) => (
+              <div key={s.label} className="rounded-xl p-4" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.10)" }}>
+                <div className="font-bold text-xl" style={{ color: "#F7941D" }}>
+                  {s.value}
+                </div>
+                <div className="text-xs mt-1" style={{ color: "rgba(255,255,255,0.42)" }}>
+                  {s.label}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -367,19 +442,19 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-sm">
           <div className="flex lg:hidden items-center gap-2 justify-center mb-8">
-            <BankIcon className="w-7 h-7" style={{ color: "var(--cib-blue)" }} />
-            <span className="font-bold text-base" style={{ color: "var(--cib-blue)" }}>
-              CIB Tuition Network
+            <Image src="/cib-logo.png" alt="CIB" width={140} height={58} style={{ height: 36, width: "auto", objectFit: "contain" }} />
+            <span className="font-bold text-base" style={{ color: "#003087" }}>
+              Tuition Network
             </span>
           </div>
 
           {state === "credentials" && (
             <AuthCard>
               <div className="mb-7">
-                <h2 className="text-xl font-bold" style={{ color: "var(--cib-blue)" }}>
+                <h2 className="text-xl font-bold" style={{ color: "#003087" }}>
                   Sign in to your account
                 </h2>
-                <p className="text-sm mt-1" style={{ color: "var(--cib-text-muted)" }}>
+                <p className="text-sm mt-1" style={{ color: "#6B7A8D" }}>
                   Authorized personnel only
                 </p>
               </div>
@@ -415,15 +490,22 @@ export default function LoginPage() {
                     }}
                     placeholder="********"
                     icon={LockIcon}
-                    right={
-                      <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ color: "#aab5c4" }}>
-                        <EyeIcon className="w-4 h-4" />
-                      </button>
-                    }
+                    right={<EyeToggle shown={showPassword} onClick={() => setShowPassword(!showPassword)} />}
                   />
                 </div>
                 <div className="flex items-center justify-between">
-                  <span />
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="w-3.5 h-3.5"
+                      style={{ accentColor: "#003087" }}
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                    />
+                    <span className="text-xs" style={{ color: "#6B7A8D" }}>
+                      Remember me
+                    </span>
+                  </label>
                   <button
                     type="button"
                     onClick={() => {
@@ -431,13 +513,20 @@ export default function LoginPage() {
                       setError("");
                     }}
                     className="text-xs font-semibold transition-colors"
-                    style={{ color: "var(--cib-blue)" }}
+                    style={{ color: "#003087" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = "#F7941D")}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = "#003087")}
                   >
                     Forgot password?
                   </button>
                 </div>
                 <PrimaryBtn type="submit" label={loading ? "Signing in..." : "Sign In"} loading={loading} />
               </form>
+              <p className="text-center text-[10px] mt-5" style={{ color: "#C4CDDA" }}>
+                Demo - Bank: <span className="font-mono">mohamed.ali@cibeg.com / CIB@2026</span>
+                <br />
+                Demo - School: <span className="font-mono">admin@nis.edu.eg / Password123!</span>
+              </p>
             </AuthCard>
           )}
 
@@ -453,14 +542,17 @@ export default function LoginPage() {
                 label="Back"
               />
               <div className="mb-7">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4" style={{ background: "var(--cib-blue-light)" }}>
-                  <KeyIcon className="w-6 h-6" style={{ color: "var(--cib-blue)" }} />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4" style={{ background: "#EBF1FB" }}>
+                  <KeyIcon className="w-6 h-6" style={{ color: "#003087" }} />
                 </div>
-                <h2 className="text-xl font-bold" style={{ color: "var(--cib-blue)" }}>
+                <h2 className="text-xl font-bold" style={{ color: "#003087" }}>
                   Two-factor verification
                 </h2>
-                <p className="text-sm mt-1" style={{ color: "var(--cib-text-muted)" }}>
-                  Enter the 6-digit code sent to {otpHint || "your registered device"}.
+                <p className="text-sm mt-1" style={{ color: "#6B7A8D" }}>
+                  Enter the 6-digit code sent to {otpHint || "your registered device"}
+                </p>
+                <p className="text-xs mt-2 font-mono" style={{ color: "#aab5c4" }}>
+                  Demo code: 123456
                 </p>
               </div>
               {error && <ErrorBanner msg={error} />}
@@ -472,47 +564,20 @@ export default function LoginPage() {
                   handleVerifyMfa();
                 }}
               >
-                <div className="grid grid-cols-6 gap-1.5 mb-4">
-                  {otp.map((digit, i) => (
-                    <input
-                      key={i}
-                      ref={(el) => {
-                        otpRefs.current[i] = el;
-                      }}
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={1}
-                      value={digit}
-                      onChange={(e) => handleOtpChange(i, e.target.value)}
-                      onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                      onPaste={(e) => handleOtpPaste(e, i)}
-                      disabled={otpExpired}
-                      className="w-full h-12 text-center text-lg font-bold border rounded-lg focus:outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                      style={{
-                        borderColor: digit ? "var(--cib-blue)" : "var(--cib-border)",
-                        color: "var(--cib-blue)",
-                        background: digit ? "var(--cib-blue-light)" : "#FAFBFD",
-                      }}
-                    />
-                  ))}
-                </div>
+                <div className="grid grid-cols-6 gap-1.5 mb-4">{otpDigitBoxes}</div>
                 <label className="flex items-center gap-2 cursor-pointer mb-4">
                   <input
                     type="checkbox"
                     className="w-3.5 h-3.5"
+                    style={{ accentColor: "#003087" }}
                     checked={rememberDevice}
                     onChange={(e) => setRememberDevice(e.target.checked)}
                   />
-                  <span className="text-xs" style={{ color: "var(--cib-text-muted)" }}>
+                  <span className="text-xs" style={{ color: "#6B7A8D" }}>
                     Remember this device for 30 days
                   </span>
                 </label>
-                <PrimaryBtn
-                  type="submit"
-                  label={loading ? "Verifying..." : "Verify & Sign In"}
-                  loading={loading}
-                  disabled={!otpComplete || otpExpired}
-                />
+                <PrimaryBtn type="submit" label={loading ? "Verifying..." : "Verify & Sign In"} loading={loading} disabled={!otpComplete || otpExpired} />
               </form>
               <div className="w-full text-center mt-4 min-h-[20px]">
                 {otpExpired ? (
@@ -520,13 +585,15 @@ export default function LoginPage() {
                     onClick={handleResend}
                     disabled={loading}
                     className="text-xs font-semibold transition-colors disabled:opacity-50"
-                    style={{ color: "var(--cib-blue)" }}
+                    style={{ color: "#003087" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = "#F7941D")}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = "#003087")}
                   >
-                    Resend code
+                    Resend OTP
                   </button>
                 ) : (
                   <span className="text-xs font-semibold tabular-nums" style={{ color: "#aab5c4" }}>
-                    Resend code <span style={{ color: "var(--cib-text-muted)" }}>({fmt(countdown)})</span>
+                    Resend OTP <span style={{ color: "#6B7A8D" }}>({fmt(countdown)})</span>
                   </span>
                 )}
               </div>
@@ -542,10 +609,10 @@ export default function LoginPage() {
                 }}
               />
               <div className="mb-7">
-                <h2 className="text-xl font-bold" style={{ color: "var(--cib-blue)" }}>
+                <h2 className="text-xl font-bold" style={{ color: "#003087" }}>
                   Reset your password
                 </h2>
-                <p className="text-sm mt-1" style={{ color: "var(--cib-text-muted)" }}>
+                <p className="text-sm mt-1" style={{ color: "#6B7A8D" }}>
                   Enter your email and we&apos;ll send a reset link
                 </p>
               </div>
@@ -581,13 +648,13 @@ export default function LoginPage() {
                 <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5" style={{ background: "#ECFDF5" }}>
                   <CheckCircleIcon className="w-7 h-7" style={{ color: "#059669" }} />
                 </div>
-                <h2 className="text-xl font-bold mb-2" style={{ color: "var(--cib-blue)" }}>
+                <h2 className="text-xl font-bold mb-2" style={{ color: "#003087" }}>
                   Check your email
                 </h2>
-                <p className="text-sm mb-6" style={{ color: "var(--cib-text-muted)" }}>
-                  If an account exists for <strong>{forgotEmail}</strong>, a reset link was sent to it. This demo
-                  environment doesn&apos;t deliver real email - the reset token is written to the backend&apos;s server
-                  log instead.
+                <p className="text-sm mb-6" style={{ color: "#6B7A8D" }}>
+                  A reset link was sent to <strong className="text-gray-700">{forgotEmail}</strong>. This environment
+                  doesn&apos;t deliver real email yet - the reset token is written to the backend&apos;s server log
+                  instead of an inbox.
                 </p>
                 <button
                   onClick={() => {
@@ -595,11 +662,13 @@ export default function LoginPage() {
                     setError("");
                   }}
                   className="w-full font-semibold py-2.5 rounded-lg text-sm transition-all mb-3"
-                  style={{ background: "var(--cib-blue-light)", color: "var(--cib-blue)", border: "1px solid rgba(0,48,135,0.15)" }}
+                  style={{ background: "#EBF1FB", color: "#003087", border: "1px solid rgba(0,48,135,0.15)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "#D6E4F5")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "#EBF1FB")}
                 >
-                  I have the reset token
+                  I have the reset token →
                 </button>
-                <button onClick={() => setState("credentials")} className="text-sm font-semibold transition-colors" style={{ color: "var(--cib-blue)" }}>
+                <button onClick={() => setState("credentials")} className="text-sm font-semibold transition-colors" style={{ color: "#003087" }}>
                   Back to sign in
                 </button>
               </div>
@@ -615,14 +684,14 @@ export default function LoginPage() {
                 }}
               />
               <div className="mb-6">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4" style={{ background: "var(--cib-blue-light)" }}>
-                  <LockIcon className="w-6 h-6" style={{ color: "var(--cib-blue)" }} />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4" style={{ background: "#EBF1FB" }}>
+                  <LockIcon className="w-6 h-6" style={{ color: "#003087" }} />
                 </div>
-                <h2 className="text-xl font-bold" style={{ color: "var(--cib-blue)" }}>
+                <h2 className="text-xl font-bold" style={{ color: "#003087" }}>
                   Set new password
                 </h2>
-                <p className="text-sm mt-1" style={{ color: "var(--cib-text-muted)" }}>
-                  Paste the reset token from the email link, then choose a new password
+                <p className="text-sm mt-1" style={{ color: "#6B7A8D" }}>
+                  Choose a new secure password for your account
                 </p>
               </div>
               {error && <ErrorBanner msg={error} />}
@@ -649,21 +718,13 @@ export default function LoginPage() {
                     }}
                     placeholder="New password"
                     icon={LockIcon}
-                    right={
-                      <button type="button" onClick={() => setShowNewPw(!showNewPw)} style={{ color: "#aab5c4" }}>
-                        <EyeIcon className="w-4 h-4" />
-                      </button>
-                    }
+                    right={<EyeToggle shown={showNewPw} onClick={() => setShowNewPw(!showNewPw)} />}
                   />
                   {newPassword && (
                     <div className="mt-2">
                       <div className="flex gap-1 mb-1">
                         {[1, 2, 3, 4, 5].map((i) => (
-                          <div
-                            key={i}
-                            className="flex-1 h-1.5 rounded-full transition-all"
-                            style={{ background: i <= strength ? STRENGTH_COLOR[strength] : "#E5E7EB" }}
-                          />
+                          <div key={i} className="flex-1 h-1.5 rounded-full transition-all" style={{ background: i <= strength ? STRENGTH_COLOR[strength] : "#E5E7EB" }} />
                         ))}
                       </div>
                       <span className="text-[10px] font-semibold" style={{ color: STRENGTH_COLOR[strength] }}>
@@ -684,21 +745,22 @@ export default function LoginPage() {
                     }}
                     placeholder="Confirm password"
                     icon={LockIcon}
-                    right={
-                      <button type="button" onClick={() => setShowConfPw(!showConfPw)} style={{ color: "#aab5c4" }}>
-                        <EyeIcon className="w-4 h-4" />
-                      </button>
-                    }
+                    right={<EyeToggle shown={showConfPw} onClick={() => setShowConfPw(!showConfPw)} />}
                   />
                   {confirmPass && newPassword !== confirmPass && (
                     <p className="text-[11px] mt-1" style={{ color: "#EF4444" }}>
                       Passwords do not match
                     </p>
                   )}
+                  {confirmPass && newPassword === confirmPass && (
+                    <p className="text-[11px] mt-1" style={{ color: "#059669" }}>
+                      Passwords match ✓
+                    </p>
+                  )}
                 </div>
 
                 <div className="rounded-lg p-3" style={{ background: "#F8FAFD", border: "1px solid #E8EDF5" }}>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--cib-text-muted)" }}>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "#6B7A8D" }}>
                     Password requirements
                   </p>
                   <div className="space-y-1.5">
@@ -730,10 +792,10 @@ export default function LoginPage() {
                 <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5" style={{ background: "#ECFDF5" }}>
                   <CheckCircleIcon className="w-7 h-7" style={{ color: "#059669" }} />
                 </div>
-                <h2 className="text-xl font-bold mb-2" style={{ color: "var(--cib-blue)" }}>
+                <h2 className="text-xl font-bold mb-2" style={{ color: "#003087" }}>
                   Password reset successfully
                 </h2>
-                <p className="text-sm mb-6" style={{ color: "var(--cib-text-muted)" }}>
+                <p className="text-sm mb-6" style={{ color: "#6B7A8D" }}>
                   Your password has been updated. You can now sign in with your new credentials.
                 </p>
                 <PrimaryBtn
