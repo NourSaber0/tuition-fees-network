@@ -6,7 +6,6 @@ import { useApiClient, useAuth } from "@tuition/api-client";
 import {
   LoadingSpinner,
   EmptyState,
-  SchoolIcon,
   UsersIcon,
   TrendUpIcon,
   TrendDownIcon,
@@ -15,9 +14,7 @@ import {
   DownloadIcon,
   ReportIcon,
   CreditCardIcon,
-  CheckCircleIcon,
   ClockIcon,
-  XCircleIcon,
   ChevronRightIcon,
 } from "@tuition/ui";
 import type {
@@ -47,13 +44,6 @@ function money(n: number): string {
 function formatDate(isoString: string): string {
   const date = new Date(isoString);
   return date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-}
-
-function formatDateTime(isoString: string): string {
-  const date = new Date(isoString);
-  return date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) +
-    " at " +
-    date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 }
 
 // Default quick links if API doesn't return them
