@@ -13,21 +13,21 @@
 
 The School Portal contract defines approximately **64 client-callable endpoints** and **2 automated system engines** across **11 phases** to back the front-end portal screens (`Login.tsx`, `Dashboard.tsx`, `Students.tsx`, `Fees.tsx`, `Upload.tsx`, `Payments.tsx`, `Reconciliation.tsx`, `Reports.tsx`, `Notifications.tsx`, `Users.tsx`, and `Settings.tsx`).
 
-Currently, **Milestone 1 (Phases 1 & 10)**, **Milestone 2 (Phases 2 & 11)**, **Milestone 3 (Phase 3)**, **Milestone 4 (Phase 4)**, **Milestone 5 (Phase 5)**, **Milestone 6 (Phase 6)**, **Milestone 7 (Phase 7)**, and **Milestone 8 (Phase 8)** are **100% complete, verified, and passing 437 automated unit and integration tests** (430 prior tests + 7 school report pipeline tests, 0 failures, 0 errors).
+Currently, **Milestone 1 (Phases 1 & 10)**, **Milestone 2 (Phases 2 & 11)**, **Milestone 3 (Phase 3)**, **Milestone 4 (Phase 4)**, **Milestone 5 (Phase 5)**, **Milestone 6 (Phase 6)**, **Milestone 7 (Phase 7)**, **Milestone 8 (Phase 8)**, and **Milestone 9 (Phase 9)** are **100% complete, verified, and passing 455 automated unit and integration tests** (439 prior tests + 16 new notification unit, integration, and E2E tests, 0 failures, 0 errors).
 
 | Metric | Count | Percentage |
 |---|:---:|:---:|
 | **Total Contract Endpoints & Jobs** | 66 (64 endpoints + 2 engines) | 100% |
-| **Milestones 1–8 Implemented & Verified** (Phases 1–8, 10, 11) | 63 (61 endpoints + 2 engines) | 95.5% |
-| **Pending Implementation** (Milestone 9 / Phase 9) | 3 endpoints | 4.5% |
-| **Automated Test Suite Health** | 437 / 437 Tests Green | 100% Pass Rate |
+| **All Milestones 1–9 Implemented & Verified** (Phases 1–11) | 66 (64 endpoints + 2 engines) | 100.0% |
+| **Pending Implementation** | 0 endpoints | 0.0% |
+| **Automated Test Suite Health** | 455 / 455 Tests Green | 100% Pass Rate |
 
 ---
 
 ## Milestone Roadmap & Progress Matrix
 
 ```
-[=====================================================================>] 95.5% Overall Progress
+[======================================================================] 100.0% Overall Progress
   - Milestone 1: Security, Identity & School Users (Phases 1 & 10)     --> [100% DONE] ✅
   - Milestone 2: Dashboard & Settings Profile (Phases 2 & 11)          --> [100% DONE] ✅
   - Milestone 3: Student Roster & Guardians (Phase 3)                  --> [100% DONE] ✅
@@ -36,7 +36,7 @@ Currently, **Milestone 1 (Phases 1 & 10)**, **Milestone 2 (Phases 2 & 11)**, **M
   - Milestone 6: Payments View & Receipts (Phase 6)                    --> [100% DONE] ✅
   - Milestone 7: Reconciliation & Settlement Visibility (Phase 7)      --> [100% DONE] ✅
   - Milestone 8: Reports & Asynchronous Generation Pipeline (Phase 8)  --> [100% DONE] ✅
-  - Milestone 9: In-App & Email Notifications (Phase 9)                --> [PENDING]   ⏳
+  - Milestone 9: In-App & Email Notifications (Phase 9)                --> [100% DONE] ✅
 ```
 
 ---
@@ -224,20 +224,22 @@ Currently, **Milestone 1 (Phases 1 & 10)**, **Milestone 2 (Phases 2 & 11)**, **M
 ---
 
 ### Milestone 9: In-App & Email Notifications (Phase 9)
-**Status:** ⏳ **PENDING** (0 / 6 Endpoints)  
+**Status:** ✅ **100% DONE** (6 / 6 Endpoints + Preferences)  
 **Target:** Notification feeds, Read markers, Bell counter, Channel delivery settings
 
 #### Phase 9 — Notifications
-**Source:** `Notifications.tsx`, US-45 to US-48 | **Roles:** `school-admin`, `school-finance`
+**Source:** `Notifications.tsx`, US-45 to US-48, Contract §9 | **Roles:** `school-admin`, `school-finance`
 
 | Endpoint | Method | Contract Purpose | Status | Target Component / Notes |
 |---|---|---|:---:|---|
-| `/notifications` | `GET` | Paginated list of in-app notifications for school user | ⏳ **PENDING** | Filter by `read`, `category`, `priority`. Scoped to user/school. |
-| `/notifications/unread-count` | `GET` | Unread notifications count for header badge | ⏳ **PENDING** | Lightweight query for live bell badge counter. |
-| `/notifications/{id}/read` | `PATCH` | Mark specific notification as read | ⏳ **PENDING** | Sets `isRead = true` and records timestamp. |
-| `/notifications/read-all` | `POST` | Mark all notifications as read | ⏳ **PENDING** | Bulk update for current user notifications. |
-| `/notifications/preferences` | `GET` | User notification preferences | ⏳ **PENDING** | User-specific channel preferences. |
-| `/notifications/preferences` | `PUT` | Update user notification preferences | ⏳ **PENDING** | Saves updated channel toggles. |
+| `/notifications` | `GET` | Paginated list of in-app notifications for school user | ✅ **DONE** | [`NotificationsController.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/notifications/web/NotificationsController.java). Filter by `type` (payment, reminder, penalty, upload), `read`, `unread`, pagination (`page`, `pageSize`). Returns envelope with `data` array matching Contract 9.1 row shape and live `unreadCount`. Strictly scoped to school. |
+| `/notifications/unread-count` | `GET` | Unread notifications count for header badge | ✅ **DONE** | [`NotificationsController.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/notifications/web/NotificationsController.java). Lightweight query returning `{"count": N}` for live bell icon counter. |
+| `/notifications/{id}/read` | `POST` / `PATCH` | Mark specific notification as read | ✅ **DONE** | [`NotificationsController.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/notifications/web/NotificationsController.java). Marks notification as read by reference format (`NTF-0091`) or UUID. Enforces strict multi-tenant boundary (`403 Forbidden` on cross-school IDs). |
+| `/notifications/read-all` | `POST` | Mark all notifications as read | ✅ **DONE** | [`NotificationsController.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/notifications/web/NotificationsController.java). Bulk updates all unread notifications for the authenticated school to read. |
+| `/notifications/{id}` | `DELETE` | Dismiss notification | ✅ **DONE** | [`NotificationsController.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/notifications/web/NotificationsController.java). Deletes/dismisses notification for the authenticated school. Returns HTTP `204 No Content`. |
+| `/notifications/reminders` | `GET` | Dedicated parent reminders feed | ✅ **DONE** | [`NotificationsController.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/notifications/web/NotificationsController.java). Dedicated view returning notifications with `type=reminder`, filterable by `status` (`Sent`, `Scheduled`, `Failed`). |
+| `/notifications/preferences` | `GET` | User/School notification channel preferences | ✅ **DONE** | [`NotificationsController.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/notifications/web/NotificationsController.java). Returns channel toggles (`inApp`, `email`). Also aligned with `/settings/notifications`. |
+| `/notifications/preferences` | `PUT` | Update notification channel preferences | ✅ **DONE** | [`NotificationsController.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/notifications/web/NotificationsController.java). Updates channel toggles (`inApp`, `email`) for the authenticated school. |
 
 ---
 
@@ -268,3 +270,6 @@ To maintain absolute security and architectural integrity, the following operati
 | **2026-09-13** | **Milestone 5:** Fee Upload & Ingestion Pipeline (Phase 5) | **400 / 400** | **0** | ✅ **Clean** |
 | **2026-09-13** | **Master E2E:** School Portal Master End-to-End Test Suite (Stages 1–7) | **407 / 407** | **0** | ✅ **Clean** |
 | **2026-09-13** | **Milestone 6:** Payments View, Receipts & Master E2E Stage 8 (Phase 6) | **424 / 424** | **0** | ✅ **Clean** |
+| **2026-09-13** | **Milestone 7:** Reconciliation & Settlement Visibility (Phase 7) | **430 / 430** | **0** | ✅ **Clean** |
+| **2026-09-14** | **Milestone 8:** Reports Pipeline & Master E2E Stage 10 (Phase 8) | **439 / 439** | **0** | ✅ **Clean** |
+| **2026-09-14** | **Milestone 9:** In-App & Email Notifications & Master E2E Stage 11 (Phase 9) | **455 / 455** | **0** | ✅ **Clean** |

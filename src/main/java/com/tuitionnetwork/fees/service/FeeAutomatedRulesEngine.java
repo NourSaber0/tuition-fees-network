@@ -35,16 +35,26 @@ public class FeeAutomatedRulesEngine {
     private final StudentRepository studentRepository;
     private final NotificationRepository notificationRepository;
     private final AuditLogRepository auditLogRepository;
+    private final com.tuitionnetwork.notifications.service.SchoolNotificationService schoolNotificationService;
 
     @Autowired
     public FeeAutomatedRulesEngine(FeeLineRepository feeLineRepository,
                                   StudentRepository studentRepository,
                                   NotificationRepository notificationRepository,
-                                  @Autowired(required = false) AuditLogRepository auditLogRepository) {
+                                  @Autowired(required = false) AuditLogRepository auditLogRepository,
+                                  @Autowired(required = false) com.tuitionnetwork.notifications.service.SchoolNotificationService schoolNotificationService) {
         this.feeLineRepository = feeLineRepository;
         this.studentRepository = studentRepository;
         this.notificationRepository = notificationRepository;
         this.auditLogRepository = auditLogRepository;
+        this.schoolNotificationService = schoolNotificationService;
+    }
+
+    public FeeAutomatedRulesEngine(FeeLineRepository feeLineRepository,
+                                  StudentRepository studentRepository,
+                                  NotificationRepository notificationRepository,
+                                  AuditLogRepository auditLogRepository) {
+        this(feeLineRepository, studentRepository, notificationRepository, auditLogRepository, null);
     }
 
     /**
@@ -94,6 +104,27 @@ public class FeeAutomatedRulesEngine {
 
                 totalPenalties = totalPenalties.add(penalty);
                 processedCount++;
+
+                if (schoolNotificationService != null && fee.getInstitutionId() != null) {
+                    try {
+                        Optional<Student> studentOpt = studentRepository.findById(fee.getStudentId());
+                        String studentName = studentOpt.map(Student::getFullName).orElse("Student");
+                        schoolNotificationService.createNotification(
+                                fee.getInstitutionId(),
+                                "penalty",
+                                "Late penalty applied",
+                                "Late penalty of " + penalty + " EGP applied to " + studentName + "'s fee line " + fee.getId(),
+                                studentName,
+                                fee.getStudentId(),
+                                fee.getFeeType() != null ? fee.getFeeType().getDisplayName() : "Tuition",
+                                penalty.longValue(),
+                                fee.getDueDate(),
+                                0,
+                                "Sent",
+                                fee.getId().toString()
+                        );
+                    } catch (Exception ignored) {}
+                }
 
                 log.info("Engine A applied 5% penalty of {} EGP to fee line {}", penalty, fee.getId());
             }
@@ -172,6 +203,25 @@ public class FeeAutomatedRulesEngine {
                     );
                     notificationRepository.save(notif);
                     remindersSent++;
+
+                    if (schoolNotificationService != null && fee.getInstitutionId() != null) {
+                        try {
+                            schoolNotificationService.createNotification(
+                                    fee.getInstitutionId(),
+                                    "reminder",
+                                    "Payment reminder sent",
+                                    "Reminder: " + student.getFullName() + "'s " + fee.getFeeType().getDisplayName() + " fee of " + fee.getRemainingAmount() + " EGP is due in 1 week on " + fee.getDueDate() + ".",
+                                    student.getFullName(),
+                                    student.getId(),
+                                    fee.getFeeType() != null ? fee.getFeeType().getDisplayName() : "Tuition",
+                                    fee.getRemainingAmount() != null ? fee.getRemainingAmount().longValue() : 0L,
+                                    fee.getDueDate(),
+                                    7,
+                                    "Sent",
+                                    fee.getId().toString()
+                            );
+                        } catch (Exception ignored) {}
+                    }
 
                     log.info("Engine B dispatched reminder for fee line {} to guardian {}", fee.getId(), guardianId);
                 }

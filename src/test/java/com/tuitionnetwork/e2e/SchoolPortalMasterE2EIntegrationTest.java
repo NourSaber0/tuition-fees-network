@@ -29,7 +29,11 @@ import com.tuitionnetwork.ingestion.repository.CsvUploadRepository;
 import com.tuitionnetwork.ingestion.repository.UploadErrorRepository;
 import com.tuitionnetwork.ingestion.repository.UploadRowRepository;
 import com.tuitionnetwork.ingestion.util.XlsxParser;
+import com.tuitionnetwork.notifications.domain.SchoolNotification;
+import com.tuitionnetwork.notifications.dto.SchoolNotificationPreferencesDto;
 import com.tuitionnetwork.notifications.repository.NotificationRepository;
+import com.tuitionnetwork.notifications.repository.SchoolNotificationRepository;
+import com.tuitionnetwork.notifications.service.SchoolNotificationService;
 import com.tuitionnetwork.payments.domain.Payment;
 import com.tuitionnetwork.payments.domain.PaymentAllocation;
 import com.tuitionnetwork.payments.domain.PaymentMethod;
@@ -145,6 +149,12 @@ public class SchoolPortalMasterE2EIntegrationTest {
     @Autowired
     private FeeAutomatedRulesEngine feeAutomatedRulesEngine;
 
+    @Autowired
+    private SchoolNotificationRepository schoolNotificationRepository;
+
+    @Autowired
+    private SchoolNotificationService schoolNotificationService;
+
     private MockMvc mockMvc;
 
     private Institution schoolA;
@@ -164,6 +174,7 @@ public class SchoolPortalMasterE2EIntegrationTest {
 
         objectMapper.findAndRegisterModules();
 
+        schoolNotificationRepository.deleteAll();
         uploadRowRepository.deleteAll();
         uploadErrorRepository.deleteAll();
         csvUploadRepository.deleteAll();
@@ -1189,6 +1200,159 @@ public class SchoolPortalMasterE2EIntegrationTest {
                                     "format": "CSV"
                                 }
                                 """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Stage 11: School In-App Notifications, Bell Counter, Reminders Feed & Preferences (Phase 9)")
+    void testStage11_NotificationsCenterAndDeliveryPreferences() throws Exception {
+        // 11.1 Bell Counter returns 0 initially (Phase 9.2)
+        mockMvc.perform(get("/notifications/unread-count")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(0));
+
+        // 11.2 Pre-seed server-generated notifications for School A
+        SchoolNotification nReminder = schoolNotificationService.createNotification(
+                schoolA.getId(),
+                "reminder",
+                "Payment reminder sent",
+                "Reminder: Yousef Adel's Tuition fee of 18,000 EGP is due in 1 week on 2026-09-15.",
+                "Yousef Adel",
+                null,
+                "Tuition",
+                18000L,
+                LocalDate.of(2026, 9, 15),
+                7,
+                "Sent",
+                "FEE-0231-01"
+        );
+
+        SchoolNotification nPenalty = schoolNotificationService.createNotification(
+                schoolA.getId(),
+                "penalty",
+                "Late penalty applied",
+                "Late penalty of 900 EGP applied to Karim Omar's fee line",
+                "Karim Omar",
+                null,
+                "Tuition",
+                900L,
+                LocalDate.now().minusDays(10),
+                0,
+                "Sent",
+                "FEE-0099-01"
+        );
+
+        // Pre-seed a notification for School B (to test isolation)
+        SchoolNotification nSchoolB = schoolNotificationService.createNotification(
+                schoolB.getId(),
+                "reminder",
+                "School B Reminder",
+                "School B private notification",
+                "Salma B",
+                null,
+                "Tuition",
+                12000L,
+                LocalDate.now().plusDays(7),
+                7,
+                "Sent",
+                "FEE-B-01"
+        );
+
+        // 11.3 Bell Counter reflects unread items for School A (count = 2)
+        mockMvc.perform(get("/notifications/unread-count")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(2));
+
+        // 11.4 GET /notifications returns feed with unreadCount and shape matching Contract 9.1
+        mockMvc.perform(get("/notifications")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(2)))
+                .andExpect(jsonPath("$.unreadCount").value(2))
+                .andExpect(jsonPath("$.total").value(2))
+                .andExpect(jsonPath("$.data[?(@.type == 'reminder')].studentName").value(hasItem("Yousef Adel")))
+                .andExpect(jsonPath("$.data[?(@.type == 'penalty')].studentName").value(hasItem("Karim Omar")));
+
+        // Filter by type=reminder
+        mockMvc.perform(get("/notifications?type=reminder")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].type").value("reminder"));
+
+        // 11.5 POST & PATCH /notifications/{id}/read mark as read (Phase 9.3)
+        mockMvc.perform(post("/notifications/" + nReminder.getNotificationRef() + "/read")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(nReminder.getNotificationRef()))
+                .andExpect(jsonPath("$.read").value(true));
+
+        // Bell counter now down to 1
+        mockMvc.perform(get("/notifications/unread-count")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+
+        // 11.6 POST /notifications/read-all marks all remaining read (Phase 9.4)
+        mockMvc.perform(post("/notifications/read-all")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.updated").value(1));
+
+        mockMvc.perform(get("/notifications/unread-count")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(0));
+
+        // 11.7 DELETE /notifications/{id} dismisses notification with 204 (Phase 9.5)
+        mockMvc.perform(delete("/notifications/" + nPenalty.getNotificationRef())
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isNoContent());
+
+        // Feed now only has 1 notification left
+        mockMvc.perform(get("/notifications")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(1)));
+
+        // 11.8 GET /notifications/reminders dedicated parent-reminder feed (Phase 9.6)
+        mockMvc.perform(get("/notifications/reminders")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].type").value("reminder"))
+                .andExpect(jsonPath("$.data[0].notificationStatus").value("Sent"));
+
+        // 11.9 GET & PUT /notifications/preferences channel toggles
+        mockMvc.perform(get("/notifications/preferences")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.channels.inApp").value(true))
+                .andExpect(jsonPath("$.channels.email").value(true));
+
+        mockMvc.perform(put("/notifications/preferences")
+                        .header("Authorization", "Bearer " + tokenAdminA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "channels": {
+                                        "inApp": true,
+                                        "email": false
+                                    }
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.channels.email").value(false));
+
+        // 11.10 Multi-tenant isolation: School A cannot read or delete School B's notifications
+        mockMvc.perform(post("/notifications/" + nSchoolB.getNotificationRef() + "/read")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(delete("/notifications/" + nSchoolB.getNotificationRef())
+                        .header("Authorization", "Bearer " + tokenAdminA))
                 .andExpect(status().isForbidden());
     }
 }
