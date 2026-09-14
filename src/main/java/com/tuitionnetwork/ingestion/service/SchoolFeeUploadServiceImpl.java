@@ -21,6 +21,7 @@ import com.tuitionnetwork.ingestion.repository.UploadErrorRepository;
 import com.tuitionnetwork.ingestion.repository.UploadRowRepository;
 import com.tuitionnetwork.ingestion.util.CsvFileParser;
 import com.tuitionnetwork.ingestion.util.XlsxParser;
+import com.tuitionnetwork.notifications.service.SchoolNotificationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,6 +60,9 @@ public class SchoolFeeUploadServiceImpl implements SchoolFeeUploadService {
     private final IdentityResolverService identityResolverService;
     private final AuditLogRepository auditLogRepository;
 
+    @Autowired(required = false)
+    private SchoolNotificationService schoolNotificationService;
+
     @Autowired
     public SchoolFeeUploadServiceImpl(
             CsvUploadRepository csvUploadRepository,
@@ -75,6 +79,10 @@ public class SchoolFeeUploadServiceImpl implements SchoolFeeUploadService {
         this.studentRepository = studentRepository;
         this.identityResolverService = identityResolverService;
         this.auditLogRepository = auditLogRepository;
+    }
+
+    public void setSchoolNotificationService(SchoolNotificationService schoolNotificationService) {
+        this.schoolNotificationService = schoolNotificationService;
     }
 
     @Override
@@ -214,6 +222,25 @@ public class SchoolFeeUploadServiceImpl implements SchoolFeeUploadService {
         upload.setFailedRows(rejectedCount);
         upload.setStatus(computeUploadStatus(dataRowCount, acceptedCount, rejectedCount));
         csvUploadRepository.save(upload);
+
+        if (schoolNotificationService != null) {
+            try {
+                schoolNotificationService.createNotification(
+                        schoolId,
+                        "upload",
+                        "Fee upload " + upload.getStatus().toLowerCase(),
+                        "File " + fileName + " processed: " + acceptedCount + " accepted, " + rejectedCount + " rejected",
+                        null,
+                        null,
+                        "Upload",
+                        null,
+                        null,
+                        null,
+                        "Sent",
+                        upload.getId().toString()
+                );
+            } catch (Exception ignored) {}
+        }
 
         logAudit(actorId, schoolId, "UPLOAD_FEES",
                 "Uploaded fees file '" + fileName + "' (Total: " + dataRowCount + ", Accepted: " + acceptedCount + ", Rejected: " + rejectedCount + ")");
