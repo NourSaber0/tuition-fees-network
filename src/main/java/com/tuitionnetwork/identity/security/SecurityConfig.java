@@ -21,11 +21,14 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final IdentityUserDetailsService identityUserDetailsService;
+    private final com.tuitionnetwork.mockbank.web.MockBankApiKeyFilter mockBankApiKeyFilter;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
-                          IdentityUserDetailsService identityUserDetailsService) {
+                          IdentityUserDetailsService identityUserDetailsService,
+                          com.tuitionnetwork.mockbank.web.MockBankApiKeyFilter mockBankApiKeyFilter) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.identityUserDetailsService = identityUserDetailsService;
+        this.mockBankApiKeyFilter = mockBankApiKeyFilter;
     }
 
     @Bean
@@ -41,14 +44,25 @@ public class SecurityConfig {
                                 "/api/v1/auth/refresh", "/auth/refresh",
                                 "/api/v1/roles/**", "/roles/**",
                                 "/api/v1/fee-categories/**", "/fee-categories/**",
+                                "/api/v1/moi/**",
+                                "/api/v1/payments/cards/**",
+                                "/api/v1/epp/quotes",
+                                "/api/v1/test-data",
+                                "/api/v1/admin/reset",
+                                "/health",
                                 "/swagger-ui/**", "/swagger-ui.html",
                                 "/v3/api-docs/**", "/swagger-resources/**", "/webjars/**"
                         ).permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/epp").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/epp").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/epp/epp_*").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/epp/epp_*/cancel").permitAll()
                         .requestMatchers("/api/v1/**").authenticated()
                         .anyRequest().permitAll()
                 )
                 .httpBasic(Customizer.withDefaults())
                 .userDetailsService(identityUserDetailsService)
+                .addFilterBefore(mockBankApiKeyFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
