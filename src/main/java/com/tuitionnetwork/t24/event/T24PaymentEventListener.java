@@ -5,14 +5,16 @@ import com.tuitionnetwork.t24.dto.T24BillingDto.UpdateBillingRequest;
 import com.tuitionnetwork.t24.service.T24CustomerBillingService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.event.EventListener;
+import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 
 /**
- * Listens for internal payment capture events and synchronously or asynchronously
- * notifies T24 via UpdateCustomerBillingProcedure to reduce outstanding billing.
+ * Listens for internal payment capture events and asynchronously (after the settling
+ * transaction commits) notifies T24 via UpdateCustomerBillingProcedure to reduce outstanding
+ * billing. Runs off the request thread, same as ReceiptGenerator/PaymentNotificationService/
+ * EppScheduleGenerator - a slow or unreachable T24 endpoint must never delay a payment response.
  */
 @Component
 public class T24PaymentEventListener {
@@ -24,7 +26,7 @@ public class T24PaymentEventListener {
         this.billingService = billingService;
     }
 
-    @EventListener
+    @ApplicationModuleListener
     public void onPaymentCaptured(PaymentCapturedEvent event) {
         if (event == null) return;
         log.info("T24 Adapter notified of PaymentCapturedEvent for paymentId={}, amount={}",
