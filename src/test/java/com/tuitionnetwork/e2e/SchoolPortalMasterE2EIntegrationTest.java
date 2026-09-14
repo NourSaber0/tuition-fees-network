@@ -43,6 +43,9 @@ import com.tuitionnetwork.students.dto.DeactivateStudentRequest;
 import com.tuitionnetwork.students.dto.EnrollStudentRequest;
 import com.tuitionnetwork.students.dto.LinkGuardianRequest;
 import com.tuitionnetwork.students.dto.UpdateStudentRequest;
+import com.tuitionnetwork.reconciliation.domain.ReconciliationException;
+import com.tuitionnetwork.reconciliation.repository.ReconciliationExceptionRepository;
+import com.tuitionnetwork.reconciliation.repository.ReconciliationRunRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -121,6 +124,12 @@ public class SchoolPortalMasterE2EIntegrationTest {
     private AuditLogRepository auditLogRepository;
 
     @Autowired
+    private ReconciliationRunRepository runRepository;
+
+    @Autowired
+    private ReconciliationExceptionRepository exceptionRepository;
+
+    @Autowired
     private JwtTokenProvider jwtTokenProvider;
 
     @Autowired
@@ -154,6 +163,8 @@ public class SchoolPortalMasterE2EIntegrationTest {
         uploadRowRepository.deleteAll();
         uploadErrorRepository.deleteAll();
         csvUploadRepository.deleteAll();
+        exceptionRepository.deleteAll();
+        runRepository.deleteAll();
         paymentAllocationRepository.deleteAll();
         receiptRepository.deleteAll();
         paymentRepository.deleteAll();
@@ -863,6 +874,159 @@ public class SchoolPortalMasterE2EIntegrationTest {
                                     "method": "Card"
                                 }
                                 """.formatted(fee.getId())))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Stage 9: Reconciliation & Settlement Visibility (Phase 7)")
+    void testStage9_ReconciliationAndSettlementVisibility() throws Exception {
+        // 9.0 Setup test student, fee lines, and payments for School A
+        Student student = new Student(null, schoolA.getId(), "hash_recon1", "enc_recon1", "Amira Khaled",
+                LocalDate.of(2011, 4, 10), "STU-0771", "Grade 11", "A",
+                "Khaled Farouk", "+20 10 9988 7766", "khaled@example.com");
+        student = studentRepository.save(student);
+
+        FeeLine fee1 = new FeeLine(schoolA.getId(), student.getId(), FeeType.TUITION, new BigDecimal("10000.00"), BigDecimal.ZERO, "2026/2027", LocalDate.of(2026, 9, 1));
+        fee1 = feeLineRepository.save(fee1);
+
+        FeeLine fee2 = new FeeLine(schoolA.getId(), student.getId(), FeeType.BUS, new BigDecimal("5000.00"), new BigDecimal("5000.00"), "2026/2027", LocalDate.of(2026, 9, 15));
+        fee2 = feeLineRepository.save(fee2);
+
+        FeeLine fee3 = new FeeLine(schoolA.getId(), student.getId(), FeeType.ACTIVITIES, new BigDecimal("3000.00"), BigDecimal.ZERO, "2026/2027", LocalDate.of(2026, 9, 20));
+        fee3 = feeLineRepository.save(fee3);
+
+        // Payment 1: CAPTURED -> Reconciled
+        Payment p1 = new Payment(UUID.randomUUID(), new BigDecimal("10000.00"), PaymentMethod.CIB_ACCOUNT, "IDEMP-RECON1-" + UUID.randomUUID());
+        p1.setStatus(PaymentStatus.CAPTURED);
+        p1.setTransactionReference("TX-20260914-0701");
+        p1 = paymentRepository.save(p1);
+        paymentAllocationRepository.save(new PaymentAllocation(p1, fee1, new BigDecimal("10000.00")));
+
+        // Payment 2: PENDING -> Pending
+        Payment p2 = new Payment(UUID.randomUUID(), new BigDecimal("5000.00"), PaymentMethod.CREDIT_CARD, "IDEMP-RECON2-" + UUID.randomUUID());
+        p2.setStatus(PaymentStatus.PENDING);
+        p2.setTransactionReference("TX-20260914-0702");
+        p2 = paymentRepository.save(p2);
+        paymentAllocationRepository.save(new PaymentAllocation(p2, fee2, new BigDecimal("5000.00")));
+
+        // Payment 3: CAPTURED with Exception -> Unreconciled
+        Payment p3 = new Payment(UUID.randomUUID(), new BigDecimal("3000.00"), PaymentMethod.CREDIT_CARD, "IDEMP-RECON3-" + UUID.randomUUID());
+        p3.setStatus(PaymentStatus.CAPTURED);
+        p3.setTransactionReference("TX-20260914-0703");
+        p3 = paymentRepository.save(p3);
+        paymentAllocationRepository.save(new PaymentAllocation(p3, fee3, new BigDecimal("3000.00")));
+
+        ReconciliationException exception = new ReconciliationException();
+        exception.setPaymentId(p3.getId());
+        exception.setTxRef("TX-20260914-0703");
+        exception.setInstitution(schoolA.getName());
+        exception.setInstitutionType("School");
+        exception.setStatus("Open");
+        exception.setType("Amount Mismatch");
+        exception.setBankAmountEGP(2800L);
+        exception.setSchoolAmountEGP(3000L);
+        exception.setDifferenceEGP(200L);
+        exceptionRepository.save(exception);
+
+        // 9.1 Query GET /reconciliation/summary (Phase 7.1)
+        // 10,000 gross, 2% CIB fee = 200, net settled = 9,800, pending payout = 5,000
+        mockMvc.perform(get("/reconciliation/summary")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalReconciled", is(1)))
+                .andExpect(jsonPath("$.totalPending", is(1)))
+                .andExpect(jsonPath("$.totalUnreconciled", is(1)))
+                .andExpect(jsonPath("$.grossCollectedEGP", is(10000)))
+                .andExpect(jsonPath("$.cibFeeEGP", is(200)))
+                .andExpect(jsonPath("$.netSettledEGP", is(9800)))
+                .andExpect(jsonPath("$.pendingPayoutEGP", is(5000)));
+
+        // Dual endpoint /api/v1/reconciliation/summary
+        mockMvc.perform(get("/api/v1/reconciliation/summary")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalReconciled", is(1)))
+                .andExpect(jsonPath("$.netSettledEGP", is(9800)));
+
+        // 9.2 Query GET /reconciliation/transactions with filters & pagination (Phase 7.2)
+        mockMvc.perform(get("/reconciliation/transactions")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total", is(3)))
+                .andExpect(jsonPath("$.data", hasSize(3)));
+
+        // Filter status=Reconciled
+        mockMvc.perform(get("/reconciliation/transactions")
+                        .param("status", "Reconciled")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total", is(1)))
+                .andExpect(jsonPath("$.data[0].paymentId", is("TX-20260914-0701")))
+                .andExpect(jsonPath("$.data[0].reconciliationStatus", is("Reconciled")));
+
+        // Filter status=Unreconciled
+        mockMvc.perform(get("/reconciliation/transactions")
+                        .param("status", "Unreconciled")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total", is(1)))
+                .andExpect(jsonPath("$.data[0].paymentId", is("TX-20260914-0703")))
+                .andExpect(jsonPath("$.data[0].reconciliationStatus", is("Unreconciled")));
+
+        // Filter by studentId
+        mockMvc.perform(get("/reconciliation/transactions")
+                        .param("studentId", "STU-0771")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total", is(3)))
+                .andExpect(jsonPath("$.data[0].studentId", is("STU-0771")));
+
+        // 9.3 Query GET /reconciliation/settlements
+        mockMvc.perform(get("/reconciliation/settlements")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(greaterThanOrEqualTo(1))))
+                .andExpect(jsonPath("$.data[0].id", startsWith("SET-SCH-001-")))
+                .andExpect(jsonPath("$.data[0].grossEGP", is(10000)))
+                .andExpect(jsonPath("$.data[0].cibFeeEGP", is(200)))
+                .andExpect(jsonPath("$.data[0].netEGP", is(9800)))
+                .andExpect(jsonPath("$.data[0].status", is("Completed")))
+                .andExpect(jsonPath("$.summary.totalSettledEGP", is(9800)));
+
+        // 9.4 Multi-tenant isolation: School B sees 0 data
+        mockMvc.perform(get("/reconciliation/summary")
+                        .header("Authorization", "Bearer " + tokenAdminB))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalReconciled", is(0)))
+                .andExpect(jsonPath("$.grossCollectedEGP", is(0)));
+
+        // Cross-school query param rejected with 403 Forbidden
+        mockMvc.perform(get("/reconciliation/summary")
+                        .param("institutionId", schoolB.getId().toString())
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isForbidden());
+
+        // 9.5 Bank Guardrails: School users attempting mutating recon actions are rejected with 403 Forbidden
+        mockMvc.perform(post("/reconciliation/runs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"date\":\"2026-09-14\"}")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/reconciliation/exceptions/" + UUID.randomUUID() + "/assign")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"assignedTo\":\"Staff\"}")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(patch("/reconciliation/exceptions/" + UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"resolutionAction\":\"Manual Match\"}")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/reconciliation/exceptions")
+                        .header("Authorization", "Bearer " + tokenAdminA))
                 .andExpect(status().isForbidden());
     }
 }
