@@ -8,6 +8,7 @@ import {
   EmptyState,
   PRIORITY_BADGE_CLASSES,
   dueDateLabel,
+  formatIsoDate,
   SchoolIcon,
   UsersIcon,
   TransactionIcon,
@@ -19,6 +20,7 @@ import {
   ReconcileIcon,
   EPPIcon,
   ChevronRightIcon,
+  AlertIcon,
 } from "@tuition/ui";
 import type {
   DashboardSummaryResponse,
@@ -264,6 +266,9 @@ export default function BankDashboardPage() {
       <div className="bg-white rounded-xl border overflow-hidden" style={{ borderColor: "#E8EDF5" }}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center">
+              <AlertIcon className="w-4 h-4 text-red-500" />
+            </div>
             <h3 className="text-sm font-semibold" style={{ color: "var(--cib-text)" }}>
               Payment Priority - Action Required
             </h3>
@@ -280,7 +285,7 @@ export default function BankDashboardPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[#F8FAFD]">
-                  {["Student", "Institution", "Fee", "Amount", "Due Date", "Status", "Penalty"].map((h) => (
+                  {["Ref / Student", "Institution", "Fee", "Amount", "Due Date", "Status", "Penalty"].map((h) => (
                     <th key={h} className="text-left px-5 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
                       {h}
                     </th>
@@ -293,14 +298,18 @@ export default function BankDashboardPage() {
                     key={item.feeLineId}
                     className={`hover:bg-[#F8FAFD] transition-colors ${item.priority === "OVERDUE" ? "bg-red-50/40" : item.daysToDue === 0 ? "bg-orange-50/40" : ""}`}
                   >
-                    <td className="px-5 py-3.5 text-xs text-gray-600">{item.student}</td>
+                    <td className="px-5 py-3.5">
+                      <div className="font-mono text-xs text-[var(--cib-blue)] font-semibold">FEE-{item.feeLineId.slice(0, 8).toUpperCase()}</div>
+                      <div className="text-xs text-gray-600 mt-0.5">{item.student}</div>
+                    </td>
                     <td className="px-5 py-3.5 text-xs text-gray-600 whitespace-nowrap">{item.institution}</td>
                     <td className="px-5 py-3.5 text-xs text-gray-500">{item.feeType}</td>
                     <td className="px-5 py-3.5 text-xs font-mono font-bold text-gray-800 whitespace-nowrap">EGP {money(item.outstandingEGP)}</td>
                     <td className="px-5 py-3.5 whitespace-nowrap">
-                      <div className="text-xs text-gray-600 font-mono">{item.dueDate}</div>
+                      <div className="text-xs text-gray-600 font-mono">{formatIsoDate(item.dueDate)}</div>
                       <div className={`text-[10px] mt-0.5 font-medium ${item.priority === "OVERDUE" ? "text-red-600" : "text-orange-600"}`}>
                         {dueDateLabel(item.daysToDue)}
+                        {item.priority === "OVERDUE" && item.daysToDue <= -7 && " · Grace ended"}
                       </div>
                     </td>
                     <td className="px-5 py-3.5 whitespace-nowrap">
