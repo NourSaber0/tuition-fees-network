@@ -13,28 +13,28 @@
 
 The School Portal contract defines approximately **64 client-callable endpoints** and **2 automated system engines** across **11 phases** to back the front-end portal screens (`Login.tsx`, `Dashboard.tsx`, `Students.tsx`, `Fees.tsx`, `Upload.tsx`, `Payments.tsx`, `Reconciliation.tsx`, `Reports.tsx`, `Notifications.tsx`, `Users.tsx`, and `Settings.tsx`).
 
-Currently, **Milestone 1 (Phases 1 & 10)**, **Milestone 2 (Phases 2 & 11)**, **Milestone 3 (Phase 3)**, **Milestone 4 (Phase 4)**, **Milestone 5 (Phase 5)**, and **Milestone 6 (Phase 6)** are **100% complete, verified, and passing 424 automated unit and integration tests** (407 prior tests + 17 payment view, receipts & E2E tests, 0 failures, 0 errors).
+Currently, **Milestone 1 (Phases 1 & 10)**, **Milestone 2 (Phases 2 & 11)**, **Milestone 3 (Phase 3)**, **Milestone 4 (Phase 4)**, **Milestone 5 (Phase 5)**, **Milestone 6 (Phase 6)**, and **Milestone 7 (Phase 7)** are **100% complete, verified, and passing 430 automated unit and integration tests** (424 prior tests + 6 reconciliation & settlement visibility tests, 0 failures, 0 errors).
 
 | Metric | Count | Percentage |
 |---|:---:|:---:|
 | **Total Contract Endpoints & Jobs** | 66 (64 endpoints + 2 engines) | 100% |
-| **Milestones 1, 2, 3, 4, 5 & 6 Implemented & Verified** (Phases 1, 2, 3, 4, 5, 6, 10, 11) | 55 (53 endpoints + 2 engines) | 83.3% |
-| **Pending Implementation** (Milestones 7–9 / Phases 7–9) | 11 endpoints | 16.7% |
-| **Automated Test Suite Health** | 424 / 424 Tests Green | 100% Pass Rate |
+| **Milestones 1, 2, 3, 4, 5, 6 & 7 Implemented & Verified** (Phases 1, 2, 3, 4, 5, 6, 7, 10, 11) | 58 (56 endpoints + 2 engines) | 87.9% |
+| **Pending Implementation** (Milestones 8–9 / Phases 8–9) | 8 endpoints | 12.1% |
+| **Automated Test Suite Health** | 430 / 430 Tests Green | 100% Pass Rate |
 
 ---
 
 ## Milestone Roadmap & Progress Matrix
 
 ```
-[=============================================================>] 83.3% Overall Progress
+[==================================================================>] 87.9% Overall Progress
   - Milestone 1: Security, Identity & School Users (Phases 1 & 10)     --> [100% DONE] ✅
   - Milestone 2: Dashboard & Settings Profile (Phases 2 & 11)          --> [100% DONE] ✅
   - Milestone 3: Student Roster & Guardians (Phase 3)                  --> [100% DONE] ✅
   - Milestone 4: Fee Structure & Penalty Automation (Phase 4)          --> [100% DONE] ✅
   - Milestone 5: Fee Upload & Ingestion Pipeline (Phase 5)             --> [100% DONE] ✅
   - Milestone 6: Payments View & Receipts (Phase 6)                    --> [100% DONE] ✅
-  - Milestone 7: Reconciliation & Settlement Visibility (Phase 7)      --> [PENDING]   ⏳
+  - Milestone 7: Reconciliation & Settlement Visibility (Phase 7)      --> [100% DONE] ✅
   - Milestone 8: Reports & Asynchronous Generation Pipeline (Phase 8)  --> [PENDING]   ⏳
   - Milestone 9: In-App & Email Notifications (Phase 9)                --> [PENDING]   ⏳
 ```
@@ -190,16 +190,18 @@ Currently, **Milestone 1 (Phases 1 & 10)**, **Milestone 2 (Phases 2 & 11)**, **M
 ---
 
 ### Milestone 7: Reconciliation & Settlement Visibility (Phase 7)
-**Status:** ⏳ **PENDING** (0 / 2 Endpoints)  
-**Target:** Daily settlement cycles, 2% CIB fee transparency, Net payout visibility
+**Status:** ✅ **100% COMPLETE** (3 / 3 Endpoints Implemented and Tested)  
+**Target:** Daily settlement cycles, 2% CIB fee transparency, Net payout visibility  
+**Test Suite:** [`SchoolReconciliationIntegrationTest.java`](file:///Users/nourahmed/Downloads/demo/src/test/java/com/tuitionnetwork/reconciliation/SchoolReconciliationIntegrationTest.java) (6 tests)
 
 #### Phase 7 — Reconciliation (view-only)
-**Source:** `Reconciliation.tsx`, US-37 to US-40 | **Roles:** `school-admin`, `school-finance` (read-only)
+**Source:** `Reconciliation.tsx`, US-37 to US-40 | **Roles:** `school-admin`, `school-finance` (read-only) | **Status:** 3 / 3 DONE
 
-| Endpoint | Method | Contract Purpose | Status | Target Component / Notes |
+| Endpoint | Method | Contract Purpose | Status | Implementation Details |
 |---|---|---|:---:|---|
-| `/reconciliation/summary` | `GET` | Settlement status overview (gross collected, 2% fee, net settled, pending payout) | ⏳ **PENDING** | Aggregates settlement totals for the school. |
-| `/reconciliation/settlements` | `GET` | Paginated settlement cycles and bank transfer references | ⏳ **PENDING** | Lists historical daily/weekly settlement runs with bank transfer batch numbers. |
+| `/reconciliation/summary` | `GET` | Settlement status overview (gross collected, 2% fee, net settled, pending payout) | ✅ **DONE** | [`ReconciliationController.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/reconciliation/web/ReconciliationController.java) via [`SchoolReconciliationService.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/reconciliation/service/SchoolReconciliationService.java). Dynamic aggregation of school-scoped totals (`totalReconciled`, `totalUnreconciled`, `totalPending`, `grossCollectedEGP`, `cibFeeEGP` [2% CIB fee transparency], `netSettledEGP`, `pendingPayoutEGP`). Dual-mapped to `/reconciliation/summary` and `/api/v1/reconciliation/summary`. |
+| `/reconciliation/transactions` | `GET` | Filterable transaction match list with pagination | ✅ **DONE** | [`ReconciliationController.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/reconciliation/web/ReconciliationController.java). Returns match breakdown (`paymentId`, `studentId`, `feeId`, `amountEGP`, `date`, `reconciliationStatus`) with filtering by `dateFrom`, `dateTo`, `status`, `studentId`, `paymentId`, and pagination. |
+| `/reconciliation/settlements` | `GET` | Paginated settlement cycles and bank transfer references | ✅ **DONE** | [`ReconciliationController.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/reconciliation/web/ReconciliationController.java). Lists historical daily/weekly settlement runs with bank transfer batch numbers (`txRef`), reconciliation batch references (`reconRef`), gross, 2% CIB fee, net settled funds, and settlement summary. |
 
 ---
 
