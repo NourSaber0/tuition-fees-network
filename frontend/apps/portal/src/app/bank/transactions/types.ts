@@ -79,10 +79,14 @@ export interface TransactionDetailDto {
 }
 
 export interface TransactionTabCountsDto {
-  all: number;
-  successful: number;
-  pending: number;
-  failed: number;
+  all?: number;
+  successful?: number;
+  pending?: number;
+  failed?: number;
+  All?: number;
+  Successful?: number;
+  Pending?: number;
+  Failed?: number;
 }
 
 export interface CustomerDto {

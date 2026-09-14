@@ -105,8 +105,16 @@ export default function TransactionsPage() {
   // Load Tab Counts
   const loadTabCounts = useCallback(() => {
     apiClient
-      .get<TransactionTabCountsDto>("/transactions/tab-counts")
-      .then(setTabCounts)
+      .get<Record<string, number>>("/transactions/tab-counts")
+      .then((data) => {
+        if (!data) return;
+        setTabCounts({
+          all: Number(data.All ?? data.all ?? 0),
+          successful: Number(data.Successful ?? data.successful ?? 0),
+          pending: Number(data.Pending ?? data.pending ?? 0),
+          failed: Number(data.Failed ?? data.failed ?? 0),
+        });
+      })
       .catch(() => {});
   }, [apiClient]);
 
@@ -373,12 +381,13 @@ export default function TransactionsPage() {
       <div className="border-b border-gray-200">
         <nav className="flex space-x-6">
           {[
-            { id: "ALL", label: "All Transactions", count: tabCounts.all },
-            { id: "SUCCESSFUL", label: "Successful", count: tabCounts.successful },
-            { id: "PENDING", label: "Pending", count: tabCounts.pending },
-            { id: "FAILED", label: "Failed", count: tabCounts.failed },
+            { id: "ALL", label: "All Transactions", count: tabCounts.all ?? tabCounts.All ?? 0 },
+            { id: "SUCCESSFUL", label: "Successful", count: tabCounts.successful ?? tabCounts.Successful ?? 0 },
+            { id: "PENDING", label: "Pending", count: tabCounts.pending ?? tabCounts.Pending ?? 0 },
+            { id: "FAILED", label: "Failed", count: tabCounts.failed ?? tabCounts.Failed ?? 0 },
           ].map((tab) => {
             const isActive = activeTab === tab.id;
+            const count = tab.count ?? 0;
             return (
               <button
                 key={tab.id}
@@ -398,7 +407,7 @@ export default function TransactionsPage() {
                     isActive ? "bg-[var(--cib-orange)] text-white" : "bg-gray-100 text-gray-600"
                   }`}
                 >
-                  {tab.count.toLocaleString()}
+                  {count.toLocaleString()}
                 </span>
               </button>
             );
@@ -658,7 +667,7 @@ export default function TransactionsPage() {
         {/* Footer & Pagination */}
         <div className="px-5 py-4 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#F8FAFD]">
           <span className="text-xs text-gray-500">
-            Showing {transactions.length} of {totalElements.toLocaleString()} transactions
+            Showing {transactions.length} of {(totalElements ?? 0).toLocaleString()} transactions
           </span>
           <Pagination
             page={page}
