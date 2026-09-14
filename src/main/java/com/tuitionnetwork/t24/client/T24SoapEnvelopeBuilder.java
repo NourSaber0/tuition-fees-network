@@ -22,6 +22,7 @@ public class T24SoapEnvelopeBuilder {
 
     public static final String T24_NS = "http://temenos.com/customerbilling";
     public static final String SOAP_ENV_NS = "http://schemas.xmlsoap.org/soap/envelope/";
+    public static final String SOAP12_ENV_NS = "http://www.w3.org/2003/05/soap-envelope";
 
     public String buildRetrieveRequestXml(String nationalId, String accountNumber, String username, String password) {
         String safeNationalId = nationalId != null ? escapeXml(nationalId) : "";
@@ -126,6 +127,10 @@ public class T24SoapEnvelopeBuilder {
     public RetrieveBillingResponse parseRetrieveResponseXml(String xml) {
         try {
             Document doc = parseXmlDocument(xml);
+            String fault = extractSoapFault(doc);
+            if (fault != null) {
+                return new RetrieveBillingResponse("ERROR", null, null, null, List.of(), BigDecimal.ZERO, fault);
+            }
             String status = getElementText(doc, "Status", "SUCCESS");
             String custNo = getElementText(doc, "CustomerNumber", "");
             String accNo = getElementText(doc, "AccountNumber", "");
@@ -170,6 +175,10 @@ public class T24SoapEnvelopeBuilder {
     public RequestBillingResponse parseRequestResponseXml(String xml) {
         try {
             Document doc = parseXmlDocument(xml);
+            String fault = extractSoapFault(doc);
+            if (fault != null) {
+                return new RequestBillingResponse("ERROR", null, fault);
+            }
             String status = getElementText(doc, "Status", "CREATED");
             String billingId = getElementText(doc, "BillingId", "");
             String message = getElementText(doc, "Message", "Customer billing record created in T24");
@@ -182,6 +191,10 @@ public class T24SoapEnvelopeBuilder {
     public UpdateBillingResponse parseUpdateResponseXml(String xml) {
         try {
             Document doc = parseXmlDocument(xml);
+            String fault = extractSoapFault(doc);
+            if (fault != null) {
+                return new UpdateBillingResponse("ERROR", null, BigDecimal.ZERO, fault);
+            }
             String status = getElementText(doc, "Status", "UPDATED");
             String billingId = getElementText(doc, "BillingId", "");
             BigDecimal rem = parseDecimal(getElementText(doc, "NewRemainingAmount", "0.00"));
@@ -199,6 +212,35 @@ public class T24SoapEnvelopeBuilder {
         dbf.setNamespaceAware(true);
         DocumentBuilder db = dbf.newDocumentBuilder();
         return db.parse(new InputSource(new StringReader(xml)));
+    }
+
+    /**
+     * Detects a SOAP 1.1/1.2 Fault element in the response body (spec: T24_SAMPLE_PAYLOADS.md
+     * &sect;5) and returns a human-readable message if present, or null for a fault-free response.
+     * Matched by namespace URI + local name rather than prefix, since a real T24 endpoint may use
+     * any prefix (soapenv:, soap:, SOAP-ENV:, ...) for the same Fault element.
+     */
+    private String extractSoapFault(Document doc) {
+        Element fault = firstElementByTagNameNS(doc, SOAP_ENV_NS, "Fault");
+        if (fault == null) {
+            fault = firstElementByTagNameNS(doc, SOAP12_ENV_NS, "Fault");
+        }
+        if (fault == null) {
+            return null;
+        }
+
+        String faultString = getChildText(fault, "faultstring");
+        String faultCode = getChildText(fault, "faultcode");
+        String errorCode = getChildText(fault, "ErrorCode");
+
+        String message = !faultString.isEmpty() ? faultString
+                : (!faultCode.isEmpty() ? faultCode : "T24 returned a SOAP fault");
+        return errorCode.isEmpty() ? message : message + " (" + errorCode + ")";
+    }
+
+    private Element firstElementByTagNameNS(Document doc, String namespaceUri, String localName) {
+        NodeList nl = doc.getElementsByTagNameNS(namespaceUri, localName);
+        return nl.getLength() > 0 ? (Element) nl.item(0) : null;
     }
 
     private String getElementText(Document doc, String tagName, String defaultVal) {

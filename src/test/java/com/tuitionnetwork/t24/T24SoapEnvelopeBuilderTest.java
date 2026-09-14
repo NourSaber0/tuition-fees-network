@@ -127,4 +127,77 @@ public class T24SoapEnvelopeBuilderTest {
         assertEquals("T24-BILL-9988", resp.billingId());
         assertEquals(new BigDecimal("13000.00"), resp.newRemainingAmount());
     }
+
+    /**
+     * Exact fault payload documented in docs/T24_SAMPLE_PAYLOADS.md &sect;5. Before the fault-detection
+     * fix, all three parsers would miss this entirely (no &lt;Status&gt; element to find) and silently
+     * default to a fabricated success response instead of surfacing the fault.
+     */
+    private static final String DOCUMENTED_FAULT_XML = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+               <soapenv:Body>
+                  <soapenv:Fault>
+                     <faultcode>soapenv:Client</faultcode>
+                     <faultstring>Customer Billing Record Not Found for ID: T24-BILL-INVALID</faultstring>
+                     <detail>
+                        <t24:ErrorCode xmlns:t24="http://temenos.com/customerbilling">ERR_BILLING_NOT_FOUND</t24:ErrorCode>
+                     </detail>
+                  </soapenv:Fault>
+               </soapenv:Body>
+            </soapenv:Envelope>
+            """;
+
+    @Test
+    @DisplayName("parseRetrieveResponseXml: documented SOAP fault is surfaced as ERROR, not a fabricated SUCCESS")
+    void testRetrieveResponse_detectsDocumentedSoapFault() {
+        RetrieveBillingResponse resp = builder.parseRetrieveResponseXml(DOCUMENTED_FAULT_XML);
+
+        assertEquals("ERROR", resp.status());
+        assertTrue(resp.items().isEmpty());
+        assertEquals(BigDecimal.ZERO, resp.totalOutstanding());
+        assertTrue(resp.message().contains("Customer Billing Record Not Found"));
+        assertTrue(resp.message().contains("ERR_BILLING_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("parseRequestResponseXml: documented SOAP fault is surfaced as ERROR, not a fabricated CREATED")
+    void testRequestResponse_detectsDocumentedSoapFault() {
+        RequestBillingResponse resp = builder.parseRequestResponseXml(DOCUMENTED_FAULT_XML);
+
+        assertEquals("ERROR", resp.status());
+        assertNull(resp.billingId());
+        assertTrue(resp.message().contains("Customer Billing Record Not Found"));
+    }
+
+    @Test
+    @DisplayName("parseUpdateResponseXml: documented SOAP fault is surfaced as ERROR, not a fabricated UPDATED")
+    void testUpdateResponse_detectsDocumentedSoapFault() {
+        UpdateBillingResponse resp = builder.parseUpdateResponseXml(DOCUMENTED_FAULT_XML);
+
+        assertEquals("ERROR", resp.status());
+        assertNull(resp.billingId());
+        assertEquals(BigDecimal.ZERO, resp.newRemainingAmount());
+        assertTrue(resp.message().contains("Customer Billing Record Not Found"));
+    }
+
+    @Test
+    @DisplayName("extractSoapFault matches Fault element regardless of the envelope prefix used (soap: vs soapenv:)")
+    void testFaultDetection_isPrefixAgnostic() {
+        String differentPrefixFault = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+                   <soap:Body>
+                      <soap:Fault>
+                         <faultcode>soap:Server</faultcode>
+                         <faultstring>T24 core banking timeout</faultstring>
+                      </soap:Fault>
+                   </soap:Body>
+                </soap:Envelope>
+                """;
+
+        UpdateBillingResponse resp = builder.parseUpdateResponseXml(differentPrefixFault);
+        assertEquals("ERROR", resp.status());
+        assertTrue(resp.message().contains("T24 core banking timeout"));
+    }
 }

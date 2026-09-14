@@ -50,7 +50,9 @@ public class T24CustomerBillingController {
 
         UUID actorId = principal != null ? principal.userId() : null;
         RetrieveBillingResponse response = service.retrieveCustomerDues(resolvedNationalId, accountNumber, actorId);
-        return ResponseEntity.ok(response);
+        return "ERROR".equalsIgnoreCase(response.status())
+                ? ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(response)
+                : ResponseEntity.ok(response);
     }
 
     /**
@@ -64,7 +66,9 @@ public class T24CustomerBillingController {
 
         UUID actorId = principal != null ? principal.userId() : null;
         RequestBillingResponse response = service.registerFeeInT24(request, actorId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return "ERROR".equalsIgnoreCase(response.status())
+                ? ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(response)
+                : ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     /**
@@ -78,7 +82,9 @@ public class T24CustomerBillingController {
 
         UUID actorId = principal != null ? principal.userId() : null;
         UpdateBillingResponse response = service.syncPaymentSettlement(request, actorId);
-        return ResponseEntity.ok(response);
+        return "ERROR".equalsIgnoreCase(response.status())
+                ? ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(response)
+                : ResponseEntity.ok(response);
     }
 
     /**
