@@ -32,6 +32,9 @@ interface AuthContextValue {
   login: (username: string, password: string) => Promise<LoginResponse>
   verifyMfa: (mfaToken: string, code: string) => Promise<AuthUser>
   resendMfa: (mfaToken: string) => Promise<void>
+  trustDevice: (mfaToken: string) => Promise<void>
+  forgotPassword: (email: string) => Promise<void>
+  resetPassword: (token: string, newPassword: string) => Promise<void>
   logout: () => Promise<void>
 }
 
@@ -70,8 +73,10 @@ export interface AuthProviderProps {
  * One AuthProvider for both portals (Bank Back-Office + School). The credentials
  * typed into the single /login page decide the role that comes back from
  * /mfa/verify; this provider just stores whatever session it's handed - it
- * doesn't know or care which portal a given user belongs to. Each (bank)/(school)
- * route group layout is responsible for checking `user.role` and redirecting.
+ * doesn't know or care which portal a given user belongs to. Each /bank and
+ * /school layout is responsible for checking `user.role` and redirecting.
+ * (Real path segments, not Next.js route groups - two route-group pages both
+ * resolving to the same "/dashboard" URL would collide.)
  */
 export function AuthProvider({ baseUrl, children }: AuthProviderProps) {
   const [session, setSession] = useState<AuthSession | null>(null)
@@ -198,6 +203,47 @@ export function AuthProvider({ baseUrl, children }: AuthProviderProps) {
     [baseUrl]
   )
 
+  const trustDevice = useCallback(
+    async (mfaToken: string) => {
+      await fetch(`${baseUrl}/auth/mfa/trust-device`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mfaToken }),
+      })
+    },
+    [baseUrl]
+  )
+
+  const forgotPassword = useCallback(
+    async (email: string) => {
+      const res = await fetch(`${baseUrl}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      if (!res.ok) {
+        const err = await parseErrorBody(res)
+        throw new Error(err.message)
+      }
+    },
+    [baseUrl]
+  )
+
+  const resetPassword = useCallback(
+    async (token: string, newPassword: string) => {
+      const res = await fetch(`${baseUrl}/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, newPassword }),
+      })
+      if (!res.ok) {
+        const err = await parseErrorBody(res)
+        throw new Error(err.message)
+      }
+    },
+    [baseUrl]
+  )
+
   const logout = useCallback(async () => {
     const current = sessionRef.current
     try {
@@ -222,6 +268,9 @@ export function AuthProvider({ baseUrl, children }: AuthProviderProps) {
     login,
     verifyMfa,
     resendMfa,
+    trustDevice,
+    forgotPassword,
+    resetPassword,
     logout,
   }
 

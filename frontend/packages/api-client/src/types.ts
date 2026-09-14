@@ -27,12 +27,24 @@ export interface ApiError {
   details?: unknown
 }
 
-export type UserRole =
-  | 'ROLE_BACK_OFFICE'
-  | 'ROLE_INSTITUTION_ADMIN'
-  | 'ROLE_SCHOOL_ADMIN'
-  | 'ROLE_SCHOOL_FINANCE'
-  | 'ROLE_GUARDIAN'
+/**
+ * These are the values actually serialized into BankUserDto.role - the bank
+ * ones come from BankRole.getRoleId() (see BankRole.java), the school ones
+ * are hardcoded in BankAuthServiceImpl.toSchoolUserDto(). They are NOT the
+ * same as the ROLE_* Spring Security authority constants (UserRole.java on
+ * the backend) - those only ever appear inside the JWT, never in this DTO.
+ */
+export type BankRoleId = 'bank-admin' | 'bank-operations' | 'bank-finance' | 'bank-reconciliation'
+export type SchoolRoleId = 'school-admin' | 'school-finance'
+export type UserRole = BankRoleId | SchoolRoleId
+
+export function isBankRole(role: string): role is BankRoleId {
+  return role.startsWith('bank-')
+}
+
+export function isSchoolRole(role: string): role is SchoolRoleId {
+  return role.startsWith('school-')
+}
 
 export interface AuthUser {
   id: string
