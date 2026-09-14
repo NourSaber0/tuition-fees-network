@@ -13,12 +13,14 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
+    "next": "^16",
     "react": "^19"
   },
   "devDependencies": {
     "@tuition/config": "workspace:*",
     "@types/react": "^19",
     "eslint": "^9",
+    "next": "^16",
     "react": "^19",
     "typescript": "^5"
   }
