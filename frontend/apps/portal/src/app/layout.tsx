@@ -19,7 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <meta name="darkreader-lock" content="true" />
       </head>
-      <body className="min-h-full flex flex-col" suppressHydrationWarning>
+      <body className="h-full min-h-full flex flex-col" suppressHydrationWarning>
         <AuthProvider baseUrl={API_BASE_URL}>
           <ToastProvider>{children}</ToastProvider>
         </AuthProvider>

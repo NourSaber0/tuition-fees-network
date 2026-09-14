@@ -51,7 +51,7 @@ export function PortalShell({
   const title = active?.label ?? brandLabel
 
   return (
-    <div className="flex h-full overflow-hidden" style={{ background: 'var(--cib-bg)' }}>
+    <div className="flex-1 flex h-screen h-[100dvh] w-full overflow-hidden" style={{ background: 'var(--cib-bg)' }}>
       <aside className="w-60 flex flex-col shrink-0 h-full" style={{ background: 'var(--cib-blue)' }}>
         <div className="h-16 flex items-center px-5 shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <div className="flex items-center gap-2 select-none">
@@ -132,7 +132,7 @@ export function PortalShell({
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full overflow-hidden">
         <header
           className="h-16 flex items-center px-6 justify-between shrink-0"
           style={{ background: 'var(--cib-card)', borderBottom: '1px solid var(--cib-border)' }}
@@ -182,8 +182,8 @@ export function PortalShell({
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto">
-          <div className="p-6 min-h-full">{children}</div>
+        <main className="flex-1 overflow-y-auto min-h-0 overscroll-contain">
+          <div className="p-6">{children}</div>
         </main>
       </div>
     </div>
