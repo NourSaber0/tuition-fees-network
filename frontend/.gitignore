@@ -1,0 +1,18 @@
+node_modules
+.pnpm-store
+dist
+.turbo
+
+# Next.js
+.next/
+out/
+
+# env
+.env
+.env.local
+.env.*.local
+
+# misc
+.DS_Store
+*.log
+npm-debug.log*
