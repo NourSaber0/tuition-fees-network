@@ -24,11 +24,11 @@ The frontend rebuild unifies both the **Bank Back-Office Portal** and the **Scho
 | Category | Total Tickets | Completed | In Progress | Ready for Assignment | Progress % |
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | **Shared Foundation & Auth** | 2 | 2 | 0 | 0 | 100% |
-| **Bank Back-Office Portal** | 11 | 1 | 0 | 10 | 9.1% |
+| **Bank Back-Office Portal** | 11 | 2 | 0 | 9 | 27.3% |
 | **School Portal** | 10 | 0 | 1 | 9 | 10.0% |
-| **Total** | **22** | **3** | **1** | **18** | **18.2%** |
+| **Total** | **22** | **4** | **1** | **17** | **27.3%** |
 
-> **Milestone Note:** Phase 0 (monorepo & foundation), AUTH (shared sign-in & role routing), and BO-P2 (full Bank Back-Office dashboard) are **100% complete and merged into `main`**. All developers can now branch off `main` and build their assigned screens concurrently.
+> **Milestone Note:** Phase 0 (monorepo & foundation), AUTH (shared sign-in & role routing), BO-P2 (Bank Dashboard), and **BO-P4 (Transactions & Payment Workflow)** are **100% complete and merged**. All developers can branch off `main` and build their assigned screens concurrently.
 
 ---
 
@@ -52,7 +52,7 @@ Layout: [`apps/portal/src/app/bank/layout.tsx`](file:///Users/nourahmed/Download
 | :--- | :--- | :--- | :--- | :---: | :---: | :--- |
 | **BO-P2** | **Bank Dashboard** | [`apps/portal/src/app/bank/dashboard/page.tsx`](file:///Users/nourahmed/Downloads/demo/frontend/apps/portal/src/app/bank/dashboard/page.tsx) | `/dashboard/summary`<br>`/dashboard/collections/weekly`<br>`/dashboard/institution-status`<br>`/dashboard/recent-transactions`<br>`/dashboard/deadline-summary` | S | ✅ **DONE** | 9 KPI cards, SVG weekly chart, status breakdown, recent transactions, deadline queue |
 | **BO-P3** | **Institution Management** | `apps/portal/src/app/bank/schools/page.tsx` | `/institutions`<br>`/institutions/{id}/students`<br>`/institutions/{id}/application`<br>`/institutions/{id}/integration`<br>`/institutions/{id}/approve\|reject\|activate\|deactivate`<br>`/institutions/{id}/fee-submissions` | L | 📋 **Ready** | List + register + tabs (Students/Application/Integration/Fees/Settlement) |
-| **BO-P4** | **Transactions & Payments** | `apps/portal/src/app/bank/transactions/page.tsx` | `/transactions`<br>`/transactions/{id}`<br>`/transactions/export`<br>`/customers/fees`<br>`/payments` | L | 📋 **Ready** | Filterable table, receipt view, multi-step payment workflow with idempotency key |
+| **BO-P4** | **Transactions & Payments** | [`apps/portal/src/app/bank/transactions/page.tsx`](file:///Users/nourahmed/Downloads/demo/frontend/apps/portal/src/app/bank/transactions/page.tsx) | `/transactions`<br>`/transactions/{id}`<br>`/transactions/tab-counts`<br>`/transactions/export`<br>`/customers/fees`<br>`/payments`<br>`/payments/{id}/retry` | L | ✅ **DONE** | Filterable table, live tab counts, 5-stage timeline drawer, 5-step payment wizard with UUID Idempotency-Key, retry modal |
 | **BO-P5** | **Reconciliation** | `apps/portal/src/app/bank/reconciliation/page.tsx` | `/reconciliation/summary`<br>`/reconciliation/runs`<br>`/reconciliation/exceptions`<br>`/reconciliation/exceptions/{id}` | M | 📋 **Ready** | Backend module is 100% merged; status cards, runs history, exception resolver |
 | **BO-P6** | **EPP Plans** | `apps/portal/src/app/bank/epp/page.tsx` | `/epp/plans`<br>`/epp/plans/{id}/schedule`<br>`/epp/quote`<br>`/epp/cards/validate` | M | 📋 **Ready** | EPP plan calculator, installment schedule table, credit card validation |
 | **BO-P7** | **Reports** | `apps/portal/src/app/bank/reports/page.tsx` | `/reports/catalogue`<br>`/reports/generate`<br>`/reports/history`<br>`/reports/jobs/{id}/download` | M | 📋 **Ready** | Synchronous generation (`200 OK`) with immediate table preview and export |
