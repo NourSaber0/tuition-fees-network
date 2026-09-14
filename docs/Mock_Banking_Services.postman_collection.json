@@ -1,0 +1,662 @@
+{
+	"info": {
+		"_postman_id": "8a32d16c-e124-4f4d-912a-35b91b8d2201",
+		"name": "Mock Banking Services (WIT 2026)",
+		"description": "Postman collection for testing the in-memory Mock Banking Services:\n1. MOI National ID Validation Service\n2. Card Payment Gateway (Acquiring)\n3. Core Banking EPP Engine (Instalments)\n4. Test Data & Utilities",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "apiKey",
+			"value": "wit-intern-2026",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "0. Utility & Admin",
+			"item": [
+				{
+					"name": "Health Check (Public)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["health"]
+						},
+						"description": "Public health check endpoint. Returns {\"status\": \"ok\"} without requiring authentication."
+					}
+				},
+				{
+					"name": "Get Test Data (Cards & Preset NIDs)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/test-data",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "test-data"]
+						},
+						"description": "Returns all preset test cards and preset Egyptian national IDs."
+					}
+				},
+				{
+					"name": "Admin Reset Store",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/reset",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "admin", "reset"]
+						},
+						"description": "Clears in-memory payments, verifications, and EPP plans."
+					}
+				}
+			]
+		},
+		{
+			"name": "1. MOI National ID Validation",
+			"item": [
+				{
+					"name": "Validate NID - Success (Mona Samir, Adult)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"national_id\": \"29805150101023\",\n  \"full_name\": \"Mona Samir Abdelrahman\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/moi/validate",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "moi", "validate"]
+						},
+						"description": "Validates a valid adult Egyptian National ID. Expected: valid=true, 200 OK."
+					}
+				},
+				{
+					"name": "Validate NID - Underage (Minor < 21)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"national_id\": \"31204010102041\",\n  \"full_name\": \"Malak Hany Sobhy\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/moi/validate",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "moi", "validate"]
+						},
+						"description": "Validates a minor National ID (< 21 yo). Expected: valid=false, reasons=['UNDER_MINIMUM_AGE']."
+					}
+				},
+				{
+					"name": "Validate NID - Deceased (Digits 10-13 = 8888)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"national_id\": \"28001010188881\",\n  \"full_name\": \"Deceased Citizen\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/moi/validate",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "moi", "validate"]
+						},
+						"description": "Digits 10-13 = 8888 triggers DECEASED status. Expected: valid=false, status=DECEASED."
+					}
+				},
+				{
+					"name": "Validate NID - Blocked (Digits 10-13 = 9999)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"national_id\": \"28001010199991\",\n  \"full_name\": \"Blocked Citizen\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/moi/validate",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "moi", "validate"]
+						},
+						"description": "Digits 10-13 = 9999 triggers BLOCKED status."
+					}
+				},
+				{
+					"name": "Validate NID - Invalid Format / Checksum",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"national_id\": \"123456789\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/moi/validate",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "moi", "validate"]
+						},
+						"description": "Returns HTTP 400 Bad Request with INVALID_NATIONAL_ID."
+					}
+				},
+				{
+					"name": "List All Verifications",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/moi/verifications",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "moi", "verifications"]
+						},
+						"description": "Returns all previously stored MOI verification records."
+					}
+				}
+			]
+		},
+		{
+			"name": "2. Card Payment Gateway",
+			"item": [
+				{
+					"name": "Process Payment - Approved (Visa Credit)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"card\": {\n    \"number\": \"4111 1111 1111 1111\",\n    \"expiry_month\": 12,\n    \"expiry_year\": 2028,\n    \"cvv\": \"123\",\n    \"holder_name\": \"Mona Samir\"\n  },\n  \"amount\": {\n    \"value\": 15000.00,\n    \"currency\": \"EGP\"\n  },\n  \"capture\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/payments/cards",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "payments", "cards"]
+						},
+						"description": "Processes payment with Visa Credit test card. Expected: 201 Created, status=CAPTURED."
+					}
+				},
+				{
+					"name": "Process Payment - Needs 3DS Challenge",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"card\": {\n    \"number\": \"4000 0000 0000 3220\",\n    \"expiry_month\": 12,\n    \"expiry_year\": 2028,\n    \"cvv\": \"123\",\n    \"holder_name\": \"Ahmed Tarek\"\n  },\n  \"amount\": {\n    \"value\": 5000.00,\n    \"currency\": \"EGP\"\n  },\n  \"capture\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/payments/cards",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "payments", "cards"]
+						},
+						"description": "Card 4000000000003220 requires 3DS. Expected: 200 OK, status=PENDING_3DS. Copy the payment_id for next step."
+					}
+				},
+				{
+					"name": "Confirm 3DS OTP (Use payment_id)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"otp\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/payments/cards/:payment_id/3ds",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "payments", "cards", ":payment_id", "3ds"],
+							"variable": [
+								{
+									"key": "payment_id",
+									"value": "pay_sample_id_here"
+								}
+							]
+						},
+						"description": "Confirms 3DS challenge with test OTP 123456. Updates status to CAPTURED."
+					}
+				},
+				{
+					"name": "Process Payment - Declined: Insufficient Funds",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"card\": {\n    \"number\": \"4000 0000 0000 0002\",\n    \"expiry_month\": 12,\n    \"expiry_year\": 2028,\n    \"cvv\": \"123\",\n    \"holder_name\": \"Mona Samir\"\n  },\n  \"amount\": {\n    \"value\": 5000.00,\n    \"currency\": \"EGP\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/payments/cards",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "payments", "cards"]
+						},
+						"description": "Declines with 402 Payment Required and response_code 51."
+					}
+				},
+				{
+					"name": "Process Payment - Declined: Expired Card",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"card\": {\n    \"number\": \"4000 0000 0000 0069\",\n    \"expiry_month\": 1,\n    \"expiry_year\": 2020,\n    \"cvv\": \"123\",\n    \"holder_name\": \"Mona Samir\"\n  },\n  \"amount\": {\n    \"value\": 5000.00,\n    \"currency\": \"EGP\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/payments/cards",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "payments", "cards"]
+						},
+						"description": "Declines with 402 Payment Required and response_code 54 (CARD_EXPIRED)."
+					}
+				},
+				{
+					"name": "List All Payments",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/payments/cards",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "payments", "cards"]
+						},
+						"description": "Lists all processed mock card payments."
+					}
+				},
+				{
+					"name": "Get Payment By ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/payments/cards/:payment_id",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "payments", "cards", ":payment_id"],
+							"variable": [
+								{
+									"key": "payment_id",
+									"value": "pay_sample_id_here"
+								}
+							]
+						},
+						"description": "Retrieves details of a specific payment by payment ID."
+					}
+				}
+			]
+		},
+		{
+			"name": "3. Core Banking EPP Engine",
+			"item": [
+				{
+					"name": "Get EPP Quotes (e.g. 24,000 EGP)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/epp/quotes?amount=24000",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "epp", "quotes"],
+							"query": [
+								{
+									"key": "amount",
+									"value": "24000"
+								}
+							]
+						},
+						"description": "Calculates instalment quotes across 3, 6, 12, 18, and 24 months with interest rates, admin fees, and monthly instalments."
+					}
+				},
+				{
+					"name": "Create EPP Plan - From Card Payment ID",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"payment_id\": \"REPLACE_WITH_CAPTURED_PAYMENT_ID\",\n  \"tenor_months\": 12,\n  \"national_id\": \"29805150101023\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/epp",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "epp"]
+						},
+						"description": "Converts a captured credit card payment into a 12-month instalment plan. Generates amortisation schedule."
+					}
+				},
+				{
+					"name": "Create EPP Plan - Direct Principal Amount",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"amount\": 30000,\n  \"tenor_months\": 6,\n  \"national_id\": \"29805150101023\",\n  \"card\": {\n    \"number\": \"4111 1111 1111 1111\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/epp",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "epp"]
+						},
+						"description": "Creates an EPP plan directly with principal amount and credit card."
+					}
+				},
+				{
+					"name": "Create EPP Plan - Debit Card Rejected (422)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"amount\": 10000,\n  \"tenor_months\": 12,\n  \"card\": {\n    \"number\": \"4000 0566 5566 5556\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/epp",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "epp"]
+						},
+						"description": "Debit card 4000056655665556 is rejected for EPP with 422 CARD_NOT_ELIGIBLE."
+					}
+				},
+				{
+					"name": "List All EPP Plans",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/epp",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "epp"]
+						},
+						"description": "Lists all booked EPP plans."
+					}
+				},
+				{
+					"name": "Get EPP Plan By ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/epp/:plan_id",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "epp", ":plan_id"],
+							"variable": [
+								{
+									"key": "plan_id",
+									"value": "epp_sample_id_here"
+								}
+							]
+						},
+						"description": "Returns full EPP plan details including all installments and due dates."
+					}
+				},
+				{
+					"name": "Cancel EPP Plan",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "X-API-Key",
+								"value": "{{apiKey}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/epp/:plan_id/cancel",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "epp", ":plan_id", "cancel"],
+							"variable": [
+								{
+									"key": "plan_id",
+									"value": "epp_sample_id_here"
+								}
+							]
+						},
+						"description": "Cancels an active EPP plan and updates remaining instalments to CANCELLED."
+					}
+				}
+			]
+		},
+		{
+			"name": "4. Security & Error Handling",
+			"item": [
+				{
+					"name": "Missing API Key (401 Unauthorized)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/test-data",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "test-data"]
+						},
+						"description": "Attempt to call mock endpoint without X-API-Key header. Expected: 401 MISSING_API_KEY."
+					}
+				},
+				{
+					"name": "Invalid API Key (401 Unauthorized)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "wrong-key-value",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/test-data",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "test-data"]
+						},
+						"description": "Attempt to call mock endpoint with incorrect X-API-Key header. Expected: 401 INVALID_API_KEY."
+					}
+				}
+			]
+		}
+	]
+}
