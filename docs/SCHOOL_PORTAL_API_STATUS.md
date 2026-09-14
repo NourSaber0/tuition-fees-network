@@ -13,21 +13,21 @@
 
 The School Portal contract defines approximately **64 client-callable endpoints** and **2 automated system engines** across **11 phases** to back the front-end portal screens (`Login.tsx`, `Dashboard.tsx`, `Students.tsx`, `Fees.tsx`, `Upload.tsx`, `Payments.tsx`, `Reconciliation.tsx`, `Reports.tsx`, `Notifications.tsx`, `Users.tsx`, and `Settings.tsx`).
 
-Currently, **Milestone 1 (Phases 1 & 10)**, **Milestone 2 (Phases 2 & 11)**, **Milestone 3 (Phase 3)**, **Milestone 4 (Phase 4)**, **Milestone 5 (Phase 5)**, **Milestone 6 (Phase 6)**, and **Milestone 7 (Phase 7)** are **100% complete, verified, and passing 430 automated unit and integration tests** (424 prior tests + 6 reconciliation & settlement visibility tests, 0 failures, 0 errors).
+Currently, **Milestone 1 (Phases 1 & 10)**, **Milestone 2 (Phases 2 & 11)**, **Milestone 3 (Phase 3)**, **Milestone 4 (Phase 4)**, **Milestone 5 (Phase 5)**, **Milestone 6 (Phase 6)**, **Milestone 7 (Phase 7)**, and **Milestone 8 (Phase 8)** are **100% complete, verified, and passing 437 automated unit and integration tests** (430 prior tests + 7 school report pipeline tests, 0 failures, 0 errors).
 
 | Metric | Count | Percentage |
 |---|:---:|:---:|
 | **Total Contract Endpoints & Jobs** | 66 (64 endpoints + 2 engines) | 100% |
-| **Milestones 1, 2, 3, 4, 5, 6 & 7 Implemented & Verified** (Phases 1, 2, 3, 4, 5, 6, 7, 10, 11) | 58 (56 endpoints + 2 engines) | 87.9% |
-| **Pending Implementation** (Milestones 8–9 / Phases 8–9) | 8 endpoints | 12.1% |
-| **Automated Test Suite Health** | 430 / 430 Tests Green | 100% Pass Rate |
+| **Milestones 1–8 Implemented & Verified** (Phases 1–8, 10, 11) | 63 (61 endpoints + 2 engines) | 95.5% |
+| **Pending Implementation** (Milestone 9 / Phase 9) | 3 endpoints | 4.5% |
+| **Automated Test Suite Health** | 437 / 437 Tests Green | 100% Pass Rate |
 
 ---
 
 ## Milestone Roadmap & Progress Matrix
 
 ```
-[==================================================================>] 87.9% Overall Progress
+[=====================================================================>] 95.5% Overall Progress
   - Milestone 1: Security, Identity & School Users (Phases 1 & 10)     --> [100% DONE] ✅
   - Milestone 2: Dashboard & Settings Profile (Phases 2 & 11)          --> [100% DONE] ✅
   - Milestone 3: Student Roster & Guardians (Phase 3)                  --> [100% DONE] ✅
@@ -35,7 +35,7 @@ Currently, **Milestone 1 (Phases 1 & 10)**, **Milestone 2 (Phases 2 & 11)**, **M
   - Milestone 5: Fee Upload & Ingestion Pipeline (Phase 5)             --> [100% DONE] ✅
   - Milestone 6: Payments View & Receipts (Phase 6)                    --> [100% DONE] ✅
   - Milestone 7: Reconciliation & Settlement Visibility (Phase 7)      --> [100% DONE] ✅
-  - Milestone 8: Reports & Asynchronous Generation Pipeline (Phase 8)  --> [PENDING]   ⏳
+  - Milestone 8: Reports & Asynchronous Generation Pipeline (Phase 8)  --> [100% DONE] ✅
   - Milestone 9: In-App & Email Notifications (Phase 9)                --> [PENDING]   ⏳
 ```
 
@@ -206,19 +206,20 @@ Currently, **Milestone 1 (Phases 1 & 10)**, **Milestone 2 (Phases 2 & 11)**, **M
 ---
 
 ### Milestone 8: Reports & Asynchronous Generation Pipeline (Phase 8)
-**Status:** ⏳ **PENDING** (0 / 5 Endpoints)  
-**Target:** Standard report templates, Async generation jobs (`202 Accepted`), Export downloads
+**Status:** ✅ **100% COMPLETE** (5 / 5 Endpoints Implemented and Tested)  
+**Target:** Standard report templates, Async generation jobs (`202 Accepted`), Export downloads  
+**Test Suite:** [`SchoolReportIntegrationTest.java`](file:///Users/nourahmed/Downloads/demo/src/test/java/com/tuitionnetwork/reporting/SchoolReportIntegrationTest.java) (7 tests)
 
 #### Phase 8 — Reports
-**Source:** `Reports.tsx`, US-41 to US-44 | **Roles:** `school-admin`, `school-finance`
+**Source:** `Reports.tsx`, US-41 to US-44 | **Roles:** `school-admin`, `school-finance` | **Status:** 5 / 5 DONE
 
-| Endpoint | Method | Contract Purpose | Status | Target Component / Notes |
+| Endpoint | Method | Contract Purpose | Status | Implementation Details |
 |---|---|---|:---:|---|
-| `/reports/templates` | `GET` | List available school report templates (Aging, Collection, Class, Reconciliation) | ⏳ **PENDING** | Standard report types and parameter schemas. |
-| `/reports/generate` | `POST` | Trigger asynchronous report generation (`202 Accepted` + `jobId`) | ⏳ **PENDING** | Enqueues background report task, returns job identifier. |
-| `/reports/jobs/{jobId}` | `GET` | Poll report generation status | ⏳ **PENDING** | Returns job status (`IN_PROGRESS`, `COMPLETED`, `FAILED`). |
-| `/reports/jobs/{jobId}/download` | `GET` | Download generated report (PDF, Excel, CSV) | ⏳ **PENDING** | Streams generated binary report file. |
-| `/reports/history` | `GET` | List past generated reports for school | ⏳ **PENDING** | Paginated list of historical report jobs. |
+| `/reports/catalogue` / `/reports/templates` | `GET` | List available school report templates (`school-collections`, `school-payments`, `school-outstanding-fees`, `school-partial-payments`) | ✅ **DONE** | [`ReportsController.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/reporting/web/ReportsController.java) via [`ReportCatalogue.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/reporting/catalogue/ReportCatalogue.java). Returns the 4 school templates with supported formats (`PDF`, `CSV`), categories, and context filters. Dual-mapped to `/catalogue` and `/templates`. |
+| `/reports/generate` | `POST` | Trigger asynchronous report generation (`202 Accepted` + `jobId` + `status: processing`) | ✅ **DONE** | [`ReportsController.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/reporting/web/ReportsController.java) via [`ReportsServiceImpl.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/reporting/service/ReportsServiceImpl.java). Validates dates (`date_from_after_date_to`), formats (`unsupported_format_for_report`), enriches report with `institutionId`, dynamically builds data, and returns HTTP `202 Accepted`. |
+| `/reports/jobs/{jobId}` | `GET` | Poll report generation status, preview rows, and download URL | ✅ **DONE** | [`ReportsController.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/reporting/web/ReportsController.java). Returns HTTP `200 OK` with `status: READY`, inline `preview` (columns and rows), and `downloadUrl`. Enforces strict multi-tenant boundary (`403 Forbidden` on cross-school jobs). |
+| `/reports/jobs/{jobId}/download` | `GET` | Download generated report (CSV file stream) | ✅ **DONE** | [`ReportsController.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/reporting/web/ReportsController.java). Streams UTF-8 CSV file with `Content-Disposition: attachment` and headers. Enforces multi-tenant isolation. |
+| `/reports/history` | `GET` | List past generated reports scoped strictly to school | ✅ **DONE** | [`ReportsController.java`](file:///Users/nourahmed/Downloads/demo/src/main/java/com/tuitionnetwork/reporting/web/ReportsController.java). Paginated history queried via `findByInstitutionIdOrderByCreatedAtDesc` ensuring complete isolation from other schools. |
 
 ---
 

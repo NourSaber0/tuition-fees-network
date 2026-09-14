@@ -29,6 +29,9 @@ public class GeneratedReport {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @Column(name = "institution_id")
+    private UUID institutionId;
+
     @Column(name = "report_id", nullable = false)
     private String reportId;
 
@@ -86,6 +89,14 @@ public class GeneratedReport {
 
     public void setId(UUID id) {
         this.id = id;
+    }
+
+    public UUID getInstitutionId() {
+        return institutionId;
+    }
+
+    public void setInstitutionId(UUID institutionId) {
+        this.institutionId = institutionId;
     }
 
     public String getReportId() {
