@@ -46,6 +46,7 @@ import com.tuitionnetwork.students.dto.UpdateStudentRequest;
 import com.tuitionnetwork.reconciliation.domain.ReconciliationException;
 import com.tuitionnetwork.reconciliation.repository.ReconciliationExceptionRepository;
 import com.tuitionnetwork.reconciliation.repository.ReconciliationRunRepository;
+import com.tuitionnetwork.reporting.repository.GeneratedReportRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -130,6 +131,9 @@ public class SchoolPortalMasterE2EIntegrationTest {
     private ReconciliationExceptionRepository exceptionRepository;
 
     @Autowired
+    private GeneratedReportRepository generatedReportRepository;
+
+    @Autowired
     private JwtTokenProvider jwtTokenProvider;
 
     @Autowired
@@ -163,6 +167,7 @@ public class SchoolPortalMasterE2EIntegrationTest {
         uploadRowRepository.deleteAll();
         uploadErrorRepository.deleteAll();
         csvUploadRepository.deleteAll();
+        generatedReportRepository.deleteAll();
         exceptionRepository.deleteAll();
         runRepository.deleteAll();
         paymentAllocationRepository.deleteAll();
@@ -1027,6 +1032,163 @@ public class SchoolPortalMasterE2EIntegrationTest {
 
         mockMvc.perform(get("/reconciliation/exceptions")
                         .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Stage 10: Reports & Async Generation Pipeline (Phase 8)")
+    void testStage10_ReportsAndAsyncGenerationPipeline() throws Exception {
+        // 10.0 Setup test student, fee line, and payment for School A
+        Student student = new Student(null, schoolA.getId(), "hash_rpt1", "enc_rpt1", "Nader Nabil",
+                LocalDate.of(2010, 5, 20), "STU-0881", "Grade 10", "A",
+                "Nabil Nader", "+20 10 3322 1100", "nabil.nader@example.com");
+        student = studentRepository.save(student);
+
+        FeeLine fee = new FeeLine(schoolA.getId(), student.getId(), FeeType.TUITION,
+                new BigDecimal("15000.00"), new BigDecimal("5000.00"), "2026/2027", LocalDate.of(2026, 9, 20));
+        fee.setPaidAmount(new BigDecimal("10000.00"));
+        fee.setStatus(FeeStatus.PARTIALLY_PAID);
+        fee = feeLineRepository.save(fee);
+
+        Payment payment = new Payment(UUID.randomUUID(), new BigDecimal("10000.00"),
+                PaymentMethod.CREDIT_CARD, "IDEMP-RPT-" + UUID.randomUUID());
+        payment.setStatus(PaymentStatus.CAPTURED);
+        payment.setTransactionReference("TX-20260914-0801");
+        payment = paymentRepository.save(payment);
+        paymentAllocationRepository.save(new PaymentAllocation(payment, fee, new BigDecimal("10000.00")));
+
+        // 10.1 GET /reports/catalogue & /reports/templates return 4 school report templates (Phase 8.1)
+        mockMvc.perform(get("/reports/catalogue")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(4)))
+                .andExpect(jsonPath("$[0].id").value("school-collections"))
+                .andExpect(jsonPath("$[1].id").value("school-payments"))
+                .andExpect(jsonPath("$[2].id").value("school-outstanding-fees"))
+                .andExpect(jsonPath("$[3].id").value("school-partial-payments"));
+
+        // Dual alias /reports/templates works identically
+        mockMvc.perform(get("/reports/templates")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(4)));
+
+        // 10.2 Validation errors on POST /reports/generate (Phase 8.2)
+        // 1. date_from_after_date_to
+        mockMvc.perform(post("/reports/generate")
+                        .header("Authorization", "Bearer " + tokenAdminA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "reportId": "school-collections",
+                                    "dateFrom": "2026-09-30",
+                                    "dateTo": "2026-09-01",
+                                    "format": "CSV"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("date_from_after_date_to"));
+
+        // 2. unsupported_format_for_report
+        mockMvc.perform(post("/reports/generate")
+                        .header("Authorization", "Bearer " + tokenAdminA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "reportId": "school-collections",
+                                    "dateFrom": "2026-09-01",
+                                    "dateTo": "2026-09-30",
+                                    "format": "XML"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("unsupported_format_for_report"));
+
+        // 10.3 Successful generation returns 202 Accepted with status processing (Phase 8.2)
+        MvcResult genResult = mockMvc.perform(post("/reports/generate")
+                        .header("Authorization", "Bearer " + tokenAdminA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "reportId": "school-outstanding-fees",
+                                    "dateFrom": "2026-08-01",
+                                    "dateTo": "2026-09-30",
+                                    "format": "CSV",
+                                    "filters": {
+                                        "feeCategory": "Tuition"
+                                    }
+                                }
+                                """))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.jobId").isNotEmpty())
+                .andExpect(jsonPath("$.status").value("processing"))
+                .andExpect(jsonPath("$.reportId").value("school-outstanding-fees"))
+                .andReturn();
+
+        String jobId = objectMapper.readTree(genResult.getResponse().getContentAsString()).get("jobId").asText();
+
+        // 10.4 GET /reports/jobs/{jobId} returns preview and downloadUrl (Phase 8.3)
+        mockMvc.perform(get("/reports/jobs/{jobId}", jobId)
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("READY"))
+                .andExpect(jsonPath("$.downloadUrl").value("/reports/jobs/" + jobId + "/download"))
+                .andExpect(jsonPath("$.preview.columns", hasSize(greaterThanOrEqualTo(4))))
+                .andExpect(jsonPath("$.preview.rows", hasSize(greaterThanOrEqualTo(1))))
+                .andExpect(jsonPath("$.preview.rows[0].student").value("Nader Nabil"));
+
+        // 10.5 GET /reports/jobs/{jobId}/download streams CSV file (Phase 8.4)
+        mockMvc.perform(get("/reports/jobs/{jobId}/download", jobId)
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", containsString("text/csv")))
+                .andExpect(header().string("Content-Disposition", containsString("attachment; filename=")))
+                .andExpect(content().string(containsString("Nader Nabil")))
+                .andExpect(content().string(containsString("5000")));
+
+        // 10.6 GET /reports/history returns prior runs scoped to School A (Phase 8.5)
+        mockMvc.perform(get("/reports/history")
+                        .header("Authorization", "Bearer " + tokenAdminA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.data[0].reportId").value("school-outstanding-fees"));
+
+        // 10.7 Multi-tenant isolation: School B cannot access School A job or download
+        mockMvc.perform(get("/reports/jobs/{jobId}", jobId)
+                        .header("Authorization", "Bearer " + tokenAdminB))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/reports/jobs/{jobId}/download", jobId)
+                        .header("Authorization", "Bearer " + tokenAdminB))
+                .andExpect(status().isForbidden());
+
+        // Cross-school query param rejected with 403 Forbidden
+        mockMvc.perform(post("/reports/generate")
+                        .param("institutionId", schoolB.getId().toString())
+                        .header("Authorization", "Bearer " + tokenAdminA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "reportId": "school-collections",
+                                    "dateFrom": "2026-08-01",
+                                    "dateTo": "2026-09-30",
+                                    "format": "CSV"
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+
+        // School user attempting to generate bank-only report rejected with 403 Forbidden
+        mockMvc.perform(post("/reports/generate")
+                        .header("Authorization", "Bearer " + tokenAdminA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "reportId": "network-collections",
+                                    "dateFrom": "2026-08-01",
+                                    "dateTo": "2026-09-30",
+                                    "format": "CSV"
+                                }
+                                """))
                 .andExpect(status().isForbidden());
     }
 }
