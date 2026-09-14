@@ -17,4 +17,5 @@ public interface StudentRepository extends JpaRepository<Student, UUID> {
     boolean existsByInstitutionIdAndStudentRef(UUID institutionId, String studentRef);
     List<Student> findByInstitutionIdAndStatus(UUID institutionId, String status);
     long countByInstitutionId(UUID institutionId);
+    List<Student> findByFullNameContainingIgnoreCase(String fullName);
 }

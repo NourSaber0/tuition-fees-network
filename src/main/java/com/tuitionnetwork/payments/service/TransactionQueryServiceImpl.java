@@ -32,6 +32,7 @@ import com.tuitionnetwork.payments.dto.TimelineEventDto;
 import com.tuitionnetwork.payments.dto.TransactionDetailDto;
 import com.tuitionnetwork.payments.dto.TransactionDto;
 import com.tuitionnetwork.payments.dto.TransactionTabCountsDto;
+import com.tuitionnetwork.payments.repository.PaymentAllocationRepository;
 import com.tuitionnetwork.payments.repository.PaymentRepository;
 import com.tuitionnetwork.payments.repository.ReceiptRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -69,6 +70,7 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
     private final AuditLogRepository auditLogRepository;
     private final ReceiptRepository receiptRepository;
     private final FeeDeadlineService feeDeadlineService;
+    private final PaymentAllocationRepository paymentAllocationRepository;
 
     @Autowired
     public TransactionQueryServiceImpl(PaymentRepository paymentRepository,
@@ -79,7 +81,8 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
                                        IdentityResolverService identityResolverService,
                                        @Autowired(required = false) AuditLogRepository auditLogRepository,
                                        ReceiptRepository receiptRepository,
-                                       FeeDeadlineService feeDeadlineService) {
+                                       FeeDeadlineService feeDeadlineService,
+                                       PaymentAllocationRepository paymentAllocationRepository) {
         this.paymentRepository = paymentRepository;
         this.feeLineRepository = feeLineRepository;
         this.studentRepository = studentRepository;
@@ -89,6 +92,7 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
         this.auditLogRepository = auditLogRepository;
         this.receiptRepository = receiptRepository;
         this.feeDeadlineService = feeDeadlineService;
+        this.paymentAllocationRepository = paymentAllocationRepository;
     }
 
     @Override
@@ -135,11 +139,32 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
             }
 
             if (search != null && !search.isBlank()) {
-                String searchLower = "%" + search.trim().toLowerCase() + "%";
+                String trimmed = search.trim();
+                String searchLower = "%" + trimmed.toLowerCase() + "%";
                 Predicate bankRefLike = cb.like(cb.lower(root.get("transactionReference")), searchLower);
                 Predicate authLike = cb.like(cb.lower(root.get("authCode")), searchLower);
                 Predicate idempLike = cb.like(cb.lower(root.get("idempotencyKey")), searchLower);
-                predicates.add(cb.or(bankRefLike, authLike, idempLike));
+                Predicate refPredicate = cb.or(bankRefLike, authLike, idempLike);
+
+                // Student/institution names live outside the payments module (no JPA
+                // relation on Payment/FeeLine), so resolve matching IDs first and OR
+                // them in by payment id rather than joining across module boundaries.
+                List<UUID> studentIds = studentRepository.findByFullNameContainingIgnoreCase(trimmed)
+                        .stream().map(Student::getId).toList();
+                List<UUID> institutionIds = institutionRepository.findByNameContainingIgnoreCase(trimmed)
+                        .stream().map(Institution::getId).toList();
+
+                if (!studentIds.isEmpty() || !institutionIds.isEmpty()) {
+                    List<UUID> matchedPaymentIds = paymentAllocationRepository
+                            .findPaymentIdsByStudentIdsOrInstitutionIds(studentIds, institutionIds);
+                    if (!matchedPaymentIds.isEmpty()) {
+                        predicates.add(cb.or(refPredicate, root.get("id").in(matchedPaymentIds)));
+                    } else {
+                        predicates.add(refPredicate);
+                    }
+                } else {
+                    predicates.add(refPredicate);
+                }
             }
 
             if (method != null && !method.isBlank()) {

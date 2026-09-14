@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -22,6 +23,8 @@ public interface InstitutionRepository extends JpaRepository<Institution, UUID> 
     Optional<Institution> findByRegistrationNumber(String registrationNumber);
 
     long countByInstitutionType(InstitutionType institutionType);
+
+    List<Institution> findByNameContainingIgnoreCase(String name);
 
     /**
      * Paged institution search for the back-office list view (US-05 .. US-07).

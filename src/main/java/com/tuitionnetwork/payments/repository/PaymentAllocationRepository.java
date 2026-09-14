@@ -21,4 +21,9 @@ public interface PaymentAllocationRepository extends JpaRepository<PaymentAlloca
 
     @Query("select count(pa) > 0 from PaymentAllocation pa where pa.payment.id = :paymentId and pa.feeLine.institutionId = :institutionId")
     boolean existsByPaymentIdAndInstitutionId(@Param("paymentId") UUID paymentId, @Param("institutionId") UUID institutionId);
+
+    @Query("select distinct pa.payment.id from PaymentAllocation pa " +
+            "where pa.feeLine.studentId in :studentIds or pa.feeLine.institutionId in :institutionIds")
+    List<UUID> findPaymentIdsByStudentIdsOrInstitutionIds(@Param("studentIds") List<UUID> studentIds,
+                                                           @Param("institutionIds") List<UUID> institutionIds);
 }

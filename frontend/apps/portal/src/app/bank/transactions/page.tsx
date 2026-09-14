@@ -219,9 +219,13 @@ export default function TransactionsPage() {
       if (dateFrom) params.set("dateFrom", dateFrom);
       if (dateTo) params.set("dateTo", dateTo);
 
-      const res = await fetch(`http://localhost:8080/api/v1/transactions/export?${params.toString()}`, {
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/api/v1";
+      const stored = localStorage.getItem("tuition.auth.session");
+      const accessToken = stored ? (JSON.parse(stored) as { accessToken?: string }).accessToken : undefined;
+
+      const res = await fetch(`${baseUrl}/transactions/export?${params.toString()}`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("tuition_access_token") ?? ""}`,
+          Authorization: `Bearer ${accessToken ?? ""}`,
         },
       });
       if (!res.ok) throw new Error("Failed to export transactions");
