@@ -1,0 +1,54 @@
+/* The IBM Plex Sans / JetBrains Mono @import lives in each app's own
+   globals.css (must be the file's first rule per CSS's @import ordering
+   rule) - this file is @import'd *into* that stylesheet, after tailwindcss
+   itself expands into rules, so an @import here would land too late. */
+@theme {
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+/* CIB brand tokens - carried over from the Figma export's index.css so both
+   portals (bank + school) share one visual language. */
+:root {
+  --cib-blue: #003087;
+  --cib-blue-dark: #002060;
+  --cib-blue-mid: #0056b8;
+  --cib-blue-light: #e8f0fb;
+  --cib-orange: #f7941d;
+  --cib-orange-dark: #c96b10;
+  --cib-orange-light: #fef3e6;
+  --cib-bg: #f4f6f9;
+  --cib-card: #ffffff;
+  --cib-border: #dde4ee;
+  --cib-text: #1b2a4a;
+  --cib-text-muted: #6b7a8d;
+}
+
+html,
+body {
+  height: 100%;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  background-color: var(--cib-bg);
+  color: var(--cib-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #c8d2e0 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: #c8d2e0;
+  border-radius: 3px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #a0aec0;
+}

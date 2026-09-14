@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  lint-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @tuition/ui exec eslint src
+      - run: pnpm --filter @tuition/api-client exec eslint src
+      - run: pnpm --filter portal exec eslint .
+
+      - run: pnpm --filter @tuition/ui exec tsc --noEmit
+      - run: pnpm --filter @tuition/api-client exec tsc --noEmit
+
+      - run: pnpm --filter portal build
