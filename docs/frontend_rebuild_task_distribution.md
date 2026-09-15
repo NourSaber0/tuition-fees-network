@@ -133,9 +133,15 @@ Each portal's `layout.tsx` also re-checks the role on every load (not just at lo
 **Endpoints:** `/reconciliation/summary`, `/reconciliation/runs`, `/reconciliation/exceptions`, `/reconciliation/exceptions/{id}` (PATCH, `/assign`) | **Size:** M
 - [ ] Summary counts, runs list, and exception management. Backend module is 100% merged and verified.
 
-### BO-P6 - EPP Plans
+### BO-P6 - EPP Plans ✅ DONE
 **Screen:** `EPP.tsx` -> `app/bank/epp/`
-**Endpoints:** `/epp/plans`, `/plans/{id}/schedule`, `/quote`, `/cards/validate`, `/plans` (create) | **Size:** M
+**Endpoints:** `/epp/summary`, `/epp/plans`, `/epp/plans/{id}`, `/epp/plans/{id}/schedule`, `/epp/quote`, `/epp/cards/validate` | **Size:** M
+- [x] List with KPI summary, search/status/tenor filters, real pagination.
+- [x] Create wizard adapted to the real backend contract: an EPP plan converts an EXISTING successful CIB credit-card payment (`sourcePaymentId`), it isn't a brand-new charge - so step 1 searches/selects an eligible payment instead of Figma's blank card+student form.
+- [x] Card validation via `/epp/cards/validate` (real BIN classifier, not Figma's demo BINs) and live pricing via `/epp/quote` (real backend rate: 0% for 3-month tenor, 14% flat p.a. otherwise, 1% admin fee capped at EGP 500).
+- [x] Detail view: real pricing breakdown, progress bars, and installment schedule (recorded installments where they exist, projected otherwise).
+- [x] Cancel Plan action via `PATCH /epp/plans/{id}`.
+- [x] Real business-rule errors (principal range, one plan per payment, max 2 plans/student, card/payment eligibility) mapped to readable messages instead of raw backend codes.
 
 ### BO-P7 - Reports
 **Screen:** `Reports.tsx` -> `app/bank/reports/`
@@ -259,7 +265,7 @@ Each portal's `layout.tsx` also re-checks the role on every load (not just at lo
 | **BO-P3** | Bank | Institution Management | L | Ready | List, register, tabs (Students/Application/Integration) |
 | **BO-P4** | Bank | Transactions & Payments | L | Ready | Multi-step payment, receipt, idempotency |
 | **BO-P5** | Bank | Reconciliation | M | Ready | Runs, exceptions, summary counts |
-| **BO-P6** | Bank | EPP Plans | M | Ready | Plan schedule, card validation, quote |
+| **BO-P6** | Bank | EPP Plans | M | ✅ Complete | Plan schedule, card validation, quote, create wizard, cancel |
 | **BO-P7** | Bank | Reports | M | Ready | Sync `200 OK` report generation & download |
 | **BO-P8** | Bank | Notifications | S | Ready | Unread badge, notification list & actions |
 | **BO-P9** | Bank | Audit Logs | S | Ready | Backend `AuditLogController` merged and ready |
