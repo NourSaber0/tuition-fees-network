@@ -137,10 +137,14 @@ Each portal's `layout.tsx` also re-checks the role on every load (not just at lo
 **Screen:** `EPP.tsx` -> `app/bank/epp/`
 **Endpoints:** `/epp/plans`, `/plans/{id}/schedule`, `/quote`, `/cards/validate`, `/plans` (create) | **Size:** M
 
-### BO-P7 - Reports
+### BO-P7 - Reports ✅ DONE
 **Screen:** `Reports.tsx` -> `app/bank/reports/`
-**Endpoints:** `/reports/catalogue`, `/reports/generate`, `/reports/jobs/{id}[/download]`, `/reports/history` | **Size:** M
-- [ ] Bank Back-Office reports generate synchronously (`200 OK`) with immediate table preview and export.
+**Endpoints:** `/reports/catalogue`, `/reports/generate`, `/reports/jobs/{id}[/download]`, `/reports/history`, `/institutions` | **Size:** M
+- [x] Bank Back-Office reports generate synchronously (`200 OK`) with immediate table preview and export.
+- [x] Fully catalogue-driven: category tabs, per-report formats, context filters, and `available`/`unavailableReason` all come from `GET /reports/catalogue` - not Figma's hardcoded 12-report list (2 of Figma's "Deadlines" reports don't exist server-side and were dropped; nothing else was invented).
+- [x] Real filter value domains, not Figma's guesses: `FeeType` display names (Tuition / Bus subscription / Books & materials / Activities), `PaymentStatus` labels (Successful / Pending / Failed / Refunded), `PaymentMethod` labels (CIB Account / Credit Card / EPP). Reconciliation status is a free-text input since real run statuses aren't a fixed enum.
+- [x] Recent Reports history panel (`GET /reports/history`) with per-entry download.
+- [x] Backend currently only accepts `format=CSV` for real generation even though the catalogue advertises PDF/XLSX too - selecting a non-CSV format surfaces the backend's real rejection via a friendly mapped message instead of a raw error code.
 
 ### BO-P8 - Notifications
 **Screens:** `Notifications.tsx` + header bell in `PortalShell.tsx`
@@ -260,7 +264,7 @@ Each portal's `layout.tsx` also re-checks the role on every load (not just at lo
 | **BO-P4** | Bank | Transactions & Payments | L | Ready | Multi-step payment, receipt, idempotency |
 | **BO-P5** | Bank | Reconciliation | M | Ready | Runs, exceptions, summary counts |
 | **BO-P6** | Bank | EPP Plans | M | Ready | Plan schedule, card validation, quote |
-| **BO-P7** | Bank | Reports | M | Ready | Sync `200 OK` report generation & download |
+| **BO-P7** | Bank | Reports | M | ✅ Complete | Catalogue-driven, sync `200 OK` generation, preview, history, download |
 | **BO-P8** | Bank | Notifications | S | Ready | Unread badge, notification list & actions |
 | **BO-P9** | Bank | Audit Logs | S | Ready | Backend `AuditLogController` merged and ready |
 | **BO-P10** | Bank | Users & Roles | M | Ready | Bank employee CRUD and permissions |
