@@ -39,3 +39,4 @@ node_modules/
 .pnpm-store/
 .turbo/
 .next/
+venv/
