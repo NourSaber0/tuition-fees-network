@@ -178,9 +178,15 @@ Each portal's `layout.tsx` also re-checks the role on every load (not just at lo
 - [x] Reset Password action (`POST /users/{id}/reset-password`) - a real backend capability Figma's screen didn't include.
 - [x] Role-count summary cards from the real `GET /users/summary`.
 
-### BO-P11 - Settings
+### BO-P11 - Settings ✅ DONE
 **Screen:** `Settings.tsx` -> `app/bank/settings/`
 **Endpoints:** `/settings/fee-types` (list/create/patch), `/settings/payment-statuses`, `/settings/epp` (get/put), `/settings/notifications` (get/put), `/settings/institutions` (get/put) | **Size:** M
+- [x] Fee Types: list + add + inline quick-toggle (taxable/active) + full edit form, all real DB-backed CRUD (Figma's table was fully static).
+- [x] Payment Statuses: all 6 real statuses (`PaymentStatusInfo.ALL`) - Figma only modeled 4, missing Refunded and Reversed.
+- [x] EPP Configuration: tenors, amount limits, per-tenor interest rates, a real separate admin-fee rate + cap (Figma only had one flat admin fee rate, no cap), require-approval, max plans/student - all persisted via `PUT /settings/epp` with the backend's real validation (min<max, ≥1 tenor enabled, 0-100% rates, etc.) surfaced inline.
+- [x] Notification Settings: event triggers + delivery channels, including a real editable "In-app" toggle (Figma hardcoded it always-on and disabled).
+- [x] School Configuration: toggles, upload limits, and allowed formats - verified live that unchecking all formats surfaces the backend's real "At least one upload format must be allowed" validation.
+- Note: `EppSettingsDto` is fully read/write and persisted, but per its own javadoc it isn't yet wired into `EppPricing`'s actual quote calculation (still hardcoded flat 14% p.a. / 0% for 3-month tenor) - a real backend gap to flag for BO-P6 follow-up, not something this ticket could or should paper over.
 
 ### BO-P12 - Payment Deadline, Priority & Late Penalty
 **Screens:** `Transactions.tsx` deadline columns + `@tuition/ui/src/priority.ts` | **Size:** S
@@ -287,7 +293,7 @@ Each portal's `layout.tsx` also re-checks the role on every load (not just at lo
 | **BO-P8** | Bank | Notifications | S | ✅ Complete | Unread badge, notification feed, mark read, dismiss |
 | **BO-P9** | Bank | Audit Logs | S | ✅ Complete | Filterable/expandable table, real roles, stats, CSV export |
 | **BO-P10** | Bank | Users & Roles | M | ✅ Complete | Bank employee CRUD, real role permissions, reset password |
-| **BO-P11** | Bank | Settings | M | Ready | Fee types, payment statuses, system settings |
+| **BO-P11** | Bank | Settings | M | ✅ Complete | Fee types, payment statuses, EPP/notification/school config |
 | **BO-P12** | Bank | Deadline / Priority / Penalty | S | Ready | UI priority badges in place; integrate in transaction lists |
 | **SP-P2** | School | Dashboard | S | ⏳ In Progress | Shell & routing ready; dashboard widgets next |
 | **SP-P3** | School | Student Management | L | ✅ Complete | Active & deactivated roster, guardian linking |
