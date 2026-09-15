@@ -24,9 +24,9 @@ The frontend rebuild unifies both the **Bank Back-Office Portal** and the **Scho
 | Category | Total Tickets | Completed | In Progress | Ready for Assignment | Progress % |
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | **Shared Foundation & Auth** | 2 | 2 | 0 | 0 | 100% |
-| **Bank Back-Office Portal** | 11 | 2 | 0 | 9 | 27.3% |
+| **Bank Back-Office Portal** | 11 | 3 | 0 | 8 | 27.3% |
 | **School Portal** | 10 | 1 | 0 | 9 | 10.0% |
-| **Total** | **22** | **5** | **0** | **17** | **22.7%** |
+| **Total** | **22** | **6** | **0** | **16** | **27.3%** |
 
 > **Milestone Note:** Phase 0 (monorepo & foundation), AUTH (shared sign-in & role routing), BO-P2 (Bank Dashboard with Figma pieces restored), **BO-P4 (Transactions & Payment Workflow)**, and **SP-P2 (School Dashboard)** are **100% complete and merged on `main`**. All developers can branch off `main` and build their assigned screens concurrently.
 
@@ -58,7 +58,7 @@ Layout: [`apps/portal/src/app/bank/layout.tsx`](file:///Users/nourahmed/Download
 | **BO-P7** | **Reports** | `apps/portal/src/app/bank/reports/page.tsx` | `/reports/catalogue`<br>`/reports/generate`<br>`/reports/history`<br>`/reports/jobs/{id}/download` | M | 📋 **Ready** | Synchronous generation (`200 OK`) with immediate table preview and export |
 | **BO-P8** | **Notifications** | `apps/portal/src/app/bank/notifications/page.tsx` | `/notifications`<br>`/notifications/unread-count`<br>`/notifications/{id}/read`<br>`/notifications/read-all` | S | 📋 **Ready** | In-app notification feed, header bell counter, mark as read, delete |
 | **BO-P9** | **Audit Logs** | `apps/portal/src/app/bank/audit-logs/page.tsx` | `/audit-logs`<br>`/audit-logs/{id}`<br>`/audit-logs/stats`<br>`/audit-logs/export` | S | 📋 **Ready** | Backend `AuditLogController` is merged; audit table with SHA-256 masked NID view |
-| **BO-P10** | **Users & Roles** | `apps/portal/src/app/bank/users/page.tsx` | `/users`<br>`/users/{id}`<br>`/users/{id}/activate\|deactivate`<br>`/roles` | M | 📋 **Ready** | Bank employee CRUD, role-permissions inspector, activation toggle |
+| **BO-P10** | **Users & Roles** | [`apps/portal/src/app/bank/users/page.tsx`](file:///Users/nourahmed/Downloads/demo/frontend/apps/portal/src/app/bank/users/page.tsx) | `/users`<br>`/users/summary`<br>`/users/{id}` (PATCH)<br>`/users/{id}/activate\|deactivate`<br>`/users/{id}/reset-password`<br>`/roles` | M | ✅ **DONE** | Bank employee CRUD (add/edit/deactivate/reactivate), real role-permission matrix from `GET /roles` (backend's actual route-segment permissions per `BankRole`, not Figma's fictional text descriptions), plus a real Reset Password action Figma didn't have. Gated by `user.role === "bank-admin"`, matching backend's own real permission model. |
 | **BO-P11** | **Settings** | `apps/portal/src/app/bank/settings/page.tsx` | `/settings/fee-types`<br>`/settings/payment-statuses`<br>`/settings/epp`<br>`/settings/notifications`<br>`/settings/institutions` | M | 📋 **Ready** | System parameter tabs, PUT audited changes |
 | **BO-P12** | **Deadline & Priority Badges** | Integrated across Transaction & Dashboard tables | `/dashboard/deadline-summary`<br>`/transactions` | S | 📋 **Ready** | Helpers in `@tuition/ui/src/priority.ts` (`dueDateLabel`, `PRIORITY_BADGE_CLASSES`) |
 

@@ -151,9 +151,13 @@ Each portal's `layout.tsx` also re-checks the role on every load (not just at lo
 **Endpoints:** `/audit-logs` (list/detail/stats/export) | **Size:** S
 - [ ] Backend module is 100% merged and verified (`AuditLogController.java`).
 
-### BO-P10 - Users & Roles
+### BO-P10 - Users & Roles ✅ DONE
 **Screen:** `Users.tsx` -> `app/bank/users/`
-**Endpoints:** `/users` (list/create/patch/activate/deactivate), `/roles` | **Size:** M
+**Endpoints:** `/users` (list/create/patch/activate/deactivate/reset-password), `/users/summary`, `/roles` | **Size:** M
+- [x] Bank employee CRUD (add/edit/deactivate/reactivate), gated by `user.role === "bank-admin"` matching the backend's own permission model.
+- [x] Role Permissions panel driven by the real `GET /roles` (`BankRole` enum's actual route-segment permissions per role) rather than Figma's fictional text permission descriptions - verified live that switching to "Reconciliation" correctly shows only Dashboard/Reconciliation/Notifications checked.
+- [x] Reset Password action (`POST /users/{id}/reset-password`) - a real backend capability Figma's screen didn't include.
+- [x] Role-count summary cards from the real `GET /users/summary`.
 
 ### BO-P11 - Settings
 **Screen:** `Settings.tsx` -> `app/bank/settings/`
@@ -263,7 +267,7 @@ Each portal's `layout.tsx` also re-checks the role on every load (not just at lo
 | **BO-P7** | Bank | Reports | M | Ready | Sync `200 OK` report generation & download |
 | **BO-P8** | Bank | Notifications | S | Ready | Unread badge, notification list & actions |
 | **BO-P9** | Bank | Audit Logs | S | Ready | Backend `AuditLogController` merged and ready |
-| **BO-P10** | Bank | Users & Roles | M | Ready | Bank employee CRUD and permissions |
+| **BO-P10** | Bank | Users & Roles | M | ✅ Complete | Bank employee CRUD, real role permissions, reset password |
 | **BO-P11** | Bank | Settings | M | Ready | Fee types, payment statuses, system settings |
 | **BO-P12** | Bank | Deadline / Priority / Penalty | S | Ready | UI priority badges in place; integrate in transaction lists |
 | **SP-P2** | School | Dashboard | S | ⏳ In Progress | Shell & routing ready; dashboard widgets next |
