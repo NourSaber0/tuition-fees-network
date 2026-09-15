@@ -567,9 +567,11 @@ export default function TransactionsPage() {
                         <div className="text-sm font-semibold text-[#1B2A4A]">
                           Due: {formatIsoDate(detailTx.dueDate)}
                         </div>
-                        <div className="text-xs text-gray-400 mt-0.5">
-                          {detailTx.daysToDue != null ? dueDateLabel(detailTx.daysToDue) : "Due soon"}
-                        </div>
+                        {detailTx.status !== "Successful" && (
+                          <div className="text-xs text-gray-400 mt-0.5">
+                            {detailTx.daysToDue != null ? dueDateLabel(detailTx.daysToDue) : "Due soon"}
+                          </div>
+                        )}
                       </div>
                       {detailTx.priority && (
                         <span
@@ -1623,7 +1625,7 @@ export default function TransactionsPage() {
                         {tx.dueDate ? (
                           <div className="space-y-1">
                             <div className="text-gray-600 font-mono text-[11px]">{formatIsoDate(tx.dueDate)}</div>
-                            {tx.daysToDue != null && (
+                            {tx.daysToDue != null && tx.status !== "Successful" && (
                               <div
                                 className={`text-[10px] font-medium ${
                                   tx.daysToDue < 0 ? "text-red-600" : tx.daysToDue === 0 ? "text-orange-600" : "text-gray-400"
