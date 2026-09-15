@@ -25,6 +25,16 @@ import {
   dueDateLabel,
   PRIORITY_BADGE_CLASSES,
 } from "@tuition/ui";
+
+async function readAccessToken(): Promise<string> {
+  try {
+    const raw = localStorage.getItem("tuition.auth.session");
+    return raw ? JSON.parse(raw).accessToken ?? "" : "";
+  } catch {
+    return "";
+  }
+}
+
 import type {
   TransactionDto,
   TransactionDetailDto,
@@ -224,9 +234,10 @@ export default function TransactionsPage() {
       if (dateFrom) params.set("dateFrom", dateFrom);
       if (dateTo) params.set("dateTo", dateTo);
 
+      const token = await readAccessToken();
       const res = await fetch(`http://localhost:8080/api/v1/transactions/export?${params.toString()}`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("tuition_access_token") ?? ""}`,
+          Authorization: `Bearer ${token}`,
         },
       });
       if (!res.ok) throw new Error("Failed to export transactions");
