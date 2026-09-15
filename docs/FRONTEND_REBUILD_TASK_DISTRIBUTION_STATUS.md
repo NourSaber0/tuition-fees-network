@@ -24,9 +24,9 @@ The frontend rebuild unifies both the **Bank Back-Office Portal** and the **Scho
 | Category | Total Tickets | Completed | In Progress | Ready for Assignment | Progress % |
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | **Shared Foundation & Auth** | 2 | 2 | 0 | 0 | 100% |
-| **Bank Back-Office Portal** | 11 | 2 | 0 | 9 | 27.3% |
+| **Bank Back-Office Portal** | 11 | 3 | 0 | 8 | 27.3% |
 | **School Portal** | 10 | 1 | 0 | 9 | 10.0% |
-| **Total** | **22** | **5** | **0** | **17** | **22.7%** |
+| **Total** | **22** | **6** | **0** | **16** | **27.3%** |
 
 > **Milestone Note:** Phase 0 (monorepo & foundation), AUTH (shared sign-in & role routing), BO-P2 (Bank Dashboard with Figma pieces restored), **BO-P4 (Transactions & Payment Workflow)**, and **SP-P2 (School Dashboard)** are **100% complete and merged on `main`**. All developers can branch off `main` and build their assigned screens concurrently.
 
@@ -54,7 +54,7 @@ Layout: [`apps/portal/src/app/bank/layout.tsx`](file:///Users/nourahmed/Download
 | **BO-P3** | **Institution Management** | `apps/portal/src/app/bank/schools/page.tsx` | `/institutions`<br>`/institutions/{id}/students`<br>`/institutions/{id}/application`<br>`/institutions/{id}/integration`<br>`/institutions/{id}/approve\|reject\|activate\|deactivate`<br>`/institutions/{id}/fee-submissions` | L | 📋 **Ready** | List + register + tabs (Students/Application/Integration/Fees/Settlement) |
 | **BO-P4** | **Transactions & Payments** | [`apps/portal/src/app/bank/transactions/page.tsx`](file:///Users/nourahmed/Downloads/demo/frontend/apps/portal/src/app/bank/transactions/page.tsx) | `/transactions`<br>`/transactions/{id}`<br>`/transactions/tab-counts`<br>`/transactions/export`<br>`/customers/fees`<br>`/payments`<br>`/payments/{id}/retry` | L | ✅ **DONE** | Filterable table, live tab counts, 5-stage timeline drawer, 5-step payment wizard with UUID Idempotency-Key, retry modal |
 | **BO-P5** | **Reconciliation** | `apps/portal/src/app/bank/reconciliation/page.tsx` | `/reconciliation/summary`<br>`/reconciliation/runs`<br>`/reconciliation/exceptions`<br>`/reconciliation/exceptions/{id}` | M | 📋 **Ready** | Backend module is 100% merged; status cards, runs history, exception resolver |
-| **BO-P6** | **EPP Plans** | `apps/portal/src/app/bank/epp/page.tsx` | `/epp/plans`<br>`/epp/plans/{id}/schedule`<br>`/epp/quote`<br>`/epp/cards/validate` | M | 📋 **Ready** | EPP plan calculator, installment schedule table, credit card validation |
+| **BO-P6** | **EPP Plans** | [`apps/portal/src/app/bank/epp/page.tsx`](file:///Users/nourahmed/Downloads/demo/frontend/apps/portal/src/app/bank/epp/page.tsx) | `/epp/summary`<br>`/epp/plans`<br>`/epp/plans/{id}`<br>`/epp/plans/{id}/schedule`<br>`/epp/quote`<br>`/epp/cards/validate` | M | ✅ **DONE** | List + KPI cards + detail (real pricing/progress/schedule) + create wizard (find eligible credit-card payment -> validate card -> live quote -> review -> create) + Cancel Plan. Real business rules enforced (EGP 5,000-100,000 principal, max 2 plans/student, one plan per payment) with friendly error mapping. Branch `feat/bank-epp-plans`, PR pending. |
 | **BO-P7** | **Reports** | `apps/portal/src/app/bank/reports/page.tsx` | `/reports/catalogue`<br>`/reports/generate`<br>`/reports/history`<br>`/reports/jobs/{id}/download` | M | 📋 **Ready** | Synchronous generation (`200 OK`) with immediate table preview and export |
 | **BO-P8** | **Notifications** | `apps/portal/src/app/bank/notifications/page.tsx` | `/notifications`<br>`/notifications/unread-count`<br>`/notifications/{id}/read`<br>`/notifications/read-all` | S | 📋 **Ready** | In-app notification feed, header bell counter, mark as read, delete |
 | **BO-P9** | **Audit Logs** | `apps/portal/src/app/bank/audit-logs/page.tsx` | `/audit-logs`<br>`/audit-logs/{id}`<br>`/audit-logs/stats`<br>`/audit-logs/export` | S | 📋 **Ready** | Backend `AuditLogController` is merged; audit table with SHA-256 masked NID view |
