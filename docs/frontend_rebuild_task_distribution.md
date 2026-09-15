@@ -173,24 +173,35 @@ Each portal's `layout.tsx` also re-checks the role on every load (not just at lo
 ### BO-P10 - Users & Roles ✅ DONE
 **Screen:** `Users.tsx` -> `app/bank/users/`
 **Endpoints:** `/users` (list/create/patch/activate/deactivate/reset-password), `/users/summary`, `/roles` | **Size:** M
+<<<<<<< HEAD
 - [x] Bank employee CRUD (add/edit/deactivate/reactivate), gated by `user.role === "bank-admin"` matching the backend's own permission model.
 - [x] Role Permissions panel driven by the real `GET /roles` (`BankRole` enum's actual route-segment permissions per role) rather than Figma's fictional text permission descriptions - verified live that switching to "Reconciliation" correctly shows only Dashboard/Reconciliation/Notifications checked.
 - [x] Reset Password action (`POST /users/{id}/reset-password`) - a real backend capability Figma's screen didn't include.
 - [x] Role-count summary cards from the real `GET /users/summary`.
+=======
+- [x] Bank employee CRUD gated by `user.role === "bank-admin"`, real role-permission matrix from `GET /roles`, Reset Password action. Branch `feat/bank-users-roles`, PR pending.
+>>>>>>> f0f18a4 (feat(bank): complete Deadline & Priority Badges (BO-P12))
 
 ### BO-P11 - Settings ✅ DONE
 **Screen:** `Settings.tsx` -> `app/bank/settings/`
 **Endpoints:** `/settings/fee-types` (list/create/patch), `/settings/payment-statuses`, `/settings/epp` (get/put), `/settings/notifications` (get/put), `/settings/institutions` (get/put) | **Size:** M
+<<<<<<< HEAD
 - [x] Fee Types: list + add + inline quick-toggle (taxable/active) + full edit form, all real DB-backed CRUD (Figma's table was fully static).
 - [x] Payment Statuses: all 6 real statuses (`PaymentStatusInfo.ALL`) - Figma only modeled 4, missing Refunded and Reversed.
 - [x] EPP Configuration: tenors, amount limits, per-tenor interest rates, a real separate admin-fee rate + cap (Figma only had one flat admin fee rate, no cap), require-approval, max plans/student - all persisted via `PUT /settings/epp` with the backend's real validation (min<max, ≥1 tenor enabled, 0-100% rates, etc.) surfaced inline.
 - [x] Notification Settings: event triggers + delivery channels, including a real editable "In-app" toggle (Figma hardcoded it always-on and disabled).
 - [x] School Configuration: toggles, upload limits, and allowed formats - verified live that unchecking all formats surfaces the backend's real "At least one upload format must be allowed" validation.
 - Note: `EppSettingsDto` is fully read/write and persisted, but per its own javadoc it isn't yet wired into `EppPricing`'s actual quote calculation (still hardcoded flat 14% p.a. / 0% for 3-month tenor) - a real backend gap to flag for BO-P6 follow-up, not something this ticket could or should paper over.
+=======
+- [x] All 5 tabs real and DB-persisted (fee types, payment statuses, EPP config, notification settings, school config). Branch `feat/bank-settings`, PR pending.
+>>>>>>> f0f18a4 (feat(bank): complete Deadline & Priority Badges (BO-P12))
 
-### BO-P12 - Payment Deadline, Priority & Late Penalty
+### BO-P12 - Payment Deadline, Priority & Late Penalty ✅ DONE
 **Screens:** `Transactions.tsx` deadline columns + `@tuition/ui/src/priority.ts` | **Size:** S
-- [ ] Backend returns `dueDate`, `priority`, `penaltyEGP`, `totalDueEGP`. Use presentational helpers from `@tuition/ui` (`dueDateLabel`, `PRIORITY_BADGE_CLASSES`).
+- [x] Backend returns `dueDate`, `priority`, `penaltyEGP`, `totalDueEGP`. Presentational helpers from `@tuition/ui` (`dueDateLabel`, `PRIORITY_BADGE_CLASSES`) were already correct and already wired into the dashboard queue and the transaction detail view.
+- [x] Audit found and fixed two real gaps: the transactions list's "DUE DATE & PRIORITY" column header promised a priority badge that was never actually rendered (added it), and the dashboard's 5 deadline KPI cards were static non-clickable divs despite the backend supporting `dueBucket=today|this-week|overdue` and `priority=URGENT|OVERDUE` transaction filters (made 4 of them real links into a pre-filtered Transactions view, with a "Filtered from dashboard" chip shown there).
+- [x] Verified live end-to-end: clicked each KPI card, confirmed the real API request carried the right filter param and the list matched.
+- Flagged separately (out of scope here): `PATCH /fees/{id}/due-date`, a real audited due-date-override action, has no frontend surface anywhere - needs design work since a payment can allocate across multiple fee lines. Branch `feat/bank-deadline-priority-badges`, PR pending.
 
 ---
 
@@ -285,16 +296,16 @@ Each portal's `layout.tsx` also re-checks the role on every load (not just at lo
 | **P0** | shared | Monorepo & foundation | M | ✅ Complete | Next.js 16, `@tuition/ui`, `@tuition/api-client`, config |
 | **AUTH** | shared | Sign-In & Role Routing | M | ✅ Complete | Shared `/login`, MFA OTP, role-based portal routing, CORS |
 | **BO-P2** | Bank | Dashboard | S | ✅ Complete | 9 KPIs, SVG trend chart, breakdown, recent transactions |
-| **BO-P3** | Bank | Institution Management | L | Ready | List, register, tabs (Students/Application/Integration) |
+| **BO-P3** | Bank | Institution Management | L | ✅ Complete | List, register, tabs (Students/Application/Integration) - Farida |
 | **BO-P4** | Bank | Transactions & Payments | L | Ready | Multi-step payment, receipt, idempotency |
-| **BO-P5** | Bank | Reconciliation | M | Ready | Runs, exceptions, summary counts |
+| **BO-P5** | Bank | Reconciliation | M | ✅ Complete | Runs, exceptions, summary counts - Farida |
 | **BO-P6** | Bank | EPP Plans | M | ✅ Complete | Plan schedule, card validation, quote, create wizard, cancel |
 | **BO-P7** | Bank | Reports | M | ✅ Complete | Catalogue-driven, sync `200 OK` generation, preview, history, download |
 | **BO-P8** | Bank | Notifications | S | ✅ Complete | Unread badge, notification feed, mark read, dismiss |
 | **BO-P9** | Bank | Audit Logs | S | ✅ Complete | Filterable/expandable table, real roles, stats, CSV export |
 | **BO-P10** | Bank | Users & Roles | M | ✅ Complete | Bank employee CRUD, real role permissions, reset password |
 | **BO-P11** | Bank | Settings | M | ✅ Complete | Fee types, payment statuses, EPP/notification/school config |
-| **BO-P12** | Bank | Deadline / Priority / Penalty | S | Ready | UI priority badges in place; integrate in transaction lists |
+| **BO-P12** | Bank | Deadline / Priority / Penalty | S | ✅ Complete | Priority badges completed in transaction list + dashboard KPI deep-links |
 | **SP-P2** | School | Dashboard | S | ⏳ In Progress | Shell & routing ready; dashboard widgets next |
 | **SP-P3** | School | Student Management | L | ✅ Complete | Active & deactivated roster, guardian linking |
 | **SP-P4** | School | Fee Management | L | Ready | Categorized fees, penalty snapshot, create/edit |

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { useApiClient, useAuth, type PageResponse } from "@tuition/api-client";
 import {
   Button,
@@ -19,6 +20,7 @@ import {
   CreditCardIcon,
   ChevronLeftIcon,
   CheckIcon,
+  XIcon,
   formatIsoDate,
   dueDateLabel,
   PRIORITY_BADGE_CLASSES,
@@ -55,6 +57,7 @@ function maskNID(nid?: string): string {
 export default function TransactionsPage() {
   const apiClient = useApiClient();
   const { user } = useAuth();
+  const searchParams = useSearchParams();
 
   // Navigation / View State
   const [mainView, setMainView] = useState<MainView>("list");
@@ -71,7 +74,8 @@ export default function TransactionsPage() {
   const [search, setSearch] = useState("");
   const [institution, setInstitution] = useState("");
   const [method, setMethod] = useState("");
-  const [priority, setPriority] = useState("");
+  const [priority, setPriority] = useState(() => searchParams.get("priority") ?? "");
+  const [dueBucket, setDueBucket] = useState(() => searchParams.get("dueBucket") ?? "");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
@@ -144,6 +148,7 @@ export default function TransactionsPage() {
     if (institution) params.set("institution", institution);
     if (method) params.set("method", method);
     if (priority) params.set("priority", priority);
+    if (dueBucket) params.set("dueBucket", dueBucket);
     if (dateFrom) params.set("dateFrom", dateFrom);
     if (dateTo) params.set("dateTo", dateTo);
 
@@ -167,7 +172,7 @@ export default function TransactionsPage() {
     return () => {
       ignore = true;
     };
-  }, [apiClient, activeTab, search, institution, method, priority, dateFrom, dateTo, page, refreshTrigger]);
+  }, [apiClient, activeTab, search, institution, method, priority, dueBucket, dateFrom, dateTo, page, refreshTrigger]);
 
   // Load Transaction Detail View
   const handleOpenDetail = (tx: TransactionDto) => {
@@ -247,6 +252,7 @@ export default function TransactionsPage() {
     setInstitution("");
     setMethod("");
     setPriority("");
+    setDueBucket("");
     setDateFrom("");
     setDateTo("");
     setPage(1);
@@ -1506,8 +1512,21 @@ export default function TransactionsPage() {
           </div>
         </div>
 
+        {/* Deep-linked due-bucket filter (e.g. from the dashboard's deadline KPI cards) */}
+        {dueBucket && (
+          <div className="flex items-center gap-1.5 pt-1">
+            <span className="text-[11px] font-semibold text-gray-400">Filtered from dashboard:</span>
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-[var(--cib-blue)]/10 text-[var(--cib-blue)] px-2 py-0.5 rounded-full">
+              {dueBucket === "today" ? "Due Today" : dueBucket === "this-week" ? "Due This Week" : "Overdue"}
+              <button onClick={() => setDueBucket("")} className="hover:opacity-60">
+                <XIcon className="w-2.5 h-2.5" />
+              </button>
+            </span>
+          </div>
+        )}
+
         {/* Clear Filters button */}
-        {(search || institution || method || priority || dateFrom || dateTo) && (
+        {(search || institution || method || priority || dueBucket || dateFrom || dateTo) && (
           <div className="flex justify-end pt-1">
             <button
               onClick={handleResetFilters}
@@ -1612,6 +1631,15 @@ export default function TransactionsPage() {
                               >
                                 {dueDateLabel(tx.daysToDue)}
                               </div>
+                            )}
+                            {tx.priority && (
+                              <span
+                                className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border ${
+                                  PRIORITY_BADGE_CLASSES[tx.priority] ?? "bg-gray-100 text-gray-600 border-gray-200"
+                                }`}
+                              >
+                                {tx.priority}
+                              </span>
                             )}
                           </div>
                         ) : (
