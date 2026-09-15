@@ -128,10 +128,14 @@ Each portal's `layout.tsx` also re-checks the role on every load (not just at lo
 - [ ] Multi-step payment workflow (search NID -> select fees -> amount -> review -> pay -> receipt), `Idempotency-Key` generated once per attempt.
 - [ ] Remove the `simulateFail` demo toggle.
 
-### BO-P5 - Reconciliation
+### BO-P5 - Reconciliation ✅ DONE
 **Screen:** `Reconciliation.tsx` -> `app/bank/reconciliation/`
-**Endpoints:** `/reconciliation/summary`, `/reconciliation/runs`, `/reconciliation/exceptions`, `/reconciliation/exceptions/{id}` (PATCH, `/assign`) | **Size:** M
-- [ ] Summary counts, runs list, and exception management. Backend module is 100% merged and verified.
+**Endpoints:** `/reconciliation/summary`, `/reconciliation/runs`, `/reconciliation/exceptions`, `/reconciliation/exceptions/{id}` (PATCH, `/assign`), `/reconciliation/assignees`, `/reconciliation/export` | **Size:** M
+- [x] Summary counts (KPI cards), runs list ("Reconciliation Summary" tab) with an Investigate cross-link into the matching exception.
+- [x] Exception Queue tab: show/hide resolved toggle, priority/status badges, per-card amount breakdown.
+- [x] Exception resolution view: real backend-computed 3-way record comparison, investigation workflow steps, and SLA - not client-derived.
+- [x] Save Resolution enforces the backend's `resolution_action_required` validation (blocked client-side with the same message before it ever reaches the API).
+- [x] CSV export via `/reconciliation/export`.
 
 ### BO-P6 - EPP Plans
 **Screen:** `EPP.tsx` -> `app/bank/epp/`
@@ -258,7 +262,7 @@ Each portal's `layout.tsx` also re-checks the role on every load (not just at lo
 | **BO-P2** | Bank | Dashboard | S | ✅ Complete | 9 KPIs, SVG trend chart, breakdown, recent transactions |
 | **BO-P3** | Bank | Institution Management | L | Ready | List, register, tabs (Students/Application/Integration) |
 | **BO-P4** | Bank | Transactions & Payments | L | Ready | Multi-step payment, receipt, idempotency |
-| **BO-P5** | Bank | Reconciliation | M | Ready | Runs, exceptions, summary counts |
+| **BO-P5** | Bank | Reconciliation | M | ✅ Complete | Runs, exceptions, summary counts, resolution workflow, CSV export |
 | **BO-P6** | Bank | EPP Plans | M | Ready | Plan schedule, card validation, quote |
 | **BO-P7** | Bank | Reports | M | Ready | Sync `200 OK` report generation & download |
 | **BO-P8** | Bank | Notifications | S | Ready | Unread badge, notification list & actions |
