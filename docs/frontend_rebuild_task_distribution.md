@@ -240,10 +240,12 @@ Each portal's `layout.tsx` also re-checks the role on every load (not just at lo
 1.  **Phase 0 (Monorepo & Foundation):** ✅ **COMPLETE** on `main`.
 2.  **AUTH (Shared Sign-In & Role Routing):** ✅ **COMPLETE** on `main`.
 3.  **Bank Dashboard (BO-P2):** ✅ **COMPLETE** on `main`.
+3a. **Institution Management (BO-P3):** ✅ **COMPLETE** on `feat/bank-institution-management`.
+3b. **Transactions & Payments (BO-P4):** ✅ **COMPLETE** on `main`.
 4.  **Fan-out Execution (Current Stage):**
     *   **School Track Priority 1:** Implement **SP-P2 (School Dashboard)** to match the bank dashboard's fidelity.
     *   **Parallel Tracks:** Assign independent phase modules across the team:
-        *   *Bank Portal:* **BO-P3 (Institutions)**, **BO-P4 (Transactions & Payments)**, **BO-P5 (Reconciliation)**, **BO-P6 (EPP)**.
+        *   *Bank Portal:* **BO-P5 (Reconciliation)**, **BO-P6 (EPP)**, **BO-P7 (Reports)**.
         *   *School Portal:* **SP-P3 (Student Management)**, **SP-P4 (Fee Management)**, **SP-P5 (Fee Upload)**.
     *   All backend endpoints across both tracks are 100% merged to `main` with 492 passing tests — zero blocking backend dependencies remain.
 
@@ -256,7 +258,7 @@ Each portal's `layout.tsx` also re-checks the role on every load (not just at lo
 | **P0** | shared | Monorepo & foundation | M | ✅ Complete | Next.js 16, `@tuition/ui`, `@tuition/api-client`, config |
 | **AUTH** | shared | Sign-In & Role Routing | M | ✅ Complete | Shared `/login`, MFA OTP, role-based portal routing, CORS |
 | **BO-P2** | Bank | Dashboard | S | ✅ Complete | 9 KPIs, SVG trend chart, breakdown, recent transactions |
-| **BO-P3** | Bank | Institution Management | L | Ready | List, register, tabs (Students/Application/Integration) |
+| **BO-P3** | Bank | Institution Management | L | ✅ Complete | List (paginated/filtered), register, 5-tab detail, approve/reject/activate/deactivate |
 | **BO-P4** | Bank | Transactions & Payments | L | Ready | Multi-step payment, receipt, idempotency |
 | **BO-P5** | Bank | Reconciliation | M | Ready | Runs, exceptions, summary counts |
 | **BO-P6** | Bank | EPP Plans | M | Ready | Plan schedule, card validation, quote |
