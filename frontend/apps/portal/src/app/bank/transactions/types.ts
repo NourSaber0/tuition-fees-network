@@ -136,7 +136,16 @@ export interface BackOfficePaymentRequest {
   creditPaymentType?: "full" | "epp";
   eppTenor?: number;
   cardToken?: string;
+  cibAccountNumber?: string;
   processedBy?: string;
+}
+
+export interface CibAccountDto {
+  accountNumber: string;
+  accountType: string;
+  balanceEGP: number;
+  currency: string;
+  status: string;
 }
 
 export interface BackOfficePaymentResponse {

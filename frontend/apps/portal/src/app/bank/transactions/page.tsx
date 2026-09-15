@@ -30,6 +30,7 @@ import type {
   CustomerFeesResponse,
   BackOfficePaymentRequest,
   BackOfficePaymentResponse,
+  CibAccountDto,
 } from "./types";
 
 type StatusTab = "ALL" | "SUCCESSFUL" | "PENDING" | "FAILED";
@@ -86,13 +87,16 @@ export default function TransactionsPage() {
   const [detailLoading, setDetailLoading] = useState(false);
 
   // Workflow / Process Payment Wizard State
-  const [payStep, setPayStep] = useState<1 | 2 | 3 | 4 | 5>(1);
+  const [payStep, setPayStep] = useState<1 | 2 | 3 | 4 | 5 | 6>(1);
   const [receiptRef, setReceiptRef] = useState("");
   const [receiptDate, setReceiptDate] = useState("");
   const [nationalIdInput, setNationalIdInput] = useState("");
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [customerData, setCustomerData] = useState<CustomerFeesResponse | null>(null);
+  const [accounts, setAccounts] = useState<CibAccountDto[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState(false);
+  const [selectedAccountNumber, setSelectedAccountNumber] = useState<string | null>(null);
   const [selectedFeeIds, setSelectedFeeIds] = useState<string[]>([]);
   const [amountInput, setAmountInput] = useState("");
   const [amountError, setAmountError] = useState<string | null>(null);
@@ -273,6 +277,20 @@ export default function TransactionsPage() {
         .filter((f) => eligible.includes(f.id))
         .reduce((sum, f) => sum + (f.remainingEGP ?? 0), 0);
       setAmountInput(totalRemaining > 0 ? String(totalRemaining) : "");
+
+      setSelectedAccountNumber(null);
+      setAccounts([]);
+      setAccountsLoading(true);
+      try {
+        const accts = await apiClient.get<CibAccountDto[]>(
+          `/customers/accounts?nationalId=${encodeURIComponent(cleanNid)}`
+        );
+        setAccounts(accts);
+        if (accts.length === 1) setSelectedAccountNumber(accts[0].accountNumber);
+      } finally {
+        setAccountsLoading(false);
+      }
+
       setPayStep(2);
     } catch (err) {
       setLookupError(err instanceof Error ? err.message : "Citizen fee record not found.");
@@ -302,6 +320,10 @@ export default function TransactionsPage() {
       setPaymentError("Please specify a valid payment amount.");
       return;
     }
+    if (payMethod === "ACCOUNT_DEBIT" && !selectedAccountNumber) {
+      setPaymentError("Select which CIB account to debit before processing this payment.");
+      return;
+    }
     setPaymentLoading(true);
     setPaymentError(null);
 
@@ -313,6 +335,7 @@ export default function TransactionsPage() {
       method: payMethod,
       creditPaymentType: payMethod === "CARD" && isEpp ? "epp" : "full",
       eppTenor: payMethod === "CARD" && isEpp ? eppTenor : undefined,
+      cibAccountNumber: payMethod === "ACCOUNT_DEBIT" ? selectedAccountNumber ?? undefined : undefined,
       processedBy: user?.name ?? "Bank Staff",
     };
 
@@ -331,7 +354,7 @@ export default function TransactionsPage() {
           " · " +
           new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
       );
-      setPayStep(5);
+      setPayStep(6);
       setRefreshTrigger((prev) => prev + 1);
     } catch (err) {
       setPaymentError(err instanceof Error ? err.message : "Payment authorization failed.");
@@ -373,6 +396,8 @@ export default function TransactionsPage() {
     setReceiptRef("");
     setReceiptDate("");
     setCustomerData(null);
+    setAccounts([]);
+    setSelectedAccountNumber(null);
     setSelectedFeeIds([]);
     setAmountInput("");
     setAmountError(null);
@@ -667,7 +692,7 @@ export default function TransactionsPage() {
      VIEW 2: PAYMENT WORKFLOW (Figma 1:1)
   ───────────────────────────────────────────────────────────── */
   if (mainView === "workflow") {
-    const steps = ["Search", "Select Fees", "Payment", "Review", "Done"];
+    const steps = ["Search", "Account", "Select Fees", "Payment", "Review", "Done"];
 
     return (
       <div className="space-y-4">
@@ -688,7 +713,7 @@ export default function TransactionsPage() {
 
         <div className="bg-white rounded-xl border border-[#E8EDF5] p-6 shadow-xs">
           {/* Stepper */}
-          {payStep <= 4 && (
+          {payStep <= 5 && (
             <div className="flex items-center gap-0 mb-6">
               {steps.map((s, i) => (
                 <div key={s} className="flex items-center flex-1 last:flex-none">
@@ -799,8 +824,71 @@ export default function TransactionsPage() {
             </div>
           )}
 
-          {/* ── Step 2: Customer + Fee Selection ── */}
+          {/* ── Step 2: Select Account ── */}
           {payStep === 2 && customerData && (
+            <div className="max-w-lg mx-auto space-y-5 py-2">
+              <div>
+                <h3 className="text-base font-bold text-[#1B2A4A] mb-1">Select Account</h3>
+                <p className="text-sm text-gray-400">
+                  Choose which of {customerData.customer.name || customerData.customer.fullName || "the customer"}&apos;s
+                  CIB accounts to pay with.
+                </p>
+              </div>
+
+              {accountsLoading ? (
+                <div className="flex justify-center py-10">
+                  <LoadingSpinner />
+                </div>
+              ) : accounts.length === 0 ? (
+                <EmptyState title="No CIB accounts found for this national ID" />
+              ) : (
+                <div className="space-y-2">
+                  {accounts.map((acct) => (
+                    <button
+                      key={acct.accountNumber}
+                      type="button"
+                      onClick={() => setSelectedAccountNumber(acct.accountNumber)}
+                      className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl border text-left transition-all ${
+                        selectedAccountNumber === acct.accountNumber
+                          ? "border-[#003087] bg-[#EBF1FB]"
+                          : "border-[#DDE3EF] hover:bg-gray-50"
+                      }`}
+                    >
+                      <div>
+                        <div className="text-sm font-semibold text-[#1B2A4A]">{acct.accountType}</div>
+                        <div className="text-xs text-gray-400 font-mono mt-0.5">{acct.accountNumber}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-mono font-bold text-[#003087]">
+                          EGP {formatMoney(acct.balanceEGP)}
+                        </div>
+                        <div className="text-[10px] text-gray-400 mt-0.5">{acct.status}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setPayStep(1)}
+                  className="px-4 py-2.5 text-sm font-semibold border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  ← Back
+                </button>
+                <button
+                  disabled={!selectedAccountNumber}
+                  onClick={() => setPayStep(3)}
+                  className="flex-1 py-2.5 text-sm font-semibold text-white bg-[#003087] rounded-lg hover:bg-[#002060] transition-colors disabled:opacity-40"
+                >
+                  Continue →
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Step 3: Customer + Fee Selection ── */}
+          {payStep === 3 && customerData && (
             <div className="space-y-4">
               {/* Customer card */}
               <div className="bg-[#F4F6F9] rounded-xl border border-[#E8EDF5] p-4 flex items-center gap-4">
@@ -933,7 +1021,7 @@ export default function TransactionsPage() {
                   disabled={selectedFeeIds.length === 0}
                   onClick={() => {
                     setAmountInput(String(selectedFeesSum));
-                    setPayStep(3);
+                    setPayStep(4);
                   }}
                   className="px-4 py-2 text-sm font-semibold text-white bg-[#003087] rounded-lg hover:bg-[#002060] transition-colors disabled:opacity-40"
                 >
@@ -943,8 +1031,8 @@ export default function TransactionsPage() {
             </div>
           )}
 
-          {/* ── Step 3: Payment Amount ── */}
-          {payStep === 3 && customerData && (
+          {/* ── Step 4: Payment Amount ── */}
+          {payStep === 4 && customerData && (
             <div className="max-w-lg mx-auto space-y-5 py-2">
               <div>
                 <h3 className="text-base font-bold text-[#1B2A4A] mb-1">Payment Amount</h3>
@@ -1046,7 +1134,7 @@ export default function TransactionsPage() {
 
               <div className="flex gap-3 pt-1">
                 <button
-                  onClick={() => setPayStep(2)}
+                  onClick={() => setPayStep(3)}
                   className="px-4 py-2.5 text-sm font-semibold border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   ← Back
@@ -1064,7 +1152,7 @@ export default function TransactionsPage() {
                       return;
                     }
                     setAmountError(null);
-                    setPayStep(4);
+                    setPayStep(5);
                   }}
                   className="flex-1 py-2.5 text-sm font-semibold text-white bg-[#003087] rounded-lg hover:bg-[#002060] transition-colors"
                 >
@@ -1074,8 +1162,8 @@ export default function TransactionsPage() {
             </div>
           )}
 
-          {/* ── Step 4: Review & Payment Method ── */}
-          {payStep === 4 && customerData && (
+          {/* ── Step 5: Review & Payment Method ── */}
+          {payStep === 5 && customerData && (
             <div className="max-w-lg mx-auto space-y-5 py-2">
               <div>
                 <h3 className="text-base font-bold text-[#1B2A4A] mb-1">Review & Confirm</h3>
@@ -1143,6 +1231,21 @@ export default function TransactionsPage() {
                     </button>
                   ))}
                 </div>
+
+                {payMethod === "ACCOUNT_DEBIT" && (
+                  <div className="rounded-xl border border-[#DDE3EF] bg-[#F8FAFD] px-3 py-2.5 flex items-center justify-between">
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Debiting</p>
+                      <p className="text-xs font-mono text-[#003087] mt-0.5">
+                        {accounts.find((a) => a.accountNumber === selectedAccountNumber)?.accountType ?? "Account"} ·{" "}
+                        {selectedAccountNumber}
+                      </p>
+                    </div>
+                    <button type="button" onClick={() => setPayStep(2)} className="text-xs font-semibold text-[#003087] hover:underline">
+                      Change
+                    </button>
+                  </div>
+                )}
 
                 {payMethod === "CARD" && (
                   <div className="rounded-xl border border-[#003087]/20 bg-[#F4F8FF] p-3 space-y-2.5">
@@ -1216,7 +1319,7 @@ export default function TransactionsPage() {
 
               <div className="flex gap-3">
                 <button
-                  onClick={() => setPayStep(3)}
+                  onClick={() => setPayStep(4)}
                   className="px-4 py-2.5 text-sm font-semibold border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   ← Back
@@ -1233,8 +1336,8 @@ export default function TransactionsPage() {
             </div>
           )}
 
-          {/* ── Step 5: Receipt ── */}
-          {payStep === 5 && customerData && (
+          {/* ── Step 6: Receipt ── */}
+          {payStep === 6 && customerData && (
             <div className="max-w-md mx-auto">
               <div className="bg-[#003087] text-white px-6 py-5 rounded-t-xl">
                 <div className="text-[10px] uppercase tracking-widest opacity-50 mb-1">

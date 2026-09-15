@@ -21,6 +21,7 @@ public record BackOfficePaymentRequest(
         String creditPaymentType, // "full" or "epp"
         Integer eppTenor,         // required if creditPaymentType == "epp"
         String cardToken,
+        String cibAccountNumber,  // required when method is the CIB account debit
         String processedBy
 ) {
 }

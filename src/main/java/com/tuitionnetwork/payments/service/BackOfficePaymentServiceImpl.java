@@ -22,6 +22,7 @@ import com.tuitionnetwork.payments.dto.PaymentSettleResponse;
 import com.tuitionnetwork.payments.dto.SelectedDueDto;
 import com.tuitionnetwork.payments.dto.TransactionDetailDto;
 import com.tuitionnetwork.payments.repository.PaymentRepository;
+import com.tuitionnetwork.payments.spi.BankGatewayAdapterInterface;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -46,6 +47,7 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
     private final TransactionQueryService transactionQueryService;
     private final AuditLogRepository auditLogRepository;
     private final FeeDeadlineService feeDeadlineService;
+    private final BankGatewayAdapterInterface bankGatewayAdapter;
 
     @Autowired
     public BackOfficePaymentServiceImpl(PaymentSettlementService paymentSettlementService,
@@ -55,7 +57,8 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
                                         IdentityResolverService identityResolverService,
                                         TransactionQueryService transactionQueryService,
                                         @Autowired(required = false) AuditLogRepository auditLogRepository,
-                                        FeeDeadlineService feeDeadlineService) {
+                                        FeeDeadlineService feeDeadlineService,
+                                        BankGatewayAdapterInterface bankGatewayAdapter) {
         this.paymentSettlementService = paymentSettlementService;
         this.paymentRepository = paymentRepository;
         this.feeLineRepository = feeLineRepository;
@@ -64,6 +67,7 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
         this.transactionQueryService = transactionQueryService;
         this.auditLogRepository = auditLogRepository;
         this.feeDeadlineService = feeDeadlineService;
+        this.bankGatewayAdapter = bankGatewayAdapter;
     }
 
     @Override
@@ -206,6 +210,17 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
             pm = PaymentMethod.CIB_ACCOUNT;
         }
 
+        if (pm == PaymentMethod.CIB_ACCOUNT) {
+            if (request.cibAccountNumber() == null || request.cibAccountNumber().isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "cib_account_required: Select which CIB account to debit before processing this payment.");
+            }
+            if (!bankGatewayAdapter.verifyCibAccount(request.cibAccountNumber())) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "cib_account_invalid: The selected CIB account could not be verified.");
+            }
+        }
+
         PaymentSettleRequest settleRequest = new PaymentSettleRequest(
                 idempotencyKey,
                 guardianId,
@@ -214,7 +229,7 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
                 request.amountEGP(),
                 isEpp ? new EppSelectionDto(request.eppTenor()) : null,
                 "4000123456789010",
-                null
+                pm == PaymentMethod.CIB_ACCOUNT ? request.cibAccountNumber() : null
         );
 
         PaymentSettleResponse settleResponse = paymentSettlementService.settlePayment(settleRequest, idempotencyKey);
