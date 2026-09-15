@@ -152,9 +152,14 @@ Each portal's `layout.tsx` also re-checks the role on every load (not just at lo
 - [x] Recent Reports history panel (`GET /reports/history`) with per-entry download.
 - [x] Backend currently only accepts `format=CSV` for real generation even though the catalogue advertises PDF/XLSX too - selecting a non-CSV format surfaces the backend's real rejection via a friendly mapped message instead of a raw error code.
 
-### BO-P8 - Notifications
+### BO-P8 - Notifications ✅ DONE
 **Screens:** `Notifications.tsx` + header bell in `PortalShell.tsx`
 **Endpoints:** `/notifications`, `/notifications/unread-count`, `/notifications/{id}/read`, `/notifications/read-all`, `/notifications/{id}` (DELETE) | **Size:** S
+- [x] Feed + type filter tabs driven by the real `NotifType` enum (`FAILED_PAYMENT`, `RECON_EXCEPTION`, `INSTITUTION_ISSUE`, `NEW_INSTITUTION`, `SYSTEM_ALERT` - only 5 values; Figma's invented "Deadline Warnings" 6th type doesn't exist server-side and was correctly dropped rather than faked).
+- [x] Mark read / mark all read / dismiss, all against the real endpoints.
+- [x] Action CTA navigates to `/bank/{action.screen}` using the real screen strings `BackOfficeNotificationPublisher` publishes (`transactions`, `reconciliation`, `schools`) - a generic template, not a hardcoded per-screen map, so it stays correct as new notification-producing screens are added.
+- [x] Header bell badge already wired from BO-P2/dashboard work.
+- Note: `GET /notifications/stream` (SSE) exists server-side for live push but wasn't wired up in this pass - the feed is poll/refetch on mutation, consistent with the rest of the app.
 
 ### BO-P9 - Audit Logs
 **Screen:** `AuditLogs.tsx` -> `app/bank/audit-logs/`
@@ -271,7 +276,7 @@ Each portal's `layout.tsx` also re-checks the role on every load (not just at lo
 | **BO-P5** | Bank | Reconciliation | M | Ready | Runs, exceptions, summary counts |
 | **BO-P6** | Bank | EPP Plans | M | ✅ Complete | Plan schedule, card validation, quote, create wizard, cancel |
 | **BO-P7** | Bank | Reports | M | ✅ Complete | Catalogue-driven, sync `200 OK` generation, preview, history, download |
-| **BO-P8** | Bank | Notifications | S | Ready | Unread badge, notification list & actions |
+| **BO-P8** | Bank | Notifications | S | ✅ Complete | Unread badge, notification feed, mark read, dismiss |
 | **BO-P9** | Bank | Audit Logs | S | Ready | Backend `AuditLogController` merged and ready |
 | **BO-P10** | Bank | Users & Roles | M | Ready | Bank employee CRUD and permissions |
 | **BO-P11** | Bank | Settings | M | Ready | Fee types, payment statuses, system settings |
