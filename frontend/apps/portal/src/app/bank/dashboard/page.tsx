@@ -197,11 +197,11 @@ export default function BankDashboardPage() {
   ];
 
   const deadlineKpis = [
-    { title: "Due Today", value: deadlines.dueToday, dot: "bg-orange-500" },
-    { title: "Due This Week", value: deadlines.dueThisWeek, dot: "bg-amber-500" },
-    { title: "Urgent", value: deadlines.urgent, dot: "bg-orange-400" },
-    { title: "Overdue", value: deadlines.overdue, dot: "bg-red-500" },
-    { title: "Penalties Applied", value: `EGP ${money(deadlines.penaltiesAppliedEGP)}`, dot: "bg-red-600" },
+    { title: "Due Today", value: deadlines.dueToday, dot: "bg-orange-500", href: "/bank/transactions?dueBucket=today" },
+    { title: "Due This Week", value: deadlines.dueThisWeek, dot: "bg-amber-500", href: "/bank/transactions?dueBucket=this-week" },
+    { title: "Urgent", value: deadlines.urgent, dot: "bg-orange-400", href: "/bank/transactions?priority=URGENT" },
+    { title: "Overdue", value: deadlines.overdue, dot: "bg-red-500", href: "/bank/transactions?priority=OVERDUE" },
+    { title: "Penalties Applied", value: `EGP ${money(deadlines.penaltiesAppliedEGP)}`, dot: "bg-red-600", href: null },
   ];
 
   const Y_MAX = niceCeil(Math.max(...weekly.series.map((p) => p.amountEGP), 1));
@@ -279,17 +279,29 @@ export default function BankDashboardPage() {
       </div>
 
       <div className="grid grid-cols-5 gap-3">
-        {deadlineKpis.map((kpi) => (
-          <div key={kpi.title} className="bg-white rounded-xl border px-4 py-3.5 hover:shadow-md transition-shadow" style={{ borderColor: "#E8EDF5" }}>
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <span className={`w-2 h-2 rounded-full shrink-0 ${kpi.dot}`} />
-              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider leading-none">{kpi.title}</span>
+        {deadlineKpis.map((kpi) => {
+          const content = (
+            <>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${kpi.dot}`} />
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider leading-none">{kpi.title}</span>
+              </div>
+              <div className="text-xl font-bold leading-none" style={{ color: "var(--cib-text)" }}>
+                {kpi.value}
+              </div>
+            </>
+          );
+          const className = "bg-white rounded-xl border px-4 py-3.5 hover:shadow-md transition-shadow block";
+          return kpi.href ? (
+            <Link key={kpi.title} href={kpi.href} className={className} style={{ borderColor: "#E8EDF5" }}>
+              {content}
+            </Link>
+          ) : (
+            <div key={kpi.title} className={className} style={{ borderColor: "#E8EDF5" }}>
+              {content}
             </div>
-            <div className="text-xl font-bold leading-none" style={{ color: "var(--cib-text)" }}>
-              {kpi.value}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="bg-white rounded-xl border overflow-hidden" style={{ borderColor: "#E8EDF5" }}>
