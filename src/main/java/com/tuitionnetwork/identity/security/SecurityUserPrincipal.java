@@ -39,7 +39,7 @@ public record SecurityUserPrincipal(
     }
 
     private static Collection<String> buildAuthorities(String role) {
-        if (UserRole.ROLE_SCHOOL_ADMIN.equals(role) || UserRole.ROLE_SCHOOL_FINANCE.equals(role)) {
+        if (UserRole.ROLE_SCHOOL_ADMIN.equals(role)) {
             return List.of(role, UserRole.ROLE_INSTITUTION_ADMIN);
         }
         if (UserRole.ROLE_INSTITUTION_ADMIN.equals(role)) {

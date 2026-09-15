@@ -11,6 +11,8 @@ public record EppPlanDetailResponse(
         @JsonProperty("plan_id") String planId,
         @JsonProperty("status") String status,
         @JsonProperty("payment_id") String paymentId,
+        @JsonProperty("card_id") String cardId,
+        @JsonProperty("customer") java.util.Map<String, String> customer,
         @JsonProperty("principal") BigDecimal principal,
         @JsonProperty("tenor_months") int tenorMonths,
         @JsonProperty("annual_rate") BigDecimal annualRate,

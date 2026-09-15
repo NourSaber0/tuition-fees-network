@@ -1,10 +1,14 @@
 package com.tuitionnetwork.mockbank.store;
 
+import com.tuitionnetwork.mockbank.domain.MockBankCustomers;
+import com.tuitionnetwork.mockbank.dto.BackofficePaymentResponse;
 import com.tuitionnetwork.mockbank.dto.CardPaymentResponse;
+import com.tuitionnetwork.mockbank.dto.CustomerLookupResponse;
 import com.tuitionnetwork.mockbank.dto.EppPlanDetailResponse;
 import com.tuitionnetwork.mockbank.dto.MoiVerificationResponse;
 import org.springframework.stereotype.Component;
 
+import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +24,68 @@ public class MockBankStore {
     private final Map<String, EppPlanDetailResponse> eppPlans = new ConcurrentHashMap<>();
     private final Set<String> convertedPaymentIds = ConcurrentHashMap.newKeySet();
     private final Map<String, CardPaymentResponse> idempotencyCache = new ConcurrentHashMap<>();
+    
+    // Back-office state
+    private final Map<String, CustomerLookupResponse> customersByNid = new ConcurrentHashMap<>();
+    private final Map<String, CustomerLookupResponse> customersById = new ConcurrentHashMap<>();
+    private final Map<String, BackofficePaymentResponse> backofficePayments = new ConcurrentHashMap<>();
+    private final Map<String, BackofficePaymentResponse> bopIdempotencyCache = new ConcurrentHashMap<>();
+
+    @PostConstruct
+    public void init() {
+        resetCustomers();
+    }
+
+    private void resetCustomers() {
+        customersByNid.clear();
+        customersById.clear();
+        for (CustomerLookupResponse customer : MockBankCustomers.getInitialCustomers()) {
+            customersByNid.put(customer.nationalId(), customer);
+            customersById.put(customer.customerId(), customer);
+        }
+    }
+
+    // --- Customers ---
+    public Optional<CustomerLookupResponse> getCustomerByNationalId(String nid) {
+        return Optional.ofNullable(customersByNid.get(nid));
+    }
+
+    public Optional<CustomerLookupResponse> getCustomerById(String id) {
+        return Optional.ofNullable(customersById.get(id));
+    }
+
+    public void updateCustomer(CustomerLookupResponse customer) {
+        customersByNid.put(customer.nationalId(), customer);
+        customersById.put(customer.customerId(), customer);
+    }
+
+    // --- Back-office Payments ---
+    public void saveBackofficePayment(BackofficePaymentResponse response) {
+        backofficePayments.put(response.paymentId(), response);
+    }
+
+    public Optional<BackofficePaymentResponse> getBackofficePayment(String id) {
+        return Optional.ofNullable(backofficePayments.get(id));
+    }
+
+    public List<BackofficePaymentResponse> listBackofficePayments(String customerId) {
+        return backofficePayments.values().stream()
+                .filter(p -> customerId == null || customerId.equals(p.customerId()))
+                .toList();
+    }
+
+    public void saveIdempotentBackofficePayment(String idempotencyKey, BackofficePaymentResponse response) {
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            bopIdempotencyCache.put(idempotencyKey, response);
+        }
+    }
+
+    public Optional<BackofficePaymentResponse> getIdempotentBackofficePayment(String idempotencyKey) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(bopIdempotencyCache.get(idempotencyKey));
+    }
 
     // --- MOI ---
     public void saveVerification(MoiVerificationResponse response) {
@@ -90,10 +156,20 @@ public class MockBankStore {
         if (existing == null) {
             return Optional.empty();
         }
+        List<EppPlanDetailResponse.InstallmentItem> updatedSchedule = existing.schedule().stream()
+                .map(item -> new EppPlanDetailResponse.InstallmentItem(
+                        item.number(),
+                        item.dueDate(),
+                        item.amount(),
+                        "CANCELLED"
+                )).toList();
+        
         EppPlanDetailResponse cancelled = new EppPlanDetailResponse(
                 existing.planId(),
                 "CANCELLED",
                 existing.paymentId(),
+                existing.cardId(),
+                existing.customer(),
                 existing.principal(),
                 existing.tenorMonths(),
                 existing.annualRate(),
@@ -103,8 +179,11 @@ public class MockBankStore {
                 existing.monthlyInstallment(),
                 existing.firstDueDate(),
                 existing.lastDueDate(),
-                existing.schedule()
+                updatedSchedule
         );
+        if (existing.paymentId() != null) {
+            convertedPaymentIds.remove(existing.paymentId());
+        }
         eppPlans.put(planId, cancelled);
         return Optional.of(cancelled);
     }
@@ -116,5 +195,8 @@ public class MockBankStore {
         eppPlans.clear();
         convertedPaymentIds.clear();
         idempotencyCache.clear();
+        backofficePayments.clear();
+        bopIdempotencyCache.clear();
+        resetCustomers();
     }
 }

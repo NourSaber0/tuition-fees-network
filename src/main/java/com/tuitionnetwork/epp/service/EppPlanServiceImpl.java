@@ -29,6 +29,7 @@ import com.tuitionnetwork.payments.repository.PaymentRepository;
 import com.tuitionnetwork.audit.domain.AuditLog;
 import com.tuitionnetwork.audit.repository.AuditLogRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import com.tuitionnetwork.settings.service.SettingsService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -57,6 +58,7 @@ public class EppPlanServiceImpl implements EppPlanService {
     private final InstitutionRepository institutionRepository;
     private final StudentRepository studentRepository;
     private final AuditLogRepository auditLogRepository;
+    private final SettingsService settingsService;
 
     @Autowired
     public EppPlanServiceImpl(EPPScheduleRepository eppScheduleRepository,
@@ -64,21 +66,24 @@ public class EppPlanServiceImpl implements EppPlanService {
                                PaymentRepository paymentRepository,
                                InstitutionRepository institutionRepository,
                                StudentRepository studentRepository,
-                               @Autowired(required = false) AuditLogRepository auditLogRepository) {
+                               @Autowired(required = false) AuditLogRepository auditLogRepository,
+                               SettingsService settingsService) {
         this.eppScheduleRepository = eppScheduleRepository;
         this.eppInstallmentRepository = eppInstallmentRepository;
         this.paymentRepository = paymentRepository;
         this.institutionRepository = institutionRepository;
         this.studentRepository = studentRepository;
         this.auditLogRepository = auditLogRepository;
+        this.settingsService = settingsService;
     }
 
     public EppPlanServiceImpl(EPPScheduleRepository eppScheduleRepository,
                                EppInstallmentRepository eppInstallmentRepository,
                                PaymentRepository paymentRepository,
                                InstitutionRepository institutionRepository,
-                               StudentRepository studentRepository) {
-        this(eppScheduleRepository, eppInstallmentRepository, paymentRepository, institutionRepository, studentRepository, null);
+                               StudentRepository studentRepository,
+                               SettingsService settingsService) {
+        this(eppScheduleRepository, eppInstallmentRepository, paymentRepository, institutionRepository, studentRepository, null, settingsService);
     }
 
     @Override
@@ -191,7 +196,7 @@ public class EppPlanServiceImpl implements EppPlanService {
         if (request.principalEGP() == null || request.tenor() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "principalEGP and tenor are required");
         }
-        EppPricing.Quote quote = EppPricing.calculate(request.principalEGP(), request.tenor());
+        EppPricing.Quote quote = EppPricing.calculate(request.principalEGP(), request.tenor(), settingsService.getEpp());
         return new EppQuoteResponse(
                 quote.principal(),
                 quote.tenorMonths(),
@@ -246,7 +251,7 @@ public class EppPlanServiceImpl implements EppPlanService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "max_plans_per_student_exceeded");
         }
 
-        EppPricing.Quote quote = EppPricing.calculate(principal, tenor);
+        EppPricing.Quote quote = EppPricing.calculate(principal, tenor, settingsService.getEpp());
         EPPSchedule schedule = new EPPSchedule(
                 sourcePayment,
                 quote.tenorMonths(),

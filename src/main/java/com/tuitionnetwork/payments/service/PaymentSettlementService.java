@@ -45,6 +45,10 @@ public class PaymentSettlementService {
     }
 
     public PaymentSettleResponse settlePayment(PaymentSettleRequest request, String headerIdempotencyKey) {
+        return settlePayment(request, headerIdempotencyKey, null);
+    }
+
+    public PaymentSettleResponse settlePayment(PaymentSettleRequest request, String headerIdempotencyKey, GatewayResponse preCapturedGatewayResponse) {
         String idempotencyKey = (headerIdempotencyKey != null && !headerIdempotencyKey.isBlank())
                 ? headerIdempotencyKey
                 : (request.idempotencyKey() != null ? request.idempotencyKey() : UUID.randomUUID().toString());
@@ -128,12 +132,14 @@ public class PaymentSettlementService {
 
         // 5. Call the bank gateway OUTSIDE of any database transaction.
         //    If the charge fails, hand the reserved amount back.
-        GatewayResponse gatewayResponse;
-        try {
-            gatewayResponse = bankGatewayAdapter.chargeCard(request.totalAmount(), idempotencyKey);
-        } catch (RuntimeException gatewayError) {
-            transactionExecutor.releaseFeeLines(request.selectedDues());
-            throw gatewayError;
+        GatewayResponse gatewayResponse = preCapturedGatewayResponse;
+        if (gatewayResponse == null) {
+            try {
+                gatewayResponse = bankGatewayAdapter.chargeCard(request.totalAmount(), idempotencyKey);
+            } catch (RuntimeException gatewayError) {
+                transactionExecutor.releaseFeeLines(request.selectedDues());
+                throw gatewayError;
+            }
         }
         if (gatewayResponse.status() != PaymentStatus.CAPTURED && gatewayResponse.status() != PaymentStatus.AUTHORIZED) {
             transactionExecutor.releaseFeeLines(request.selectedDues());
