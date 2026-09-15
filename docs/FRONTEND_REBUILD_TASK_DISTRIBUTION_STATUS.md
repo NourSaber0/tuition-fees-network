@@ -24,9 +24,9 @@ The frontend rebuild unifies both the **Bank Back-Office Portal** and the **Scho
 | Category | Total Tickets | Completed | In Progress | Ready for Assignment | Progress % |
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | **Shared Foundation & Auth** | 2 | 2 | 0 | 0 | 100% |
-| **Bank Back-Office Portal** | 11 | 2 | 0 | 9 | 27.3% |
+| **Bank Back-Office Portal** | 11 | 3 | 0 | 8 | 27.3% |
 | **School Portal** | 10 | 1 | 0 | 9 | 10.0% |
-| **Total** | **22** | **5** | **0** | **17** | **22.7%** |
+| **Total** | **22** | **6** | **0** | **16** | **27.3%** |
 
 > **Milestone Note:** Phase 0 (monorepo & foundation), AUTH (shared sign-in & role routing), BO-P2 (Bank Dashboard with Figma pieces restored), **BO-P4 (Transactions & Payment Workflow)**, and **SP-P2 (School Dashboard)** are **100% complete and merged on `main`**. All developers can branch off `main` and build their assigned screens concurrently.
 
@@ -59,7 +59,7 @@ Layout: [`apps/portal/src/app/bank/layout.tsx`](file:///Users/nourahmed/Download
 | **BO-P8** | **Notifications** | `apps/portal/src/app/bank/notifications/page.tsx` | `/notifications`<br>`/notifications/unread-count`<br>`/notifications/{id}/read`<br>`/notifications/read-all` | S | 📋 **Ready** | In-app notification feed, header bell counter, mark as read, delete |
 | **BO-P9** | **Audit Logs** | `apps/portal/src/app/bank/audit-logs/page.tsx` | `/audit-logs`<br>`/audit-logs/{id}`<br>`/audit-logs/stats`<br>`/audit-logs/export` | S | 📋 **Ready** | Backend `AuditLogController` is merged; audit table with SHA-256 masked NID view |
 | **BO-P10** | **Users & Roles** | `apps/portal/src/app/bank/users/page.tsx` | `/users`<br>`/users/{id}`<br>`/users/{id}/activate\|deactivate`<br>`/roles` | M | 📋 **Ready** | Bank employee CRUD, role-permissions inspector, activation toggle |
-| **BO-P11** | **Settings** | `apps/portal/src/app/bank/settings/page.tsx` | `/settings/fee-types`<br>`/settings/payment-statuses`<br>`/settings/epp`<br>`/settings/notifications`<br>`/settings/institutions` | M | 📋 **Ready** | System parameter tabs, PUT audited changes |
+| **BO-P11** | **Settings** | [`apps/portal/src/app/bank/settings/page.tsx`](file:///Users/nourahmed/Downloads/demo/frontend/apps/portal/src/app/bank/settings/page.tsx) | `/settings/fee-types` (+POST/PATCH)<br>`/settings/payment-statuses`<br>`/settings/epp` (+PUT)<br>`/settings/notifications` (+PUT)<br>`/settings/institutions` (+PUT) | M | ✅ **DONE** | All 5 tabs real and DB-persisted (not client-only state like Figma). Payment Statuses shows all 6 real statuses (Figma was missing Refunded/Reversed). Notification Settings' "In-app" channel is a real editable toggle, not Figma's hardcoded always-on. Backend validation (e.g. "at least one upload format", EPP amount/rate ranges) surfaces inline, verified live. Note: EPP settings are read/write but not yet actually consumed by `EppPricing` (still hardcoded flat 14%/tenor-3-free) - a genuine backend gap, not a frontend one. |
 | **BO-P12** | **Deadline & Priority Badges** | Integrated across Transaction & Dashboard tables | `/dashboard/deadline-summary`<br>`/transactions` | S | 📋 **Ready** | Helpers in `@tuition/ui/src/priority.ts` (`dueDateLabel`, `PRIORITY_BADGE_CLASSES`) |
 
 ---
