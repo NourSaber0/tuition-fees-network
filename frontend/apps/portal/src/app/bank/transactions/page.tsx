@@ -219,9 +219,17 @@ export default function TransactionsPage() {
       if (dateFrom) params.set("dateFrom", dateFrom);
       if (dateTo) params.set("dateTo", dateTo);
 
+      let accessToken = "";
+      try {
+        const raw = localStorage.getItem("tuition.auth.session");
+        accessToken = raw ? JSON.parse(raw).accessToken ?? "" : "";
+      } catch {
+        // fall through with an empty token; the request will 401 and surface the error below
+      }
+
       const res = await fetch(`http://localhost:8080/api/v1/transactions/export?${params.toString()}`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("tuition_access_token") ?? ""}`,
+          Authorization: `Bearer ${accessToken}`,
         },
       });
       if (!res.ok) throw new Error("Failed to export transactions");
