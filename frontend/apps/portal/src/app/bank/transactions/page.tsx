@@ -266,12 +266,11 @@ export default function TransactionsPage() {
       const res = await apiClient.get<CustomerFeesResponse>(
         `/customers/fees?nationalId=${encodeURIComponent(cleanNid)}`
       );
-      setCustomerData(res);
-      const eligible = (res.fees ?? []).filter((f) => f.eligible || f.remainingEGP > 0).map((f) => f.id);
+      const outstandingFees = (res.fees ?? []).filter(f => (f.remainingEGP ?? 0) > 0);
+      setCustomerData({ ...res, fees: outstandingFees });
+      const eligible = outstandingFees.map((f) => f.id);
       setSelectedFeeIds(eligible);
-      const totalRemaining = (res.fees ?? [])
-        .filter((f) => eligible.includes(f.id))
-        .reduce((sum, f) => sum + (f.remainingEGP ?? 0), 0);
+      const totalRemaining = outstandingFees.reduce((sum, f) => sum + (f.remainingEGP ?? 0), 0);
       setAmountInput(totalRemaining > 0 ? String(totalRemaining) : "");
       setPayStep(2);
     } catch (err) {
@@ -905,7 +904,7 @@ export default function TransactionsPage() {
                             </td>
                             <td className="px-4 py-3">
                               <span className="text-[11px] font-semibold px-2 py-0.5 rounded border bg-amber-50 text-amber-700 border-amber-200">
-                                {fee.remainingEGP === fee.originalAmountEGP ? "Unpaid" : "Partial"}
+                                {fee.remainingEGP === 0 ? "Paid" : fee.remainingEGP === fee.originalAmountEGP ? "Unpaid" : "Partial"}
                               </span>
                             </td>
                             <td className="px-4 py-3 text-xs font-mono text-gray-500">
