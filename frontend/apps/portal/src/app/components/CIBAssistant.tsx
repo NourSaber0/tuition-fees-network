@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
-import type { Page } from '../types';
+export type Page = string;
 import {
   sendChatMessage,
   type ConversationMessage,
@@ -283,12 +283,22 @@ const FAQ_DATA: FAQSection[] = [
   },
 ];
 
-const CATEGORIES = FAQ_DATA.map(section => ({
-  label: section.label,
-  icon: section.icon,
-  faqKey: section.label,
-  adminOnly: section.adminOnly,
-})).concat([{ label: 'FAQs', icon: '❓', faqKey: null as string | null }]);
+interface CategoryItem {
+  label: string;
+  icon: string;
+  faqKey: string | null;
+  adminOnly?: boolean;
+}
+
+const CATEGORIES: CategoryItem[] = [
+  ...FAQ_DATA.map((section): CategoryItem => ({
+    label: section.label,
+    icon: section.icon,
+    faqKey: section.label,
+    adminOnly: section.adminOnly,
+  })),
+  { label: 'FAQs', icon: '❓', faqKey: null },
+];
 
 const QUICK_ACTIONS = [
   { label: 'View FAQs', action: 'faq' as const },

@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.Map;
 
-@RestControllerAdvice
+@RestControllerAdvice(basePackages = "com.tuitionnetwork.ai.web")
 public class ExceptionHandlerController {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
