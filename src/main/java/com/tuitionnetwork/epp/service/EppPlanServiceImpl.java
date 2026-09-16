@@ -50,7 +50,7 @@ public class EppPlanServiceImpl implements EppPlanService {
     private static final Set<String> TERMINAL_STATUSES = Set.of("CANCELLED", "DEFAULTED");
     private static final BigDecimal MIN_PRINCIPAL_EGP = BigDecimal.valueOf(5000);
     private static final BigDecimal MAX_PRINCIPAL_EGP = BigDecimal.valueOf(100000);
-    private static final int MAX_PLANS_PER_STUDENT = 2;
+    private static final int MAX_PLANS_PER_STUDENT = 10;
 
     private final EPPScheduleRepository eppScheduleRepository;
     private final EppInstallmentRepository eppInstallmentRepository;

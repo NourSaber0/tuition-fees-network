@@ -260,11 +260,15 @@ export default function SchoolReportsPage() {
       apiClient
         .get<SchoolReportJobResponse>(`/reports/jobs/${jobId}`)
         .then((res) => {
-          setJob(res);
-          if (res.status === "ready") {
+          const normalized: SchoolReportJobResponse = {
+            ...res,
+            status: (res?.status || "").toLowerCase(),
+          };
+          setJob(normalized);
+          if (normalized.status === "ready") {
             setPolling(false);
             setHistoryRefresh((p) => p + 1);
-          } else if (res.status === "failed") {
+          } else if (normalized.status === "failed") {
             setPolling(false);
             setPollError("Report generation failed. Please try again.");
           } else {
@@ -305,9 +309,13 @@ export default function SchoolReportsPage() {
       };
 
       const res = await apiClient.post<SchoolReportJobResponse>("/reports/generate", payload);
-      setJob(res);
+      const normalized: SchoolReportJobResponse = {
+        ...res,
+        status: (res?.status || "").toLowerCase(),
+      };
+      setJob(normalized);
 
-      if (res.status === "ready") {
+      if (normalized.status === "ready") {
         // Backend returned synchronously ready — show download immediately
         setHistoryRefresh((p) => p + 1);
       } else {

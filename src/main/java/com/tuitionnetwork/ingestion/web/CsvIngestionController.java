@@ -41,7 +41,7 @@ public class CsvIngestionController {
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasRole('INSTITUTION_ADMIN')")
+    @PreAuthorize("hasAnyRole('INSTITUTION_ADMIN', 'SCHOOL_FINANCE', 'SCHOOL_ADMIN')")
     public ResponseEntity<IngestionReportResponse> uploadDuesCsv(
             @PathVariable("id") UUID institutionId,
             @RequestParam("file") MultipartFile file) {

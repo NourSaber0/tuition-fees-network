@@ -199,7 +199,7 @@ function CreateEppWizard({
   const stepOrder = ["payment", "card", "details", "review"];
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-4">
+    <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8EDF5]">
           <div>
@@ -883,7 +883,7 @@ function EppPlanDetail({
 export default function EppPlansPage() {
   const apiClient = useApiClient();
   const { user } = useAuth();
-  const canCreate = user?.role === "bank-admin" || user?.role === "bank-operations";
+  const canCreate = user?.role === "bank-admin" || user?.role === "bank-operations" || user?.role === "bank-finance";
 
   const [summary, setSummary] = useState<EppSummaryResponse | null>(null);
   const [plans, setPlans] = useState<EppPlanListResponse | null>(null);

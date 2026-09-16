@@ -77,6 +77,12 @@ public class AuditLogDto {
 
     private static String deriveEntityId(String targetResource) {
         if (targetResource != null && !targetResource.isBlank()) {
+            if (targetResource.contains(":")) {
+                String afterColon = targetResource.substring(targetResource.indexOf(':') + 1).trim();
+                if (!afterColon.isBlank()) {
+                    return afterColon;
+                }
+            }
             String[] parts = targetResource.split("[:\\s]+");
             if (parts.length > 1 && !parts[1].isBlank()) {
                 return parts[1];

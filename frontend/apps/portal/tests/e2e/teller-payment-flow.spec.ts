@@ -1,77 +1,68 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Teller Payment Flow', () => {
-  test('should lookup customer by National ID and process payment', async ({ page }) => {
-    // 1. Authentication
+  test.describe.configure({ mode: 'serial' });
+
+  const loginAs = async (page: any, email: string, password: string = 'Password123!') => {
     await page.goto('/login');
-    await expect(page.getByText('Sign in to your account')).toBeVisible();
+    await page.getByPlaceholder('you@example.com').fill(email);
+    await page.getByPlaceholder('********').fill(password);
+    await page.getByRole('button', { name: 'Sign In' }).click();
 
-    // Fill login form
-    await page.getByPlaceholder('you@example.com').fill('ahmed.ops@cib.eg');
-    await page.getByPlaceholder('********').fill('Password123!');
-    
-    page.on('response', response => console.log('Response:', response.url(), response.status()));
-    
-    await page.getByRole('button', { name: 'Sign in' }).click();
+    const mfaHeading = page.getByText('Two-factor verification');
+    const directNav = page.waitForURL(/\/bank/, { timeout: 6000 }).then(() => 'NAV' as const);
+    const mfaShown = mfaHeading.waitFor({ state: 'visible', timeout: 6000 }).then(() => 'MFA' as const);
 
-    // Fill MFA
-    await expect(page.getByText('Two-factor verification')).toBeVisible();
-    
-    // Fill the 6 OTP inputs
-    const otpInputs = page.locator('input[type="text"]');
-    await otpInputs.nth(0).fill('1');
-    await otpInputs.nth(1).fill('2');
-    await otpInputs.nth(2).fill('3');
-    await otpInputs.nth(3).fill('4');
-    await otpInputs.nth(4).fill('5');
-    await otpInputs.nth(5).fill('6');
+    const outcome = await Promise.race([
+      directNav.catch(() => null),
+      mfaShown.catch(() => null),
+    ]);
 
-    await page.getByRole('button', { name: 'Verify & Sign In' }).click();
+    if (outcome === 'MFA') {
+      const otpInputs = page.locator('input[inputMode="numeric"]');
+      for (let i = 0; i < 6; i++) {
+        await otpInputs.nth(i).fill((i + 1).toString());
+      }
+      await page.getByRole('button', { name: 'Verify & Sign In' }).click();
+    }
 
-    // Verify successful login
-    await expect(page).toHaveURL(/\/bank\/dashboard/);
-    await expect(page.getByText('Dashboard').first()).toBeVisible();
+    await expect(page).toHaveURL(/\/bank/);
+  };
+
+  test('should lookup customer by National ID and process OTC payment', async ({ page }) => {
+    // 1. Authentication as Bank Operations
+    await loginAs(page, 'ahmed.ops@cib.eg');
 
     // 2. Customer Lookup via Transactions Page
     await page.goto('/bank/transactions');
-    
-    // Click "Process Payment" to open the wizard
     await page.getByRole('button', { name: 'Process Payment' }).click();
     await expect(page.getByText('Process Customer Payment')).toBeVisible();
 
-    // Enter National ID
+    // Lookup citizen Ahmed Tarek Mahmoud (isolated from Mona to avoid concurrent lock contention)
     await page.getByPlaceholder('14-digit National ID').fill('29511020204536');
     await page.getByRole('button', { name: 'Search' }).click();
-
-    // Verify lookup succeeds and shows correct customer name
     await expect(page.getByText('Ahmed Tarek Mahmoud')).toBeVisible();
 
-    // 3. Fee Selection & Payment
-    const isSettled = await page.getByText('No Outstanding Fees').isVisible({ timeout: 3000 }).catch(() => false);
+    // 3. Fee Selection & Partial Amount
+    const continueBtn = page.getByRole('button', { name: /Continue to Payment/i });
+    await expect(continueBtn).toBeVisible();
+    await continueBtn.click();
+    await expect(page.getByText('Payment Amount')).toBeVisible();
 
-    if (isSettled) {
-      await expect(page.getByText('All educational and institutional fees are completely settled')).toBeVisible();
-    } else {
-      const checkbox = page.locator('input[type="checkbox"]').first();
-      await checkbox.check();
+    // Fill partial amount of EGP 300 to preserve outstanding fee status
+    const amountInput = page.getByPlaceholder('Enter amount…');
+    await amountInput.clear();
+    await amountInput.fill('300');
 
-      // Proceed to Step 3 (Payment Amount)
-      await page.getByRole('button', { name: 'Continue to Payment →' }).click();
-      await expect(page.getByText('Payment Amount')).toBeVisible();
-      
-      // Proceed to Step 4 (Review & Payment Method)
-      await page.getByRole('button', { name: 'Continue to Review →' }).click();
-      await expect(page.getByText('Review & Confirm')).toBeVisible();
+    // Proceed to Review
+    await page.getByRole('button', { name: /Continue to Review/i }).click();
+    await expect(page.getByText('Review & Confirm')).toBeVisible();
 
-      // Select the active Mastercard in the list
-      await page.getByText('Mastercard Credit').click();
-      
-      // Process the payment
-      await page.getByRole('button', { name: 'Process Payment' }).click();
+    // Process payment with pre-selected verified bank payment source
+    await page.getByRole('button', { name: 'Process Payment' }).click();
 
-      // 5. Confirmation
-      await expect(page.getByText('Payment Successful')).toBeVisible();
-      await expect(page.getByText('Transaction Ref.')).toBeVisible();
-    }
+    // Confirmation
+    await expect(page.getByText('Payment Successful')).toBeVisible();
+    await expect(page.getByText(/Transaction Ref\./i)).toBeVisible();
   });
 });
