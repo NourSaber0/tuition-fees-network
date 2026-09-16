@@ -10,6 +10,7 @@ import com.tuitionnetwork.payments.repository.EPPScheduleRepository;
 import com.tuitionnetwork.payments.repository.PaymentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.tuitionnetwork.settings.service.SettingsService;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Component;
 
@@ -23,11 +24,14 @@ public class EppScheduleGenerator {
 
     private final EPPScheduleRepository eppScheduleRepository;
     private final PaymentRepository paymentRepository;
+    private final SettingsService settingsService;
 
     public EppScheduleGenerator(EPPScheduleRepository eppScheduleRepository,
-                                PaymentRepository paymentRepository) {
+                                PaymentRepository paymentRepository,
+                                SettingsService settingsService) {
         this.eppScheduleRepository = eppScheduleRepository;
         this.paymentRepository = paymentRepository;
+        this.settingsService = settingsService;
     }
 
     @ApplicationModuleListener
@@ -77,7 +81,7 @@ public class EppScheduleGenerator {
             );
         }
 
-        EppPricing.Quote quote = EppPricing.calculate(principal, tenorMonths);
+        EppPricing.Quote quote = EppPricing.calculate(principal, tenorMonths, settingsService.getEpp());
 
         return new EPPSchedule(
                 payment,

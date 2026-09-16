@@ -224,6 +224,11 @@ public class DemoDataSeeder implements CommandLineRunner {
         Guardian ahmed = new Guardian(ahmedHmac, "enc_" + ahmedNid, "Ahmed Tarek Mahmoud", "ahmed.tarek@example.com", "01009876543", "Password123!", true);
         ahmed = guardianRepository.save(ahmed);
 
+        String nourNid = "30103222103442";
+        String nourHmac = identityResolverService.computeHmacSha256(nourNid);
+        Guardian nour = new Guardian(nourHmac, "enc_" + nourNid, "Nour Khaled Fahmy", "nour.khaled@example.com", "01001234568", "Password123!", true);
+        nour = guardianRepository.save(nour);
+
         // 4. Students
         String saraNid = "31205150101042";
         Student sara = new Student(mona.getId(), nile.getId(), identityResolverService.computeHmacSha256(saraNid), "enc_" + saraNid, "Sara Ahmed", LocalDate.of(2012, 5, 15));

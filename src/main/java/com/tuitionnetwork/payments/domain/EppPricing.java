@@ -1,13 +1,11 @@
 package com.tuitionnetwork.payments.domain;
 
+import com.tuitionnetwork.settings.dto.EppSettingsDto;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
 public final class EppPricing {
-
-    private static final BigDecimal ANNUAL_RATE = new BigDecimal("0.14");
-    private static final BigDecimal ADMIN_FEE_RATE = new BigDecimal("0.01");
-    private static final BigDecimal ADMIN_FEE_CAP = new BigDecimal("500.00");
 
     private EppPricing() {
     }
@@ -23,7 +21,7 @@ public final class EppPricing {
     ) {
     }
 
-    public static Quote calculate(BigDecimal principal, int tenorMonths) {
+    public static Quote calculate(BigDecimal principal, int tenorMonths, EppSettingsDto settings) {
         if (principal == null || principal.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Principal amount must be greater than zero");
         }
@@ -32,21 +30,27 @@ public final class EppPricing {
         }
 
         BigDecimal scaledPrincipal = principal.setScale(2, RoundingMode.HALF_UP);
+        
+        // Ensure tenor is supported, else fallback to 0%? Actually just use 0 if missing.
+        Integer ratePct = settings.interestRatePct() != null ? settings.interestRatePct().get(tenorMonths) : null;
         BigDecimal annualInterestRate;
-        BigDecimal interestAmount;
-        BigDecimal adminFee;
-
-        if (tenorMonths == 3) {
+        if (ratePct == null) {
             annualInterestRate = BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
-            interestAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-            adminFee = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         } else {
-            annualInterestRate = ANNUAL_RATE.setScale(4, RoundingMode.HALF_UP);
-            interestAmount = scaledPrincipal.multiply(annualInterestRate)
-                    .multiply(BigDecimal.valueOf(tenorMonths))
-                    .divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP);
-            BigDecimal calculatedAdminFee = scaledPrincipal.multiply(ADMIN_FEE_RATE).setScale(2, RoundingMode.HALF_UP);
-            adminFee = calculatedAdminFee.min(ADMIN_FEE_CAP);
+            annualInterestRate = BigDecimal.valueOf(ratePct).divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
+        }
+
+        BigDecimal adminFeeRate = BigDecimal.valueOf(settings.adminFeeRatePct()).divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
+        BigDecimal adminFeeCap = BigDecimal.valueOf(settings.adminFeeCapEGP()).setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal interestAmount = scaledPrincipal.multiply(annualInterestRate)
+                .multiply(BigDecimal.valueOf(tenorMonths))
+                .divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP);
+                
+        BigDecimal adminFee = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        if (annualInterestRate.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal calculatedAdminFee = scaledPrincipal.multiply(adminFeeRate).setScale(2, RoundingMode.HALF_UP);
+            adminFee = calculatedAdminFee.min(adminFeeCap);
         }
 
         BigDecimal totalPayable = scaledPrincipal.add(interestAmount).add(adminFee).setScale(2, RoundingMode.HALF_UP);

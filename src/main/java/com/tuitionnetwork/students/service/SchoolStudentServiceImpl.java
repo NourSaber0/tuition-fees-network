@@ -130,9 +130,10 @@ public class SchoolStudentServiceImpl implements SchoolStudentService {
         }
 
         String studentRef;
-        if (request.studentRef() == null || request.studentRef().isBlank() ||
-                studentRepository.findByInstitutionIdAndStudentRef(institutionId, request.studentRef().trim()).isPresent()) {
+        if (request.studentRef() == null || request.studentRef().isBlank()) {
             studentRef = generateUniqueStudentRef(institutionId);
+        } else if (studentRepository.findByInstitutionIdAndStudentRef(institutionId, request.studentRef().trim()).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "duplicate_student_ref");
         } else {
             studentRef = request.studentRef().trim();
         }

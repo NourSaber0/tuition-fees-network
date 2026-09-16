@@ -64,7 +64,7 @@ class BackOfficePaymentIntegrationTest {
 
     private MockMvc mockMvc;
     private FeeLine sampleFee;
-    private final String testNationalId = "29901011234567";
+    private final String testNationalId = "29805150101023";
 
     @BeforeEach
     void setUp() {
@@ -96,10 +96,10 @@ class BackOfficePaymentIntegrationTest {
     @Test
     @WithMockUser(username = "ops@cibeg.com", roles = {"BACK_OFFICE"})
     void customerFees_returnsCustomerAndFees() throws Exception {
-        mockMvc.perform(get("/api/v1/customers/fees").param("nationalId", testNationalId))
+        mockMvc.perform(get("/api/v1/customers/fees").header("X-API-Key", "wit-intern-2026").param("nationalId", testNationalId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.customer.name").value("Hassan Mahmoud"))
-                .andExpect(jsonPath("$.customer.nationalIdMasked").value("299*******4567"))
+                .andExpect(jsonPath("$.customer.nationalIdMasked").value("298*******1023"))
                 .andExpect(jsonPath("$.fees").isArray())
                 .andExpect(jsonPath("$.fees[0].originalAmountEGP").value(10000.00))
                 .andExpect(jsonPath("$.fees[0].eligible").value(true));
@@ -108,14 +108,14 @@ class BackOfficePaymentIntegrationTest {
     @Test
     @WithMockUser(username = "ops@cibeg.com", roles = {"BACK_OFFICE"})
     void customerFees_invalidNationalId_returns400() throws Exception {
-        mockMvc.perform(get("/api/v1/customers/fees").param("nationalId", "12345"))
+        mockMvc.perform(get("/api/v1/customers/fees").header("X-API-Key", "wit-intern-2026").param("nationalId", "12345"))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     @WithMockUser(username = "ops@cibeg.com", roles = {"BACK_OFFICE"})
     void customerFees_unknownCustomer_returns404() throws Exception {
-        mockMvc.perform(get("/api/v1/customers/fees").param("nationalId", "29999999999999"))
+        mockMvc.perform(get("/api/v1/customers/fees").header("X-API-Key", "wit-intern-2026").param("nationalId", "29999999999999"))
                 .andExpect(status().isNotFound());
     }
 
@@ -126,13 +126,13 @@ class BackOfficePaymentIntegrationTest {
                 {
                     "nationalId": "%s",
                     "feeIds": ["%s"],
-                    "amountEGP": 5000.00,
+                    "sourceId": "card_mona_visa", "amountEGP": 5000.00,
                     "method": "CIB Credit Card"
                 }
                 """.formatted(testNationalId, sampleFee.getId());
 
         mockMvc.perform(post("/api/v1/payments")
-                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-API-Key", "wit-intern-2026").contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest());
     }
@@ -144,14 +144,14 @@ class BackOfficePaymentIntegrationTest {
                 {
                     "nationalId": "%s",
                     "feeIds": ["%s"],
-                    "amountEGP": 0,
+                    "sourceId": "card_mona_visa", "amountEGP": 0,
                     "method": "CIB Credit Card"
                 }
                 """.formatted(testNationalId, sampleFee.getId());
 
         mockMvc.perform(post("/api/v1/payments")
                         .header("Idempotency-Key", UUID.randomUUID().toString())
-                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-API-Key", "wit-intern-2026").contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest());
     }
@@ -164,7 +164,7 @@ class BackOfficePaymentIntegrationTest {
                 {
                     "nationalId": "%s",
                     "feeIds": ["%s"],
-                    "amountEGP": 5000.00,
+                    "sourceId": "card_mona_visa", "amountEGP": 5000.00,
                     "method": "CIB Credit Card",
                     "processedBy": "EMP-001"
                 }
@@ -172,9 +172,9 @@ class BackOfficePaymentIntegrationTest {
 
         mockMvc.perform(post("/api/v1/payments")
                         .header("Idempotency-Key", idempKey)
-                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-API-Key", "wit-intern-2026").contentType(MediaType.APPLICATION_JSON)
                         .content(body))
-                .andExpect(status().isCreated())
+                .andDo(org.springframework.test.web.servlet.result.MockMvcResultHandlers.print()).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("Successful"))
                 .andExpect(jsonPath("$.amountPaidEGP").value(5000.00))
                 .andExpect(jsonPath("$.isPartial").value(true))
@@ -191,24 +191,24 @@ class BackOfficePaymentIntegrationTest {
                 {
                     "nationalId": "%s",
                     "feeIds": ["%s"],
-                    "amountEGP": 4000.00,
+                    "sourceId": "card_mona_visa", "amountEGP": 4000.00,
                     "method": "CIB Credit Card"
                 }
                 """.formatted(testNationalId, sampleFee.getId());
 
         mockMvc.perform(post("/api/v1/payments")
                         .header("Idempotency-Key", idempKey)
-                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-API-Key", "wit-intern-2026").contentType(MediaType.APPLICATION_JSON)
                         .content(body))
-                .andExpect(status().isCreated())
+                .andDo(org.springframework.test.web.servlet.result.MockMvcResultHandlers.print()).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.amountPaidEGP").value(4000.00));
 
         // Replay with exact same idempotency key
         mockMvc.perform(post("/api/v1/payments")
                         .header("Idempotency-Key", idempKey)
-                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-API-Key", "wit-intern-2026").contentType(MediaType.APPLICATION_JSON)
                         .content(body))
-                .andExpect(status().isCreated())
+                .andDo(org.springframework.test.web.servlet.result.MockMvcResultHandlers.print()).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.amountPaidEGP").value(4000.00));
     }
 
@@ -219,16 +219,16 @@ class BackOfficePaymentIntegrationTest {
                 {
                     "nationalId": "%s",
                     "feeIds": ["%s"],
-                    "amountEGP": 5000.00,
+                    "sourceId": "card_mona_visa", "amountEGP": 5000.00,
                     "method": "CIB Debit Card",
                     "creditPaymentType": "epp",
-                    "eppTenor": 12
+                    "eppTenor": 12, "sourceId": "card_mona_visa"
                 }
                 """.formatted(testNationalId, sampleFee.getId());
 
         mockMvc.perform(post("/api/v1/payments")
                         .header("Idempotency-Key", UUID.randomUUID().toString())
-                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-API-Key", "wit-intern-2026").contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isUnprocessableEntity());
     }
@@ -290,12 +290,12 @@ class BackOfficePaymentIntegrationTest {
     void noRefundEndpoints_exist_perBusinessRule() throws Exception {
         // Asserting that refund endpoint is NOT found (404/405), strictly adhering to "no refund in any of the portals"
         mockMvc.perform(post("/api/v1/transactions/{id}/refund", UUID.randomUUID())
-                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-API-Key", "wit-intern-2026").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reason\":\"test\"}"))
                 .andExpect(status().isNotFound());
 
         mockMvc.perform(post("/api/v1/transactions/{id}/reverse", UUID.randomUUID())
-                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-API-Key", "wit-intern-2026").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reason\":\"test\"}"))
                 .andExpect(status().isNotFound());
     }
@@ -323,7 +323,7 @@ class BackOfficePaymentIntegrationTest {
                 {
                     "nationalId": "%s",
                     "feeIds": ["%s"],
-                    "amountEGP": 8400.00,
+                    "sourceId": "card_mona_visa", "amountEGP": 8400.00,
                     "method": "CIB Credit Card",
                     "processedBy": "EMP-001"
                 }
@@ -331,9 +331,9 @@ class BackOfficePaymentIntegrationTest {
 
         mockMvc.perform(post("/api/v1/payments")
                         .header("Idempotency-Key", idempKey)
-                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-API-Key", "wit-intern-2026").contentType(MediaType.APPLICATION_JSON)
                         .content(body))
-                .andExpect(status().isCreated())
+                .andDo(org.springframework.test.web.servlet.result.MockMvcResultHandlers.print()).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("Successful"))
                 .andExpect(jsonPath("$.isPartial").value(false))
                 .andExpect(jsonPath("$.remainingBalanceEGP").value(0.00))
@@ -352,7 +352,7 @@ class BackOfficePaymentIntegrationTest {
                 {
                     "nationalId": "%s",
                     "feeIds": ["%s"],
-                    "amountEGP": 8000.00,
+                    "sourceId": "card_mona_visa", "amountEGP": 8000.00,
                     "method": "CIB Credit Card",
                     "processedBy": "EMP-001"
                 }
@@ -360,9 +360,9 @@ class BackOfficePaymentIntegrationTest {
 
         mockMvc.perform(post("/api/v1/payments")
                         .header("Idempotency-Key", idempKey)
-                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-API-Key", "wit-intern-2026").contentType(MediaType.APPLICATION_JSON)
                         .content(body))
-                .andExpect(status().isCreated())
+                .andDo(org.springframework.test.web.servlet.result.MockMvcResultHandlers.print()).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.isPartial").value(true))
                 .andExpect(jsonPath("$.remainingBalanceEGP").value(400.00))
                 .andExpect(jsonPath("$.originalFeeEGP").value(8000.00))
@@ -378,7 +378,7 @@ class BackOfficePaymentIntegrationTest {
                 {
                     "nationalId": "%s",
                     "feeIds": ["%s"],
-                    "amountEGP": 9000.00,
+                    "sourceId": "card_mona_visa", "amountEGP": 9000.00,
                     "method": "CIB Credit Card",
                     "processedBy": "EMP-001"
                 }
@@ -386,7 +386,7 @@ class BackOfficePaymentIntegrationTest {
 
         mockMvc.perform(post("/api/v1/payments")
                         .header("Idempotency-Key", idempKey)
-                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-API-Key", "wit-intern-2026").contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest());
     }

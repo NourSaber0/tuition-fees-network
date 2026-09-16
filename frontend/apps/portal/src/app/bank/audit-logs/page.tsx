@@ -310,7 +310,12 @@ export default function AuditLogsPage() {
                           <div className="text-[10px] text-gray-400">{roleLabel(entry.role)}</div>
                         </td>
                         <td className="px-4 py-3.5 text-xs text-gray-700 whitespace-nowrap">{entry.action}</td>
-                        <td className="px-4 py-3.5 text-xs text-gray-600 max-w-[150px] truncate">{entry.entity}</td>
+                        <td className="px-4 py-3.5 text-xs text-gray-600 max-w-[180px] truncate" title={entry.targetResource || `${entry.entity} ${entry.entityId || ""}`}>
+                          <span>{entry.entity}</span>
+                          {entry.entityId && entry.entityId !== "-" && (
+                            <span className="block text-[11px] font-mono text-gray-400 truncate">{entry.entityId}</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3.5">
                           {!entry.prevValue ? (
                             <span className="text-gray-300 text-xs">—</span>

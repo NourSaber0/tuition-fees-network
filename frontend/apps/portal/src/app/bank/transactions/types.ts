@@ -126,6 +126,41 @@ export interface EppSummaryDto {
   tenorMonths?: number;
   monthlyInstallmentEGP?: number;
   interestRatePct?: number;
+  tenor?: number;
+  monthlyEGP?: number;
+}
+
+export interface BankAccountDto {
+  account_id: string;
+  account_number: string;
+  type: string;
+  currency: string;
+  available_balance: number;
+  status: string;
+}
+
+export interface BankCardDto {
+  card_id: string;
+  masked_number: string;
+  scheme: string;
+  type: string;
+  holder_name: string;
+  expiry: string;
+  status: string;
+  credit_limit?: number;
+  available_limit?: number;
+  linked_account_id?: string;
+}
+
+export interface BankCustomerLookupResponse {
+  customer_id: string;
+  national_id: string;
+  full_name_en: string;
+  full_name_ar: string;
+  mobile: string;
+  status: string;
+  accounts: BankAccountDto[];
+  cards: BankCardDto[];
 }
 
 export interface BackOfficePaymentRequest {
@@ -133,6 +168,7 @@ export interface BackOfficePaymentRequest {
   feeIds: string[];
   amountEGP: number;
   method: "ACCOUNT_DEBIT" | "CARD" | string;
+  sourceId?: string;
   creditPaymentType?: "full" | "epp";
   eppTenor?: number;
   cardToken?: string;

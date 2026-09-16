@@ -71,13 +71,17 @@ export function createApiClient(baseUrl: string, hooks: ApiClientHooks): ApiClie
     isRetry = false
   ): Promise<T> {
     const token = hooks.getAccessToken()
-    const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(options?.headers ?? {}) }
+    const isFormData = typeof FormData !== 'undefined' && body instanceof FormData
+    const headers: Record<string, string> = { ...options?.headers }
+    if (!isFormData && !headers['Content-Type'] && body !== undefined) {
+      headers['Content-Type'] = 'application/json'
+    }
     if (token && !headers.Authorization) headers.Authorization = `Bearer ${token}`
 
     const res = await fetch(`${baseUrl}${path}`, {
       method,
       headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: isFormData ? (body as FormData) : (body !== undefined ? JSON.stringify(body) : undefined),
     })
 
     if (res.status === 401 && !isRetry) {

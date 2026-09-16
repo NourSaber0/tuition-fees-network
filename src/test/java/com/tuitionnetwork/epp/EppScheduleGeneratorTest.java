@@ -30,7 +30,9 @@ class EppScheduleGeneratorTest {
     void setUp() {
         eppScheduleRepository = mock(EPPScheduleRepository.class);
         paymentRepository = mock(PaymentRepository.class);
-        generator = new EppScheduleGenerator(eppScheduleRepository, paymentRepository);
+        com.tuitionnetwork.settings.service.SettingsService settingsService = mock(com.tuitionnetwork.settings.service.SettingsService.class);
+        when(settingsService.getEpp()).thenReturn(com.tuitionnetwork.settings.dto.EppSettingsDto.defaults());
+        generator = new EppScheduleGenerator(eppScheduleRepository, paymentRepository, settingsService);
     }
 
     @Test

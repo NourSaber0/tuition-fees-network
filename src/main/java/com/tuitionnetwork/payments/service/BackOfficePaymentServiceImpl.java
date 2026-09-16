@@ -21,7 +21,11 @@ import com.tuitionnetwork.payments.dto.PaymentSettleRequest;
 import com.tuitionnetwork.payments.dto.PaymentSettleResponse;
 import com.tuitionnetwork.payments.dto.SelectedDueDto;
 import com.tuitionnetwork.payments.dto.TransactionDetailDto;
+import com.tuitionnetwork.payments.infrastructure.MockBankBackOfficeClient;
 import com.tuitionnetwork.payments.repository.PaymentRepository;
+import com.tuitionnetwork.payments.spi.GatewayResponse;
+import com.tuitionnetwork.payments.domain.EppPricing;
+import com.tuitionnetwork.settings.service.SettingsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -46,6 +50,8 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
     private final TransactionQueryService transactionQueryService;
     private final AuditLogRepository auditLogRepository;
     private final FeeDeadlineService feeDeadlineService;
+    private final MockBankBackOfficeClient mockBankClient;
+    private final SettingsService settingsService;
 
     @Autowired
     public BackOfficePaymentServiceImpl(PaymentSettlementService paymentSettlementService,
@@ -55,7 +61,9 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
                                         IdentityResolverService identityResolverService,
                                         TransactionQueryService transactionQueryService,
                                         @Autowired(required = false) AuditLogRepository auditLogRepository,
-                                        FeeDeadlineService feeDeadlineService) {
+                                        FeeDeadlineService feeDeadlineService,
+                                        MockBankBackOfficeClient mockBankClient,
+                                        SettingsService settingsService) {
         this.paymentSettlementService = paymentSettlementService;
         this.paymentRepository = paymentRepository;
         this.feeLineRepository = feeLineRepository;
@@ -64,6 +72,8 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
         this.transactionQueryService = transactionQueryService;
         this.auditLogRepository = auditLogRepository;
         this.feeDeadlineService = feeDeadlineService;
+        this.mockBankClient = mockBankClient;
+        this.settingsService = settingsService;
     }
 
     @Override
@@ -96,9 +106,14 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
             if (methodStr.toUpperCase().contains("DEBIT")) {
                 throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "debit_card_not_eligible_for_epp: Debit cards are not eligible for EPP.");
             }
-            if (!methodStr.toUpperCase().contains("CIB")) {
+            boolean isCib = methodStr.toUpperCase().contains("CIB") || (request.sourceId() != null && request.sourceId().startsWith("card_"));
+            if (!isCib) {
                 throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "non_cib_card_not_eligible: Only CIB cards are eligible for EPP.");
             }
+        }
+        
+        if (request.sourceId() == null || request.sourceId().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "sourceId is required for back-office payments.");
         }
 
         // Idempotency check: if key already processed, return existing record
@@ -213,11 +228,22 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
                 selectedDues,
                 request.amountEGP(),
                 isEpp ? new EppSelectionDto(request.eppTenor()) : null,
-                "4000123456789010",
+                request.sourceId(),
                 null
         );
 
-        PaymentSettleResponse settleResponse = paymentSettlementService.settlePayment(settleRequest, idempotencyKey);
+        // Call mock bank first
+        GatewayResponse gatewayResponse = mockBankClient.processBackOfficePayment(
+                request.sourceId(),
+                request.amountEGP(),
+                idempotencyKey
+        );
+
+        if (gatewayResponse.status() == PaymentStatus.FAILED) {
+            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Payment failed at bank: " + gatewayResponse.message());
+        }
+
+        PaymentSettleResponse settleResponse = paymentSettlementService.settlePayment(settleRequest, idempotencyKey, gatewayResponse);
 
         if (auditLogRepository != null) {
             auditLogRepository.save(new AuditLog(
@@ -232,9 +258,19 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
         BigDecimal remainingBalance = totalDue.subtract(request.amountEGP());
 
         EppSummaryDto eppDto = null;
+        BigDecimal totalCollectedEGP = request.amountEGP();
+
         if (isEpp && request.eppTenor() != null) {
-            BigDecimal monthly = request.amountEGP().divide(BigDecimal.valueOf(request.eppTenor()), 2, java.math.RoundingMode.HALF_UP);
-            eppDto = new EppSummaryDto("EPP-" + settleResponse.paymentId().toString().substring(0, 8).toUpperCase(), request.eppTenor(), monthly);
+            EppPricing.Quote quote = EppPricing.calculate(request.amountEGP(), request.eppTenor(), settingsService.getEpp());
+            totalCollectedEGP = quote.totalPayable();
+            BigDecimal interestRatePct = quote.annualInterestRate().multiply(BigDecimal.valueOf(100)).setScale(2, java.math.RoundingMode.HALF_UP);
+            
+            eppDto = new EppSummaryDto(
+                    "EPP-" + settleResponse.paymentId().toString().substring(0, 8).toUpperCase(),
+                    request.eppTenor(),
+                    quote.monthlyInstalment(),
+                    interestRatePct
+            );
         }
 
         return new BackOfficePaymentResponse(
@@ -250,7 +286,7 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
                 eppDto,
                 feePortion,
                 penaltyPortion,
-                request.amountEGP(),
+                totalCollectedEGP,
                 latestPenaltyAppliedAt
         );
     }
