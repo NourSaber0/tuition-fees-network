@@ -126,6 +126,8 @@ export interface EppSummaryDto {
   tenorMonths?: number;
   monthlyInstallmentEGP?: number;
   interestRatePct?: number;
+  tenor?: number;
+  monthlyEGP?: number;
 }
 
 export interface BankAccountDto {

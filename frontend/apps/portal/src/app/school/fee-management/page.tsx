@@ -9,6 +9,7 @@ import {
   formatIsoDate,
   SearchIcon,
   PlusIcon,
+  Pagination,
 } from "@tuition/ui";
 import FeeDetailDrawer from "./FeeDetailDrawer";
 import CreateFeeModal from "./CreateFeeModal";
@@ -24,6 +25,10 @@ export default function FeeManagementPage() {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
+  const [dueDateFrom, setDueDateFrom] = useState("");
+  const [dueDateTo, setDueDateTo] = useState("");
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   
   const [selectedFeeId, setSelectedFeeId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -34,25 +39,51 @@ export default function FeeManagementPage() {
     try {
       const [feesRes, catRes] = await Promise.all([
         getFees(apiClient, {
-          search,
+          search: search.trim() || undefined,
           category: selectedCategory || undefined,
           status: selectedStatus || undefined,
+          dueDateFrom: dueDateFrom || undefined,
+          dueDateTo: dueDateTo || undefined,
+          page,
+          pageSize: 25,
         }),
         getFeeCategories(apiClient),
       ]);
       setFees(feesRes.data);
+      setTotalPages(Math.max(1, feesRes.totalPages ?? 1));
       setCategories(catRes);
     } catch {
       setError("Failed to load fees.");
     } finally {
       setLoading(false);
     }
-  }, [apiClient, search, selectedCategory, selectedStatus]);
+  }, [apiClient, search, selectedCategory, selectedStatus, dueDateFrom, dueDateTo, page]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData();
   }, [fetchData]);
+
+  // Reset to page 0 when filters change
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+    setPage(0);
+  };
+  const handleCategoryChange = (val: string) => {
+    setSelectedCategory(val);
+    setPage(0);
+  };
+  const handleStatusChange = (val: string) => {
+    setSelectedStatus(val);
+    setPage(0);
+  };
+  const handleDueDateFromChange = (val: string) => {
+    setDueDateFrom(val);
+    setPage(0);
+  };
+  const handleDueDateToChange = (val: string) => {
+    setDueDateTo(val);
+    setPage(0);
+  };
 
   const handleCreated = () => {
     setShowCreateModal(false);
@@ -77,21 +108,21 @@ export default function FeeManagementPage() {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex-1 flex flex-col min-h-0 overflow-hidden">
-          <div className="p-4 border-b border-gray-100 flex gap-3">
-            <div className="relative w-72">
+          <div className="p-4 border-b border-gray-100 flex flex-wrap gap-3 items-center">
+            <div className="relative w-64">
               <SearchIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search by student or fee ID..."
                 className="w-full pl-9 pr-4 py-2 border rounded-lg text-sm outline-none focus:border-blue-500"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
               />
             </div>
             
             <select
               value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
+              onChange={(e) => handleCategoryChange(e.target.value)}
               className="border rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 bg-white"
             >
               <option value="">All Categories</option>
@@ -102,7 +133,7 @@ export default function FeeManagementPage() {
 
             <select
               value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
+              onChange={(e) => handleStatusChange(e.target.value)}
               className="border rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 bg-white"
             >
               <option value="">All Statuses</option>
@@ -111,6 +142,42 @@ export default function FeeManagementPage() {
               <option value="Partial">Partial</option>
               <option value="Overdue">Overdue</option>
             </select>
+
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              <span>Due:</span>
+              <input
+                type="date"
+                value={dueDateFrom}
+                onChange={(e) => handleDueDateFromChange(e.target.value)}
+                className="border rounded-lg px-2 py-1.5 text-xs outline-none focus:border-blue-500 bg-white"
+                title="Due Date From"
+              />
+              <span>to</span>
+              <input
+                type="date"
+                value={dueDateTo}
+                onChange={(e) => handleDueDateToChange(e.target.value)}
+                className="border rounded-lg px-2 py-1.5 text-xs outline-none focus:border-blue-500 bg-white"
+                title="Due Date To"
+              />
+            </div>
+
+            {(search || selectedCategory || selectedStatus || dueDateFrom || dueDateTo) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  setSelectedCategory("");
+                  setSelectedStatus("");
+                  setDueDateFrom("");
+                  setDueDateTo("");
+                  setPage(0);
+                }}
+                className="text-xs text-blue-600 hover:text-blue-800 underline ml-auto"
+              >
+                Clear filters
+              </button>
+            )}
           </div>
 
           <div className="flex-1 overflow-auto">
@@ -175,6 +242,16 @@ export default function FeeManagementPage() {
               </table>
             )}
           </div>
+
+          {totalPages > 1 && (
+            <div className="p-4 border-t border-gray-100 flex justify-center bg-white">
+              <Pagination
+                page={page + 1}
+                totalPages={totalPages}
+                onPageChange={(p) => setPage(p - 1)}
+              />
+            </div>
+          )}
         </div>
       </div>
 

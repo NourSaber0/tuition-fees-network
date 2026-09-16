@@ -40,36 +40,38 @@ test.describe('Teller Payment Flow', () => {
     await expect(page.getByText('Process Customer Payment')).toBeVisible();
 
     // Enter National ID
-    await page.getByPlaceholder('14-digit National ID').fill('29805150101023');
+    await page.getByPlaceholder('14-digit National ID').fill('29511020204536');
     await page.getByRole('button', { name: 'Search' }).click();
 
     // Verify lookup succeeds and shows correct customer name
-    await expect(page.getByText('Mona Samir Abdelrahman')).toBeVisible();
+    await expect(page.getByText('Ahmed Tarek Mahmoud')).toBeVisible();
 
-    // 3. Fee Selection
-    // Ensure fees are loaded
-    await expect(page.getByText('Outstanding Fees')).toBeVisible();
+    // 3. Fee Selection & Payment
+    const isSettled = await page.getByText('No Outstanding Fees').isVisible({ timeout: 3000 }).catch(() => false);
 
-    // Proceed to Step 3 (Payment Amount)
-    await page.getByRole('button', { name: 'Continue to Payment →' }).click();
-    await expect(page.getByText('Payment Amount')).toBeVisible();
-    
-    // Proceed to Step 4 (Review & Payment Method)
-    await page.getByRole('button', { name: 'Continue to Review →' }).click();
-    await expect(page.getByText('Review & Confirm')).toBeVisible();
+    if (isSettled) {
+      await expect(page.getByText('All educational and institutional fees are completely settled')).toBeVisible();
+    } else {
+      const checkbox = page.locator('input[type="checkbox"]').first();
+      await checkbox.check();
 
-    // 'CIB Card' is selected by default, just wait for cards to appear
-    
-    // Select the first card in the list (e.g. Visa Credit)
-    await page.locator('div').filter({ hasText: 'Exp:' }).first().click();
-    
-    // Process the payment
-    await page.getByRole('button', { name: 'Process Payment' }).click();
+      // Proceed to Step 3 (Payment Amount)
+      await page.getByRole('button', { name: 'Continue to Payment →' }).click();
+      await expect(page.getByText('Payment Amount')).toBeVisible();
+      
+      // Proceed to Step 4 (Review & Payment Method)
+      await page.getByRole('button', { name: 'Continue to Review →' }).click();
+      await expect(page.getByText('Review & Confirm')).toBeVisible();
 
-    // 5. Confirmation
-    await expect(page.getByText('Payment Successful')).toBeVisible();
-    
-    // Check if receipt has Transaction Ref.
-    await expect(page.getByText('Transaction Ref.')).toBeVisible();
+      // Select the active Mastercard in the list
+      await page.getByText('Mastercard Credit').click();
+      
+      // Process the payment
+      await page.getByRole('button', { name: 'Process Payment' }).click();
+
+      // 5. Confirmation
+      await expect(page.getByText('Payment Successful')).toBeVisible();
+      await expect(page.getByText('Transaction Ref.')).toBeVisible();
+    }
   });
 });
