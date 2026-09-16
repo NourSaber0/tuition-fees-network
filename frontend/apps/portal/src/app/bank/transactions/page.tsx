@@ -42,6 +42,9 @@ import type {
   CustomerFeesResponse,
   BackOfficePaymentRequest,
   BackOfficePaymentResponse,
+  BankCustomerLookupResponse,
+  BankAccountDto,
+  BankCardDto,
 } from "./types";
 
 type StatusTab = "ALL" | "SUCCESSFUL" | "PENDING" | "FAILED";
@@ -107,6 +110,9 @@ export default function TransactionsPage() {
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [customerData, setCustomerData] = useState<CustomerFeesResponse | null>(null);
+  const [bankCustomer, setBankCustomer] = useState<BankCustomerLookupResponse | null>(null);
+  const [selectedSourceId, setSelectedSourceId] = useState<string>("");
+  const [noFeesInfo, setNoFeesInfo] = useState<string | null>(null);
   const [selectedFeeIds, setSelectedFeeIds] = useState<string[]>([]);
   const [amountInput, setAmountInput] = useState("");
   const [amountError, setAmountError] = useState<string | null>(null);
@@ -278,17 +284,60 @@ export default function TransactionsPage() {
       return;
     }
     setLookupError(null);
+    setNoFeesInfo(null);
     setLookupLoading(true);
     try {
       const res = await apiClient.get<CustomerFeesResponse>(
         `/customers/fees?nationalId=${encodeURIComponent(cleanNid)}`
       );
+
+      // Attempt to load customer bank accounts and cards from mock bank register
+      let bankCust: BankCustomerLookupResponse | null = null;
+      try {
+        bankCust = await apiClient.get<BankCustomerLookupResponse>(
+          `/customers?national_id=${encodeURIComponent(cleanNid)}`,
+          { headers: { "X-API-Key": "wit-intern-2026" } }
+        );
+        setBankCustomer(bankCust);
+      } catch {
+        setBankCustomer(null);
+      }
+
       const outstandingFees = (res.fees ?? []).filter(f => (f.remainingEGP ?? 0) > 0);
       setCustomerData({ ...res, fees: outstandingFees });
+
+      if (outstandingFees.length === 0) {
+        const custName = res.customer?.name || res.customer?.fullName || bankCust?.full_name_en || "Customer";
+        setNoFeesInfo(
+          `Customer found: ${custName} (${maskNID(cleanNid)}). This customer currently has no outstanding tuition or institutional fees.`
+        );
+        return;
+      }
+
       const eligible = outstandingFees.map((f) => f.id);
       setSelectedFeeIds(eligible);
       const totalRemaining = outstandingFees.reduce((sum, f) => sum + (f.remainingEGP ?? 0), 0);
       setAmountInput(totalRemaining > 0 ? String(totalRemaining) : "");
+
+      // Auto-select first active payment source
+      if (bankCust) {
+        const activeCreditCard = bankCust.cards?.find((c) => c.status === "ACTIVE" && c.type === "CREDIT");
+        const activeCard = bankCust.cards?.find((c) => c.status === "ACTIVE");
+        const activeAcc = bankCust.accounts?.find((a) => a.status === "ACTIVE");
+        if (activeCreditCard) {
+          setSelectedSourceId(activeCreditCard.card_id);
+          setPayMethod("CARD");
+        } else if (activeCard) {
+          setSelectedSourceId(activeCard.card_id);
+          setPayMethod("CARD");
+          setIsEpp(false);
+        } else if (activeAcc) {
+          setSelectedSourceId(activeAcc.account_id);
+          setPayMethod("ACCOUNT_DEBIT");
+          setIsEpp(false);
+        }
+      }
+
       setPayStep(2);
     } catch (err) {
       setLookupError(err instanceof Error ? err.message : "Citizen fee record not found.");
@@ -321,15 +370,22 @@ export default function TransactionsPage() {
     setPaymentLoading(true);
     setPaymentError(null);
 
+    const selectedCard = bankCustomer?.cards?.find((c) => c.card_id === selectedSourceId);
+    let resolvedMethod = payMethod === "CARD" ? "CIB_CREDIT_CARD" : "CIB_ACCOUNT";
+    if (selectedCard && selectedCard.type === "DEBIT") {
+      resolvedMethod = "CIB_DEBIT_CARD";
+    }
+
     const idempKey = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `idemp-${Date.now()}`;
     const payload: BackOfficePaymentRequest = {
       nationalId: customerData.customer.nationalId || nationalIdInput.trim(),
       feeIds: selectedFeeIds,
       amountEGP: amt,
-      method: payMethod,
+      method: resolvedMethod,
+      sourceId: selectedSourceId || (payMethod === "CARD" ? "card_cib" : "acc_cib"),
       creditPaymentType: payMethod === "CARD" && isEpp ? "epp" : "full",
       eppTenor: payMethod === "CARD" && isEpp ? eppTenor : undefined,
-      processedBy: user?.name ?? "Bank Staff",
+      processedBy: user?.name ?? "Mohamed Ali",
     };
 
     try {
@@ -389,6 +445,9 @@ export default function TransactionsPage() {
     setReceiptRef("");
     setReceiptDate("");
     setCustomerData(null);
+    setBankCustomer(null);
+    setSelectedSourceId("");
+    setNoFeesInfo(null);
     setSelectedFeeIds([]);
     setAmountInput("");
     setAmountError(null);
@@ -603,18 +662,22 @@ export default function TransactionsPage() {
                       </div>
                       {penalty > 0 && (
                         <div className="flex justify-between text-xs">
-                          <span className="text-red-600 font-semibold">Late Penalty (5%)</span>
-                          <span className="font-mono font-bold text-red-600">
+                          <span className={`font-semibold ${detailTx.status === "Successful" ? "text-gray-600" : "text-red-600"}`}>
+                            {detailTx.status === "Successful" ? "Late Penalty (Paid)" : "Late Penalty (5%)"}
+                          </span>
+                          <span className={`font-mono font-bold ${detailTx.status === "Successful" ? "text-gray-700" : "text-red-600"}`}>
                             + EGP {formatMoney(penalty)}
                           </span>
                         </div>
                       )}
-                      <div className="flex justify-between text-sm border-t pt-2.5">
-                        <span className="font-semibold text-gray-700">Total Due</span>
-                        <span className="font-mono font-bold text-[#003087]">
-                          EGP {formatMoney(totalDue)}
-                        </span>
-                      </div>
+                      {detailTx.status !== "Successful" && (
+                        <div className="flex justify-between text-sm border-t pt-2.5">
+                          <span className="font-semibold text-gray-700">Total Due</span>
+                          <span className="font-mono font-bold text-[#003087]">
+                            EGP {formatMoney(totalDue)}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -794,25 +857,59 @@ export default function TransactionsPage() {
               </div>
               {lookupError && <p className="text-xs text-red-500 mt-1.5">{lookupError}</p>}
 
+              {noFeesInfo && (
+                <div className="mt-4 p-4 bg-emerald-50/90 border border-emerald-200 rounded-xl text-xs text-emerald-900 flex items-start gap-3 shadow-xs">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0 mt-0.5">
+                    <CheckCircleIcon className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-emerald-950 text-sm">No Outstanding Fees</div>
+                    <p className="text-emerald-800 mt-1 leading-relaxed">{noFeesInfo}</p>
+                    <p className="text-emerald-700/80 text-[11px] mt-1.5">
+                      All educational and institutional fees are completely settled. No payment is required at this time.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="mt-3 flex items-start gap-1.5 text-[11px] text-gray-400">
                 <span className="shrink-0 mt-0.5">🔒</span>
                 National ID is treated as sensitive information and will be masked after retrieval.
               </div>
-              <div className="mt-4 bg-[#F4F6F9] rounded-lg px-4 py-3 text-xs text-gray-500">
-                <span className="font-semibold text-gray-600">Demo NIDs: </span>
-                <span
-                  className="font-mono cursor-pointer hover:underline text-[#003087]"
-                  onClick={() => setNationalIdInput("29805150101023")}
-                >
-                  29805150101023
-                </span>{" "}
-                ·{" "}
-                <span
-                  className="font-mono cursor-pointer hover:underline text-[#003087]"
-                  onClick={() => setNationalIdInput("29901011234567")}
-                >
-                  29901011234567
-                </span>
+              <div className="mt-4 bg-[#F4F6F9] rounded-lg px-4 py-3 text-xs text-gray-500 space-y-1.5">
+                <div className="font-semibold text-gray-700">Quick Test National IDs:</div>
+                <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-[11px]">
+                  <span
+                    className="cursor-pointer hover:underline text-[#003087]"
+                    onClick={() => {
+                      setNationalIdInput("29511020204536");
+                      setLookupError(null);
+                      setNoFeesInfo(null);
+                    }}
+                  >
+                    29511020204536 <span className="font-sans text-gray-500">(Ahmed - 18k Dues, EPP)</span>
+                  </span>
+                  <span
+                    className="cursor-pointer hover:underline text-[#003087]"
+                    onClick={() => {
+                      setNationalIdInput("30103222103442");
+                      setLookupError(null);
+                      setNoFeesInfo(null);
+                    }}
+                  >
+                    30103222103442 <span className="font-sans text-gray-500">(Nour - No Dues)</span>
+                  </span>
+                  <span
+                    className="cursor-pointer hover:underline text-[#003087]"
+                    onClick={() => {
+                      setNationalIdInput("29805150101023");
+                      setLookupError(null);
+                      setNoFeesInfo(null);
+                    }}
+                  >
+                    29805150101023 <span className="font-sans text-gray-500">(Mona - Active Accounts & Cards)</span>
+                  </span>
+                </div>
               </div>
             </div>
           )}
@@ -1134,39 +1231,183 @@ export default function TransactionsPage() {
                 </div>
               </div>
 
-              {/* Method choice */}
-              <div className="space-y-2">
-                <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">
-                  Payment Method
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { id: "ACCOUNT_DEBIT", label: "CIB Account Debit" },
-                    { id: "CARD", label: "CIB Card" },
-                  ].map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => {
-                        setPayMethod(m.id as PayMethodChoice);
-                        if (m.id !== "CARD") setIsEpp(false);
-                      }}
-                      className={`py-2.5 text-xs font-semibold rounded-lg border transition-all ${
-                        payMethod === m.id
-                          ? "border-[#003087] bg-[#EBF1FB] text-[#003087]"
-                          : "border-[#DDE3EF] text-gray-500 hover:bg-gray-50"
-                      }`}
-                    >
-                      {m.label}
-                    </button>
-                  ))}
+              {/* Method choice / Stored Accounts & Cards */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block">
+                    Select Payment Source
+                  </label>
+                  {bankCustomer && (
+                    <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                      Verified CIB Register
+                    </span>
+                  )}
                 </div>
 
+                {bankCustomer?.accounts && bankCustomer.accounts.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-gray-700">Bank Accounts</p>
+                    <div className="space-y-2">
+                      {bankCustomer.accounts.map((acc) => {
+                        const isActive = acc.status === "ACTIVE";
+                        const isSelected = selectedSourceId === acc.account_id;
+                        return (
+                          <div
+                            key={acc.account_id}
+                            onClick={() => {
+                              if (!isActive) return;
+                              setSelectedSourceId(acc.account_id);
+                              setPayMethod("ACCOUNT_DEBIT");
+                              setIsEpp(false);
+                            }}
+                            className={`p-3 rounded-xl border transition-all flex items-center justify-between ${
+                              !isActive
+                                ? "opacity-60 bg-gray-50 border-gray-200 cursor-not-allowed"
+                                : isSelected
+                                ? "border-[#003087] bg-[#EBF1FB] ring-1 ring-[#003087] cursor-pointer"
+                                : "border-[#E8EDF5] bg-white hover:border-gray-300 cursor-pointer"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div
+                                className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                                  isSelected ? "border-[#003087] bg-[#003087]" : "border-gray-300 bg-white"
+                                }`}
+                              >
+                                {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-xs font-bold text-gray-800 flex items-center gap-2">
+                                  <span>{acc.type} Account</span>
+                                  <span className="font-mono text-gray-500 font-normal">···{acc.account_number.slice(-4)}</span>
+                                </div>
+                                <div className="text-[11px] text-gray-500 mt-0.5 font-mono">
+                                  Available: <span className="font-semibold text-gray-700">EGP {formatMoney(acc.available_balance)}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${
+                                  isActive
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                    : "bg-rose-50 text-rose-700 border-rose-200"
+                                }`}
+                              >
+                                {acc.status}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {bankCustomer?.cards && bankCustomer.cards.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-gray-700">Stored Cards</p>
+                    <div className="space-y-2">
+                      {bankCustomer.cards.map((card) => {
+                        const isActive = card.status === "ACTIVE";
+                        const isSelected = selectedSourceId === card.card_id;
+                        const isCredit = card.type === "CREDIT";
+                        return (
+                          <div
+                            key={card.card_id}
+                            onClick={() => {
+                              if (!isActive) return;
+                              setSelectedSourceId(card.card_id);
+                              setPayMethod("CARD");
+                              if (!isCredit) setIsEpp(false);
+                            }}
+                            className={`p-3 rounded-xl border transition-all flex items-center justify-between ${
+                              !isActive
+                                ? "opacity-60 bg-gray-50 border-gray-200 cursor-not-allowed"
+                                : isSelected
+                                ? "border-[#003087] bg-[#EBF1FB] ring-1 ring-[#003087] cursor-pointer"
+                                : "border-[#E8EDF5] bg-white hover:border-gray-300 cursor-pointer"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div
+                                className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                                  isSelected ? "border-[#003087] bg-[#003087]" : "border-gray-300 bg-white"
+                                }`}
+                              >
+                                {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-xs font-bold text-gray-800 flex items-center gap-2">
+                                  <span>{card.scheme} {card.type}</span>
+                                  <span className="font-mono text-gray-500 font-normal">{card.masked_number}</span>
+                                </div>
+                                <div className="text-[11px] text-gray-500 mt-0.5">
+                                  {isCredit && card.available_limit != null && (
+                                    <span className="font-mono">
+                                      Limit: <span className="font-semibold text-gray-700">EGP {formatMoney(card.available_limit)}</span> ·{" "}
+                                    </span>
+                                  )}
+                                  <span>Exp: {card.expiry}</span>
+                                  {card.holder_name && ` · ${card.holder_name}`}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${
+                                  isActive
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                    : "bg-rose-50 text-rose-700 border-rose-200"
+                                }`}
+                              >
+                                {card.status}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* If no bank customer records found, fallback to generic options */}
+                {(!bankCustomer || ((bankCustomer.accounts?.length ?? 0) === 0 && (bankCustomer.cards?.length ?? 0) === 0)) && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: "ACCOUNT_DEBIT", label: "CIB Account Debit" },
+                      { id: "CARD", label: "CIB Card" },
+                    ].map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => {
+                          setPayMethod(m.id as PayMethodChoice);
+                          if (m.id !== "CARD") setIsEpp(false);
+                        }}
+                        className={`py-2.5 text-xs font-semibold rounded-lg border transition-all ${
+                          payMethod === m.id
+                            ? "border-[#003087] bg-[#EBF1FB] text-[#003087]"
+                            : "border-[#DDE3EF] text-gray-500 hover:bg-gray-50"
+                        }`}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* EPP / Installment section for selected credit card */}
                 {payMethod === "CARD" && (
-                  <div className="rounded-xl border border-[#003087]/20 bg-[#F4F8FF] p-3 space-y-2.5">
-                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-                      Payment Type
-                    </p>
+                  <div className="rounded-xl border border-[#003087]/20 bg-[#F4F8FF] p-3.5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                        Payment Mode
+                      </p>
+                      {bankCustomer?.cards?.find((c) => c.card_id === selectedSourceId)?.type === "DEBIT" && (
+                        <span className="text-[11px] text-amber-600">Debit cards: Full payment only</span>
+                      )}
+                    </div>
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
@@ -1181,8 +1422,9 @@ export default function TransactionsPage() {
                       </button>
                       <button
                         type="button"
+                        disabled={bankCustomer?.cards?.find((c) => c.card_id === selectedSourceId)?.type === "DEBIT"}
                         onClick={() => setIsEpp(true)}
-                        className={`py-2 text-xs font-semibold rounded-lg border transition-all ${
+                        className={`py-2 text-xs font-semibold rounded-lg border transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
                           isEpp
                             ? "border-[#003087] bg-[#EBF1FB] text-[#003087]"
                             : "border-[#DDE3EF] text-gray-500 bg-white hover:bg-gray-50"
@@ -1193,8 +1435,8 @@ export default function TransactionsPage() {
                     </div>
 
                     {isEpp && (
-                      <div className="space-y-2 pt-1">
-                        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                      <div className="space-y-2 pt-1 border-t border-[#003087]/10">
+                        <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                           Installment Tenor
                         </p>
                         <div className="grid grid-cols-4 gap-1.5">
@@ -1205,15 +1447,15 @@ export default function TransactionsPage() {
                               onClick={() => setEppTenor(t)}
                               className={`py-2 text-xs font-semibold rounded-lg border transition-all ${
                                 eppTenor === t
-                                  ? "border-[#003087] bg-[#EBF1FB] text-[#003087]"
-                                  : "border-[#DDE3EF] text-gray-500 bg-white hover:bg-gray-50"
+                                  ? "border-[#003087] bg-[#EBF1FB] text-[#003087] font-bold"
+                                  : "border-[#DDE3EF] text-gray-600 bg-white hover:bg-gray-50"
                               }`}
                             >
                               {t}m
                             </button>
                           ))}
                         </div>
-                        <div className="flex items-center justify-between pt-0.5">
+                        <div className="flex items-center justify-between pt-1">
                           <span className="text-[11px] text-gray-500">Est. monthly installment</span>
                           <span className="text-xs font-bold font-mono text-[#003087]">
                             EGP {formatMoney(Math.ceil(payAmountNum / eppTenor))} / month
@@ -1310,11 +1552,19 @@ export default function TransactionsPage() {
                   ))}
                 </div>
 
-                <div className="bg-[#F4F6F9] rounded-lg px-4 py-3 flex items-center justify-between border border-[#E8EDF5]">
-                  <span className="text-sm text-gray-500">Amount Paid</span>
-                  <span className="text-xl font-bold font-mono text-[#003087]">
-                    EGP {formatMoney(paymentSuccess?.amountPaidEGP ?? payAmountNum)}
-                  </span>
+                <div className="bg-[#F4F6F9] rounded-lg px-4 py-3 border border-[#E8EDF5]">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-500">Total Amount Charged</span>
+                    <span className="text-xl font-bold font-mono text-[#003087]">
+                      EGP {formatMoney(paymentSuccess?.totalCollectedEGP ?? paymentSuccess?.amountPaidEGP ?? payAmountNum)}
+                    </span>
+                  </div>
+                  {paymentSuccess?.epp && (
+                    <div className="mt-2 text-xs text-gray-500 border-t border-[#E8EDF5] pt-2">
+                      Includes {paymentSuccess.epp.interestRatePct}% EPP interest. 
+                      Monthly installment: EGP {formatMoney(paymentSuccess.epp.monthlyEGP)} for {paymentSuccess.epp.tenor} months.
+                    </div>
+                  )}
                 </div>
 
                 {isPartial && (

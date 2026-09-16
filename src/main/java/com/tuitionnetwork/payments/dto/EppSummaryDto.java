@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 public record EppSummaryDto(
         String planId,
         int tenor,
-        BigDecimal monthlyEGP
+        BigDecimal monthlyEGP,
+        BigDecimal interestRatePct
 ) {
 }

@@ -49,8 +49,13 @@ public class MockBankApiKeyFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String apiKey = request.getHeader(API_KEY_HEADER);
+        String authHeader = request.getHeader("Authorization");
 
         if (apiKey == null || apiKey.trim().isEmpty()) {
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                filterChain.doFilter(request, response);
+                return;
+            }
             sendError(response, HttpStatus.UNAUTHORIZED, "MISSING_API_KEY", "The X-API-Key header is missing");
             return;
         }

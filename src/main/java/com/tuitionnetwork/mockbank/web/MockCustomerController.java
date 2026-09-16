@@ -21,7 +21,10 @@ public class MockCustomerController {
     }
 
     @GetMapping
-    public ResponseEntity<CustomerLookupResponse> lookupCustomer(@RequestParam("national_id") String nationalId) {
+    public ResponseEntity<CustomerLookupResponse> lookupCustomer(
+            @RequestParam(value = "national_id", required = false) String national_id,
+            @RequestParam(value = "nationalId", required = false) String nationalIdParam) {
+        String nationalId = national_id != null && !national_id.isBlank() ? national_id : nationalIdParam;
         if (nationalId == null || nationalId.length() != 14 || !nationalId.matches("\\d+")) {
             throw new MockBankException(HttpStatus.BAD_REQUEST, "INVALID_NATIONAL_ID", "Invalid national ID format");
         }

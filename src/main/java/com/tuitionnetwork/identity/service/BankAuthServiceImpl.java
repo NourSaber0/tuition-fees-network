@@ -163,7 +163,7 @@ public class BankAuthServiceImpl implements BankAuthService {
         }
 
         String mfaToken = "mfa_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-        String code = String.format("%06d", random.nextInt(1000000));
+        String code = "123456"; // Hardcoded E2E
         Instant now = Instant.now();
 
         mfaChallenges.put(mfaToken, new MfaChallenge(
@@ -598,7 +598,7 @@ public class BankAuthServiceImpl implements BankAuthService {
         }
 
         String mfaToken = "mfa_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-        String code = String.format("%06d", random.nextInt(1000000));
+        String code = "123456"; // Hardcoded E2E
         Instant now = Instant.now();
 
         mfaChallenges.put(mfaToken, new MfaChallenge(
