@@ -224,6 +224,11 @@ public class DemoDataSeeder implements CommandLineRunner {
         Guardian ahmed = new Guardian(ahmedHmac, "enc_" + ahmedNid, "Ahmed Tarek Mahmoud", "ahmed.tarek@example.com", "01009876543", "Password123!", true);
         ahmed = guardianRepository.save(ahmed);
 
+        String nourNid = "30103222103442";
+        String nourHmac = identityResolverService.computeHmacSha256(nourNid);
+        Guardian nour = new Guardian(nourHmac, "enc_" + nourNid, "Nour Khaled Fahmy", "nour.khaled@example.com", "01001234568", "Password123!", true);
+        nour = guardianRepository.save(nour);
+
         // 4. Students
         String saraNid = "31205150101042";
         Student sara = new Student(mona.getId(), nile.getId(), identityResolverService.computeHmacSha256(saraNid), "enc_" + saraNid, "Sara Ahmed", LocalDate.of(2012, 5, 15));
@@ -380,6 +385,9 @@ public class DemoDataSeeder implements CommandLineRunner {
         n2.setReadFlag(false);
         backOfficeNotificationRepository.save(n2);
 
+        // 9.5 Cairo International School & Students (School Portal Demo)
+        seedCairoInternationalSchool();
+
         // 10. Audit Log
         AuditLog audit = new AuditLog(
                 null,
@@ -395,5 +403,142 @@ public class DemoDataSeeder implements CommandLineRunner {
                 "System"
         );
         auditLogRepository.save(audit);
+    }
+
+    private void seedCairoInternationalSchool() {
+        if (institutionRepository.findByCode("SCH-001").isPresent()) {
+            return;
+        }
+
+        Institution cis = new Institution("Cairo International School", "SCH-001", "SCHOOL_ABSORBS");
+        cis.setInstitutionType(InstitutionType.SCHOOL);
+        cis.setSubType("International");
+        cis.setCity("Cairo");
+        cis.setPrincipalName("Dr. Hassan Mostafa");
+        cis.setPhone("+20 2 2516 0000");
+        cis.setEmail("info@cis.edu.eg");
+        cis.setRegistrationNumber("MOEDU-SCH-2024-0112");
+        cis.setStudentCount(850);
+        cis.setRegistrationStatus(RegistrationStatus.APPROVED);
+        cis.setAccountStatus(AccountStatus.ACTIVE);
+        cis.setIntegrationStatus(IntegrationStatus.INTEGRATED);
+        cis = institutionRepository.save(cis);
+
+        // Admins
+        InstitutionAdmin adminHassan = new InstitutionAdmin(cis.getId(), "Dr. Hassan Mostafa", "hassan.mostafa@cis.edu.eg", "Password123!", "School Admin");
+        institutionAdminRepository.save(adminHassan);
+
+        InstitutionAdmin adminAmr = new InstitutionAdmin(cis.getId(), "Amr Hassan", "amr.hassan@cis.edu.eg", "Password123!", "School Admin");
+        institutionAdminRepository.save(adminAmr);
+
+        InstitutionAdmin financeDina = new InstitutionAdmin(cis.getId(), "Dina Fouad", "dina.fouad@cis.edu.eg", "Finance@2026", "School Finance");
+        institutionAdminRepository.save(financeDina);
+
+        // 10 Active Students matching Figma screenshot exactly:
+        // STU-001: Ahmed Hassan (Grade 10) - Total: 54,000 | Paid: 36,000 | Outstanding: 18,000
+        seedCisStudent(cis, "STU-001", "Ahmed Hassan", "Grade 10", "A", "Hassan Ahmed", "+20 10 1234 5678", "hassan.ahmed@example.com", "Active", null, null, 54000, 36000);
+
+        // STU-002: Sara Mohamed (Grade 8) - Total: 54,000 | Paid: 54,000 | Outstanding: 0
+        seedCisStudent(cis, "STU-002", "Sara Mohamed", "Grade 8", "B", "Mohamed Tarek", "+20 10 2345 6789", "m.tarek@example.com", "Active", null, null, 54000, 54000);
+
+        // STU-003: Omar Ali (Grade 11) - Total: 54,000 | Paid: 18,000 | Outstanding: 36,000
+        seedCisStudent(cis, "STU-003", "Omar Ali", "Grade 11", "A", "Ali Mostafa", "+20 10 3456 7890", "ali.mostafa@example.com", "Active", null, null, 54000, 18000);
+
+        // STU-004: Nadia Saleh (Grade 7) - Total: 48,000 | Paid: 48,000 | Outstanding: 0
+        seedCisStudent(cis, "STU-004", "Nadia Saleh", "Grade 7", "C", "Saleh Ibrahim", "+20 10 4567 8901", "saleh.ibrahim@example.com", "Active", null, null, 48000, 48000);
+
+        // STU-005: Fatma Khalil (Grade 9) - Total: 54,000 | Paid: 27,000 | Outstanding: 27,000
+        seedCisStudent(cis, "STU-005", "Fatma Khalil", "Grade 9", "B", "Khalil Mahmoud", "+20 10 5678 9012", "khalil.m@example.com", "Active", null, null, 54000, 27000);
+
+        // STU-006: Yousef Adel (Grade 10) - Total: 50,000 | Paid: 25,000 | Outstanding: 25,000
+        seedCisStudent(cis, "STU-006", "Yousef Adel", "Grade 10", "B", "Adel Mostafa", "+20 10 6789 0123", "adel.mostafa@example.com", "Active", null, null, 50000, 25000);
+
+        // STU-007: Laila Samir (Grade 8) - Total: 52,000 | Paid: 52,000 | Outstanding: 0
+        seedCisStudent(cis, "STU-007", "Laila Samir", "Grade 8", "A", "Samir Fathy", "+20 10 7890 1234", "samir.fathy@example.com", "Active", null, null, 52000, 52000);
+
+        // STU-008: Karim Mahmoud (Grade 12) - Total: 60,000 | Paid: 40,000 | Outstanding: 20,000
+        seedCisStudent(cis, "STU-008", "Karim Mahmoud", "Grade 12", "A", "Mahmoud Nabil", "+20 10 8901 2345", "m.nabil@example.com", "Active", null, null, 60000, 40000);
+
+        // STU-009: Mona Khaled (Grade 11) - Total: 54,000 | Paid: 36,000 | Outstanding: 18,000
+        seedCisStudent(cis, "STU-009", "Mona Khaled", "Grade 11", "C", "Khaled Fahmy", "+20 10 9012 3456", "khaled.fahmy@example.com", "Active", null, null, 54000, 36000);
+
+        // STU-010: Tarek Ibrahim (Grade 9) - Total: 48,000 | Paid: 48,000 | Outstanding: 0
+        seedCisStudent(cis, "STU-010", "Tarek Ibrahim", "Grade 9", "B", "Ibrahim Youssef", "+20 10 0123 4567", "ibrahim.y@example.com", "Active", null, null, 48000, 48000);
+
+        // 1 Deactivated Student:
+        // STU-011: Nour Kamal (Grade 8) - Inactive, Reason: "Withdrawn by Guardian"
+        seedCisStudent(cis, "STU-011", "Nour Kamal", "Grade 8", "A", "Kamal Nour", "+20 10 1122 3344", "kamal.nour@example.com", "Inactive", LocalDate.of(2026, 7, 14), "Withdrawn by Guardian", 30000, 30000);
+        
+        log.info("Seeded Cairo International School with Dr. Hassan Mostafa, 10 active students, and 1 deactivated student.");
+    }
+
+    private void seedCisStudent(Institution cis, String studentRef, String name, String grade, String section,
+                                String parentName, String parentPhone, String parentEmail,
+                                String status, LocalDate deactDate, String deactReason,
+                                int totalAmount, int paidAmount) {
+        String rawNid = "30" + UUID.randomUUID().toString().replaceAll("[^0-9]", "");
+        if (rawNid.length() < 14) {
+            rawNid = String.format("%-14s", rawNid).replace(' ', '1');
+        } else if (rawNid.length() > 14) {
+            rawNid = rawNid.substring(0, 14);
+        }
+        String nidHash = identityResolverService.computeHmacSha256(rawNid);
+        String nidEnc = "enc_" + rawNid;
+
+        // Guardian
+        String guardianHmac = identityResolverService.computeHmacSha256(parentEmail);
+        Guardian guardian = guardianRepository.findByEmail(parentEmail).orElseGet(() -> {
+            Guardian g = new Guardian(guardianHmac, "enc_" + parentEmail, parentName, parentEmail, parentPhone, "Password123!", true);
+            return guardianRepository.save(g);
+        });
+
+        Student student = new Student(
+                guardian.getId(),
+                cis.getId(),
+                nidHash,
+                nidEnc,
+                name,
+                LocalDate.of(2012, 1, 1),
+                studentRef,
+                grade,
+                section,
+                parentName,
+                parentPhone,
+                parentEmail
+        );
+        student.setStatus(status);
+        student.setDeactivatedDate(deactDate);
+        student.setDeactivationReason(deactReason);
+        student = studentRepository.save(student);
+
+        BigDecimal totalBd = new BigDecimal(totalAmount);
+        BigDecimal paidBd = new BigDecimal(paidAmount);
+        BigDecimal remainingBd = totalBd.subtract(paidBd);
+
+        if (paidBd.compareTo(BigDecimal.ZERO) > 0 && remainingBd.compareTo(BigDecimal.ZERO) > 0) {
+            FeeLine term1 = new FeeLine(cis.getId(), student.getId(), FeeType.TUITION, paidBd, BigDecimal.ZERO, "Term 1 · 2026", LocalDate.now().minusMonths(3));
+            term1.setPaidAmount(paidBd);
+            term1.setStatus(FeeStatus.PAID);
+            term1.setRowIdempotencyKey("SEED-CIS-" + studentRef + "-T1");
+            feeLineRepository.save(term1);
+
+            FeeLine term2 = new FeeLine(cis.getId(), student.getId(), FeeType.TUITION, remainingBd, remainingBd, "Term 2 · 2026", LocalDate.now().plusDays(20));
+            term2.setPaidAmount(BigDecimal.ZERO);
+            term2.setStatus(FeeStatus.OUTSTANDING);
+            term2.setRowIdempotencyKey("SEED-CIS-" + studentRef + "-T2");
+            feeLineRepository.save(term2);
+        } else if (remainingBd.compareTo(BigDecimal.ZERO) == 0) {
+            FeeLine fullYear = new FeeLine(cis.getId(), student.getId(), FeeType.TUITION, totalBd, BigDecimal.ZERO, "Annual · 2026", LocalDate.now().minusMonths(4));
+            fullYear.setPaidAmount(totalBd);
+            fullYear.setStatus(FeeStatus.PAID);
+            fullYear.setRowIdempotencyKey("SEED-CIS-" + studentRef + "-FULL");
+            feeLineRepository.save(fullYear);
+        } else {
+            FeeLine fullYear = new FeeLine(cis.getId(), student.getId(), FeeType.TUITION, totalBd, totalBd, "Annual · 2026", LocalDate.now().plusDays(15));
+            fullYear.setPaidAmount(BigDecimal.ZERO);
+            fullYear.setStatus(FeeStatus.OUTSTANDING);
+            fullYear.setRowIdempotencyKey("SEED-CIS-" + studentRef + "-UNPAID");
+            feeLineRepository.save(fullYear);
+        }
     }
 }

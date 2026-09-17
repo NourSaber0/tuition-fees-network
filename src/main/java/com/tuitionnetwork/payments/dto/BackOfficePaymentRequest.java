@@ -18,6 +18,7 @@ public record BackOfficePaymentRequest(
         @NotNull(message = "method is required")
         String method,
 
+        String sourceId,          // e.g. "acc_mona_current", "card_mona_visa"
         String creditPaymentType, // "full" or "epp"
         Integer eppTenor,         // required if creditPaymentType == "epp"
         String cardToken,

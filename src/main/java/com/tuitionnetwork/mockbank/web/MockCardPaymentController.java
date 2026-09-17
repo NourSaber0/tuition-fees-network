@@ -41,7 +41,7 @@ public class MockCardPaymentController {
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
             Optional<CardPaymentResponse> cached = store.getIdempotentPayment(idempotencyKey);
             if (cached.isPresent()) {
-                return ResponseEntity.status(HttpStatus.CREATED).body(cached.get());
+                return ResponseEntity.status(HttpStatus.OK).body(cached.get());
             }
         }
 
@@ -76,26 +76,26 @@ public class MockCardPaymentController {
                     Map.of("fields", Map.of("amount.value", "must be positive")));
         }
 
-        // Test card specific decline triggers
-        if ("4000000000000002".equals(cardNumber)) {
-            throw new MockBankException(HttpStatus.PAYMENT_REQUIRED, "CARD_DECLINED", "Insufficient funds", Map.of("response_code", "51"));
-        }
-        if ("4000000000009995".equals(cardNumber)) {
-            throw new MockBankException(HttpStatus.PAYMENT_REQUIRED, "CARD_DECLINED", "Do not honour", Map.of("response_code", "05"));
-        }
-        if ("4000000000000101".equals(cardNumber)) {
-            throw new MockBankException(HttpStatus.PAYMENT_REQUIRED, "CARD_DECLINED", "Incorrect CVV", Map.of("response_code", "82"));
-        }
-        if ("4000000000000119".equals(cardNumber)) {
-            throw new MockBankException(HttpStatus.BAD_GATEWAY, "ISSUER_UNAVAILABLE", "Issuer unavailable — safe to retry", Map.of("response_code", "91"));
-        }
-        if ("4000000000000077".equals(cardNumber) && amount.compareTo(new BigDecimal("10000")) > 0) {
-            throw new MockBankException(HttpStatus.PAYMENT_REQUIRED, "CARD_DECLINED", "Transaction limit exceeded (max 10,000 EGP)", Map.of("response_code", "51"));
-        }
-
         String paymentId = "pay_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
         String cardType = CardLib.detectCardType(cardNumber);
         String maskedNumber = CardLib.maskCardNumber(cardNumber);
+
+        // Test card specific decline triggers
+        if ("4000000000000002".equals(cardNumber)) {
+            throwDecline(HttpStatus.PAYMENT_REQUIRED, "CARD_DECLINED", "Insufficient funds", "51", amount, maskedNumber, scheme, cardType, idempotencyKey, paymentId);
+        }
+        if ("4000000000009995".equals(cardNumber)) {
+            throwDecline(HttpStatus.PAYMENT_REQUIRED, "CARD_DECLINED", "Do not honour", "05", amount, maskedNumber, scheme, cardType, idempotencyKey, paymentId);
+        }
+        if ("4000000000000101".equals(cardNumber)) {
+            throwDecline(HttpStatus.PAYMENT_REQUIRED, "CARD_DECLINED", "Incorrect CVV", "82", amount, maskedNumber, scheme, cardType, idempotencyKey, paymentId);
+        }
+        if ("4000000000000119".equals(cardNumber)) {
+            throwDecline(HttpStatus.BAD_GATEWAY, "ISSUER_UNAVAILABLE", "Issuer unavailable — safe to retry", "91", amount, maskedNumber, scheme, cardType, idempotencyKey, paymentId);
+        }
+        if ("4000000000000077".equals(cardNumber) && amount.compareTo(new BigDecimal("10000")) > 0) {
+            throwDecline(HttpStatus.PAYMENT_REQUIRED, "CARD_DECLINED", "Transaction limit exceeded (max 10,000 EGP)", "51", amount, maskedNumber, scheme, cardType, idempotencyKey, paymentId);
+        }
 
         // 3-D Secure card test case
         if ("4000000000003220".equals(cardNumber)) {
@@ -109,7 +109,8 @@ public class MockCardPaymentController {
                     null,
                     null,
                     "00",
-                    "3-D Secure authentication required"
+                    "3-D Secure authentication required",
+                    null
             );
             store.savePayment(response3ds);
             return ResponseEntity.ok(response3ds);
@@ -131,7 +132,8 @@ public class MockCardPaymentController {
                 authCode,
                 rrn,
                 "00",
-                "Approved"
+                "Approved",
+                null
         );
 
         store.savePayment(response);
@@ -171,7 +173,8 @@ public class MockCardPaymentController {
                 authCode,
                 rrn,
                 "00",
-                "Approved"
+                "Approved",
+                existing.eppPlanId()
         );
 
         store.savePayment(confirmed);
@@ -202,7 +205,8 @@ public class MockCardPaymentController {
                 existing.authCode(),
                 existing.rrn(),
                 existing.responseCode(),
-                "Captured"
+                "Captured",
+                existing.eppPlanId()
         );
 
         store.savePayment(captured);
@@ -217,7 +221,7 @@ public class MockCardPaymentController {
         CardPaymentResponse existing = store.getPayment(paymentId)
                 .orElseThrow(() -> new MockBankException(HttpStatus.NOT_FOUND, "PAYMENT_NOT_FOUND", "Payment not found: " + paymentId));
 
-        if (!"CAPTURED".equals(existing.status())) {
+        if (!"CAPTURED".equals(existing.status()) && !"PARTIALLY_REFUNDED".equals(existing.status())) {
             throw new MockBankException(HttpStatus.CONFLICT, "INVALID_PAYMENT_STATE", "Cannot refund payment that is not captured");
         }
 
@@ -234,7 +238,8 @@ public class MockCardPaymentController {
                 existing.authCode(),
                 existing.rrn(),
                 existing.responseCode(),
-                "Refunded " + refundAmt + " EGP"
+                "Refunded " + refundAmt + " EGP",
+                existing.eppPlanId()
         );
 
         store.savePayment(refunded);
@@ -260,7 +265,8 @@ public class MockCardPaymentController {
                 existing.authCode(),
                 existing.rrn(),
                 existing.responseCode(),
-                "Voided"
+                "Voided",
+                existing.eppPlanId()
         );
 
         store.savePayment(voided);
@@ -277,5 +283,18 @@ public class MockCardPaymentController {
     @GetMapping
     public ResponseEntity<List<CardPaymentResponse>> listPayments(@RequestParam(value = "status", required = false) String status) {
         return ResponseEntity.ok(store.listPayments(status));
+    }
+
+    private void throwDecline(HttpStatus status, String code, String message, String responseCode, BigDecimal amount, String maskedNumber, String scheme, String cardType, String idempotencyKey, String paymentId) {
+        CardPaymentResponse response = new CardPaymentResponse(
+                paymentId, "DECLINED", false, amount, BigDecimal.ZERO,
+                new CardPaymentResponse.CardInfo(maskedNumber, scheme, cardType),
+                null, null, responseCode, message, null
+        );
+        store.savePayment(response);
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            store.saveIdempotentPayment(idempotencyKey, response);
+        }
+        throw new MockBankException(status, code, message, Map.of("response_code", responseCode, "payment_id", paymentId));
     }
 }

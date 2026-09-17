@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
+
 import { useRouter } from "next/navigation";
+
 import { useAuth, isSchoolRole } from "@tuition/api-client";
+
 import {
   PortalShell,
   LoadingSpinner,
@@ -19,6 +22,7 @@ import {
   type PortalNavItem,
 } from "@tuition/ui";
 
+import CIBAssistant from "../components/CIBAssistant";
 const NAV_ITEMS: PortalNavItem[] = [
   { id: "dashboard", label: "Dashboard", href: "/school/dashboard", Icon: DashboardIcon },
   { id: "students", label: "Students", href: "/school/students", Icon: UserIcon },
@@ -37,21 +41,33 @@ const ROLE_LABELS: Record<string, string> = {
   "school-finance": "School Finance",
 };
 
-export default function SchoolLayout({ children }: { children: React.ReactNode }) {
+export default function SchoolLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const router = useRouter();
   const { status, user, logout } = useAuth();
 
   useEffect(() => {
     if (status === "unauthenticated") {
       router.replace("/login");
-    } else if (status === "authenticated" && user && !isSchoolRole(user.role)) {
+    } else if (
+      status === "authenticated" &&
+      user &&
+      !isSchoolRole(user.role)
+    ) {
       // Defense in depth only - the backend's @PreAuthorize is what actually
       // blocks a bank account from calling school endpoints.
       router.replace("/login");
     }
   }, [status, user, router]);
 
-  if (status !== "authenticated" || !user || !isSchoolRole(user.role)) {
+  if (
+    status !== "authenticated" ||
+    !user ||
+    !isSchoolRole(user.role)
+  ) {
     return (
       <div className="flex flex-1 items-center justify-center">
         <LoadingSpinner />
@@ -59,19 +75,37 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
     );
   }
 
-  const navItems = NAV_ITEMS.filter((item) => user.permissions.includes(item.id));
+  const navItems = NAV_ITEMS.filter((item) =>
+    user.permissions.includes(item.id)
+  );
+
+  const assistantRole =
+    user.role === "school-admin"
+      ? "School Admin"
+      : "School Finance";
 
   return (
     <PortalShell
       brandLabel={user.schoolName ?? "School Portal"}
       navItems={navItems}
-      user={{ name: user.name, initials: user.initials ?? "??", roleLabel: ROLE_LABELS[user.role] ?? user.role }}
+      user={{
+        name: user.name,
+        initials: user.initials ?? "??",
+        roleLabel: ROLE_LABELS[user.role] ?? user.role,
+      }}
       onLogout={() => {
         logout();
         router.replace("/login");
       }}
     >
       {children}
+
+      <CIBAssistant
+        currentUserRole={assistantRole}
+        navigate={(page) => {
+          router.push(`/school/${page}`);
+        }}
+      />
     </PortalShell>
   );
 }

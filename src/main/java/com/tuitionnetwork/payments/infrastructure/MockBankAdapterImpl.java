@@ -5,6 +5,8 @@ import com.tuitionnetwork.payments.domain.PaymentStatus;
 import com.tuitionnetwork.payments.spi.BankGatewayAdapterInterface;
 import com.tuitionnetwork.payments.spi.EppPlanResponse;
 import com.tuitionnetwork.payments.spi.GatewayResponse;
+import com.tuitionnetwork.payments.spi.GatewayResponse;
+import com.tuitionnetwork.settings.service.SettingsService;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -12,6 +14,12 @@ import java.util.UUID;
 
 @Component
 public class MockBankAdapterImpl implements BankGatewayAdapterInterface {
+
+    private final SettingsService settingsService;
+
+    public MockBankAdapterImpl(SettingsService settingsService) {
+        this.settingsService = settingsService;
+    }
 
     @Override
     public GatewayResponse chargeCard(BigDecimal amount, String idempotencyKey) {
@@ -27,7 +35,7 @@ public class MockBankAdapterImpl implements BankGatewayAdapterInterface {
 
     @Override
     public EppPlanResponse generateEppSchedule(BigDecimal principal, int tenorMonths) {
-        EppPricing.Quote quote = EppPricing.calculate(principal, tenorMonths);
+        EppPricing.Quote quote = EppPricing.calculate(principal, tenorMonths, settingsService.getEpp());
 
         return new EppPlanResponse(
                 quote.principal(),

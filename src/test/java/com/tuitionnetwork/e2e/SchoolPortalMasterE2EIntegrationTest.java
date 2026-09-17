@@ -117,6 +117,12 @@ public class SchoolPortalMasterE2EIntegrationTest {
     private PaymentRepository paymentRepository;
 
     @Autowired
+    private com.tuitionnetwork.payments.repository.EppInstallmentRepository eppInstallmentRepository;
+
+    @Autowired
+    private com.tuitionnetwork.payments.repository.EPPScheduleRepository eppScheduleRepository;
+
+    @Autowired
     private PaymentAllocationRepository paymentAllocationRepository;
 
     @Autowired
@@ -183,6 +189,8 @@ public class SchoolPortalMasterE2EIntegrationTest {
         runRepository.deleteAll();
         paymentAllocationRepository.deleteAll();
         receiptRepository.deleteAll();
+        eppInstallmentRepository.deleteAll();
+        eppScheduleRepository.deleteAll();
         paymentRepository.deleteAll();
         notificationRepository.deleteAll();
         feeLineRepository.deleteAll();

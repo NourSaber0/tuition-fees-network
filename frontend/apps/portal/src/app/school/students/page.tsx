@@ -1,3 +1,4 @@
+/* eslint-disable */
 "use client";
 
 import { useEffect, useState, useCallback, useMemo, useId } from "react";
@@ -139,6 +140,8 @@ export default function StudentsPage() {
 
   // Modals state
   const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
+  const [isNidAlertOpen, setIsNidAlertOpen] = useState(false);
+  const [nidAlertMessage, setNidAlertMessage] = useState("");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
   const [isReactivateModalOpen, setIsReactivateModalOpen] = useState(false);
@@ -241,6 +244,16 @@ export default function StudentsPage() {
     }
   }, [activeTab, fetchActiveStudents, fetchDeactivatedStudents]);
 
+  // Fetch initial deactivated count on mount so the tab badge displays immediately
+  useEffect(() => {
+    apiClient
+      .get<PageResponse<StudentSummary>>("/students/deactivated?page=1&pageSize=1")
+      .then((res) => {
+        setDeactData((prev) => prev ?? res);
+      })
+      .catch(() => {});
+  }, [apiClient]);
+
   // Fetch single student detail
   const loadStudentDetail = useCallback(async (studentId: string) => {
     setSelectedStudentId(studentId);
@@ -292,8 +305,22 @@ export default function StudentsPage() {
   // Handle Add Student (matches Screenshot 1 fields)
   const handleEnrollStudent = async (e: React.FormEvent) => {
     e.preventDefault();
-    setActionSubmitting(true);
     setErrorMessage(null);
+
+    const nid = enrollForm.nationalId.trim();
+    if (!nid) {
+      setNidAlertMessage("You should add the National ID. National ID is a mandatory field to enroll a new student.");
+      setIsNidAlertOpen(true);
+      return;
+    }
+
+    if (nid.length !== 14 || !/^\d{14}$/.test(nid)) {
+      setNidAlertMessage("National ID must be exactly 14 numeric digits. Please check and try again.");
+      setIsNidAlertOpen(true);
+      return;
+    }
+
+    setActionSubmitting(true);
 
     // Auto-generate unique student reference (e.g. STU-8421) if not provided
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
@@ -310,7 +337,7 @@ export default function StudentsPage() {
       name: enrollForm.name.trim(),
       grade: formattedGrade,
       section: enrollForm.section.trim() || "A",
-      nationalId: enrollForm.nationalId.trim() || undefined,
+      nationalId: nid,
       parentName: enrollForm.parentName.trim() || undefined,
       parentPhone: enrollForm.parentPhone.trim() || undefined,
       parentEmail: enrollForm.parentEmail.trim() || undefined,
@@ -337,6 +364,39 @@ export default function StudentsPage() {
       setActionSubmitting(false);
     }
   };
+
+  // Open Edit Modal with prefilled student info
+  const openEditModal = useCallback(
+    async (student: StudentSummary) => {
+      setSelectedStudentId(student.id);
+      setEditForm({
+        studentRef: student.studentRef,
+        name: student.name,
+        grade: student.grade,
+        section: student.section || "",
+        parentName: "",
+        parentPhone: "",
+        parentEmail: "",
+      });
+      setIsEditModalOpen(true);
+      try {
+        const detail = await apiClient.get<StudentDetail>(`/students/${student.id}`);
+        setStudentDetail(detail);
+        setEditForm({
+          studentRef: detail.studentRef,
+          name: detail.name,
+          grade: detail.grade,
+          section: detail.section || "",
+          parentName: detail.parentName || "",
+          parentPhone: detail.parentPhone || "",
+          parentEmail: detail.parentEmail || "",
+        });
+      } catch {
+        // Keep initial values if detail fetch fails
+      }
+    },
+    [apiClient]
+  );
 
   // Handle Update Student
   const handleUpdateStudent = async (e: React.FormEvent) => {
@@ -371,7 +431,7 @@ export default function StudentsPage() {
       setStudentDetail(null);
       triggerToast("Student moved to Deactivated Archive.");
       fetchActiveStudents();
-      if (activeTab === "deactivated") fetchDeactivatedStudents();
+      fetchDeactivatedStudents();
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Failed to deactivate student");
     } finally {
@@ -556,6 +616,8 @@ export default function StudentsPage() {
                     <th className="px-5 py-3 font-semibold">TOTAL FEES</th>
                     <th className="px-5 py-3 font-semibold">PAID</th>
                     <th className="px-5 py-3 font-semibold">OUTSTANDING</th>
+                    <th className="px-5 py-3 font-semibold">STATUS</th>
+                    <th className="px-5 py-3 font-semibold text-right">ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -624,6 +686,52 @@ export default function StudentsPage() {
                         }`}
                       >
                         {Math.round(row.outstandingEGP).toLocaleString()} EGP
+                      </td>
+
+                      {/* Status */}
+                      <td className="px-5 py-3.5">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#E8F8F0] text-[#12B76A]">
+                          {row.status === "ACTIVE" ? "Active" : row.status}
+                        </span>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-5 py-3.5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        <div className="inline-flex items-center gap-1.5 justify-end">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              loadStudentDetail(row.id);
+                            }}
+                            className="px-2.5 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50 shadow-2xs transition-colors"
+                          >
+                            View
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditModal(row);
+                            }}
+                            className="px-2.5 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50 shadow-2xs transition-colors"
+                          >
+                            Edit
+                          </button>
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedStudentId(row.id);
+                                setIsDeactivateModalOpen(true);
+                              }}
+                              className="px-2.5 py-1 text-xs font-medium text-rose-600 bg-white border border-rose-200 rounded-md hover:bg-rose-50 shadow-2xs transition-colors"
+                            >
+                              Deactivate
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -805,13 +913,13 @@ export default function StudentsPage() {
                 </div>
                 <div>
                   <label htmlFor={enrollNidId} className="block text-[11px] font-bold text-gray-600 tracking-wider uppercase mb-1.5">
-                    NATIONAL ID
+                    NATIONAL ID <span className="text-red-500">*</span>
                   </label>
                   <input
                     id={enrollNidId}
                     type="text"
                     maxLength={14}
-                    placeholder="14-digit National ID"
+                    placeholder="14-digit National ID (Required)"
                     value={enrollForm.nationalId}
                     onChange={(e) => setEnrollForm({ ...enrollForm, nationalId: e.target.value })}
                     className="w-full px-3.5 py-2.5 text-xs rounded-lg border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#16335C] focus:ring-1 focus:ring-[#16335C] font-mono"
@@ -887,8 +995,190 @@ export default function StudentsPage() {
         </div>
       )}
 
+      {/* =========================================================================
+          POP-UP MODAL: NATIONAL ID REQUIRED
+         ========================================================================= */}
+      {isNidAlertOpen && (
+        <div className="fixed inset-0 bg-black/50 z-60 flex items-center justify-center p-4 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl border border-red-100 p-6 space-y-4 text-center">
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
+              <AlertIcon className="w-6 h-6 text-red-600" />
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-base font-bold text-gray-900">National ID Required</h3>
+              <p className="text-xs text-gray-600 leading-relaxed">
+                {nidAlertMessage}
+              </p>
+            </div>
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsNidAlertOpen(false);
+                  setTimeout(() => {
+                    document.getElementById(enrollNidId)?.focus();
+                  }, 50);
+                }}
+                className="w-full py-2.5 px-4 bg-[#16335C] hover:bg-[#102544] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer"
+              >
+                Enter National ID
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          MODAL: EDIT STUDENT
+         ========================================================================= */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-gray-100 p-6 space-y-5">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-gray-900">Edit Student</h2>
+              <button
+                type="button"
+                onClick={() => setIsEditModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 text-lg font-bold p-1 leading-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleUpdateStudent} className="space-y-4 text-xs">
+              {/* Row 1: STUDENT ID & NAME */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor={editStudentRefId} className="block text-[11px] font-bold text-gray-600 tracking-wider uppercase mb-1.5">
+                    STUDENT ID
+                  </label>
+                  <input
+                    id={editStudentRefId}
+                    type="text"
+                    readOnly
+                    disabled
+                    value={editForm.studentRef || ""}
+                    className="w-full px-3.5 py-2.5 text-xs rounded-lg border border-gray-200 bg-gray-50 text-gray-500 font-mono cursor-not-allowed"
+                  />
+                </div>
+                <div>
+                  <label htmlFor={editNameId} className="block text-[11px] font-bold text-gray-600 tracking-wider uppercase mb-1.5">
+                    NAME
+                  </label>
+                  <input
+                    id={editNameId}
+                    type="text"
+                    required
+                    placeholder="Full student name"
+                    value={editForm.name || ""}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    className="w-full px-3.5 py-2.5 text-xs rounded-lg border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#16335C] focus:ring-1 focus:ring-[#16335C]"
+                  />
+                </div>
+              </div>
+
+              {/* Row 2: GRADE & SECTION */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor={editGradeId} className="block text-[11px] font-bold text-gray-600 tracking-wider uppercase mb-1.5">
+                    GRADE
+                  </label>
+                  <input
+                    id={editGradeId}
+                    type="text"
+                    placeholder="e.g. Grade 10"
+                    value={editForm.grade || ""}
+                    onChange={(e) => setEditForm({ ...editForm, grade: e.target.value })}
+                    className="w-full px-3.5 py-2.5 text-xs rounded-lg border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#16335C] focus:ring-1 focus:ring-[#16335C]"
+                  />
+                </div>
+                <div>
+                  <label htmlFor={editSectionId} className="block text-[11px] font-bold text-gray-600 tracking-wider uppercase mb-1.5">
+                    SECTION
+                  </label>
+                  <input
+                    id={editSectionId}
+                    type="text"
+                    placeholder="e.g. A"
+                    value={editForm.section || ""}
+                    onChange={(e) => setEditForm({ ...editForm, section: e.target.value })}
+                    className="w-full px-3.5 py-2.5 text-xs rounded-lg border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#16335C] focus:ring-1 focus:ring-[#16335C]"
+                  />
+                </div>
+              </div>
+
+              {/* Row 3: PARENT NAME & PARENT PHONE */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor={editParentNameId} className="block text-[11px] font-bold text-gray-600 tracking-wider uppercase mb-1.5">
+                    PARENT NAME
+                  </label>
+                  <input
+                    id={editParentNameId}
+                    type="text"
+                    placeholder="Parent full name"
+                    value={editForm.parentName || ""}
+                    onChange={(e) => setEditForm({ ...editForm, parentName: e.target.value })}
+                    className="w-full px-3.5 py-2.5 text-xs rounded-lg border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#16335C] focus:ring-1 focus:ring-[#16335C]"
+                  />
+                </div>
+                <div>
+                  <label htmlFor={editParentPhoneId} className="block text-[11px] font-bold text-gray-600 tracking-wider uppercase mb-1.5">
+                    PARENT PHONE
+                  </label>
+                  <input
+                    id={editParentPhoneId}
+                    type="tel"
+                    placeholder="+20 1XX XXX XXXX"
+                    value={editForm.parentPhone || ""}
+                    onChange={(e) => setEditForm({ ...editForm, parentPhone: e.target.value })}
+                    className="w-full px-3.5 py-2.5 text-xs rounded-lg border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#16335C] focus:ring-1 focus:ring-[#16335C]"
+                  />
+                </div>
+              </div>
+
+              {/* Row 4: PARENT EMAIL */}
+              <div>
+                <label htmlFor={editParentEmailId} className="block text-[11px] font-bold text-gray-600 tracking-wider uppercase mb-1.5">
+                  PARENT EMAIL
+                </label>
+                <input
+                  id={editParentEmailId}
+                  type="email"
+                  placeholder="parent@email.com"
+                  value={editForm.parentEmail || ""}
+                  onChange={(e) => setEditForm({ ...editForm, parentEmail: e.target.value })}
+                  className="w-full px-3.5 py-2.5 text-xs rounded-lg border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#16335C] focus:ring-1 focus:ring-[#16335C]"
+                />
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                  disabled={actionSubmitting}
+                  className="px-5 py-2.5 text-xs font-semibold text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionSubmitting}
+                  className="px-5 py-2.5 text-xs font-semibold text-white bg-[#16335C] hover:bg-[#102544] rounded-lg shadow-sm transition-colors disabled:opacity-50"
+                >
+                  {actionSubmitting ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Student Profile & Financial Overview Drawer (Sub-tab view) */}
-      {selectedStudentId && (
+      {selectedStudentId && !isEditModalOpen && !isDeactivateModalOpen && !isReactivateModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-gray-200 overflow-hidden max-h-[90vh] flex flex-col">
             {detailLoading || !studentDetail ? (

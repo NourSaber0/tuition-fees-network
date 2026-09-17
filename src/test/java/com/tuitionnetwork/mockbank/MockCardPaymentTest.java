@@ -107,7 +107,7 @@ class MockCardPaymentTest {
                         .header("Idempotency-Key", "IDEM-ABC-123")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated())
+                .andExpect(status().isOk())
                 .andReturn();
 
         String paymentId2 = objectMapper.readTree(secondResult.getResponse().getContentAsString()).get("payment_id").asText();

@@ -33,6 +33,8 @@ public class MockBankApiKeyFilter extends OncePerRequestFilter {
         // Only filter mock banking endpoints
         boolean isMockBankPath = path.startsWith("/api/v1/moi")
                 || path.startsWith("/api/v1/payments/cards")
+                || path.equals("/api/v1/customers")
+                || path.startsWith("/api/v1/backoffice/payments")
                 || path.equals("/api/v1/epp/quotes")
                 || (path.equals("/api/v1/epp") && ("POST".equalsIgnoreCase(request.getMethod()) || "GET".equalsIgnoreCase(request.getMethod())))
                 || (path.startsWith("/api/v1/epp/") && !path.startsWith("/api/v1/epp/plans") && !path.startsWith("/api/v1/epp/summary") && !path.startsWith("/api/v1/epp/quote") && !path.startsWith("/api/v1/epp/cards"))
@@ -47,9 +49,14 @@ public class MockBankApiKeyFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String apiKey = request.getHeader(API_KEY_HEADER);
+        String authHeader = request.getHeader("Authorization");
 
         if (apiKey == null || apiKey.trim().isEmpty()) {
-            sendError(response, HttpStatus.UNAUTHORIZED, "MISSING_API_KEY", "The X-API-Key header is missing or empty");
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+            sendError(response, HttpStatus.UNAUTHORIZED, "MISSING_API_KEY", "The X-API-Key header is missing");
             return;
         }
 

@@ -12,6 +12,7 @@ public final class CardBinClassifier {
                clean.startsWith("5078") ||
                clean.startsWith("5888") ||
                clean.startsWith("6703") ||
+               clean.startsWith("400005") ||
                clean.startsWith("400000") ||
                clean.startsWith("4023") ||
                clean.startsWith("5000");

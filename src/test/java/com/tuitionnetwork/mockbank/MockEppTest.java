@@ -59,20 +59,20 @@ class MockEppTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.amount", is(24000)))
                 .andExpect(jsonPath("$.currency", is("EGP")))
-                .andExpect(jsonPath("$.quotes", hasSize(5)))
+                .andExpect(jsonPath("$.options", hasSize(5)))
                 // 3 months (0% rate, 0 admin fee, 8000 monthly)
-                .andExpect(jsonPath("$.quotes[0].tenor_months", is(3)))
-                .andExpect(jsonPath("$.quotes[0].annual_rate").value(0))
-                .andExpect(jsonPath("$.quotes[0].admin_fee").value(0))
-                .andExpect(jsonPath("$.quotes[0].total_payable", is(24000.0)))
-                .andExpect(jsonPath("$.quotes[0].monthly_installment", is(8000.0)))
+                .andExpect(jsonPath("$.options[0].tenor_months", is(3)))
+                .andExpect(jsonPath("$.options[0].annual_rate").value(0))
+                .andExpect(jsonPath("$.options[0].admin_fee").value(0))
+                .andExpect(jsonPath("$.options[0].total_payable", is(24000.0)))
+                .andExpect(jsonPath("$.options[0].monthly_installment", is(8000.0)))
                 // 12 months (14% rate, 240 admin fee, 3360 interest, 27600 total, 2300 monthly)
-                .andExpect(jsonPath("$.quotes[2].tenor_months", is(12)))
-                .andExpect(jsonPath("$.quotes[2].annual_rate", is(0.14)))
-                .andExpect(jsonPath("$.quotes[2].interest_amount", is(3360.0)))
-                .andExpect(jsonPath("$.quotes[2].admin_fee", is(240.0)))
-                .andExpect(jsonPath("$.quotes[2].total_payable", is(27600.0)))
-                .andExpect(jsonPath("$.quotes[2].monthly_installment", is(2300.0)));
+                .andExpect(jsonPath("$.options[2].tenor_months", is(12)))
+                .andExpect(jsonPath("$.options[2].annual_rate", is(0.14)))
+                .andExpect(jsonPath("$.options[2].interest_amount", is(3360.0)))
+                .andExpect(jsonPath("$.options[2].admin_fee", is(240.0)))
+                .andExpect(jsonPath("$.options[2].total_payable", is(27600.0)))
+                .andExpect(jsonPath("$.options[2].monthly_installment", is(2300.0)));
     }
 
     @Test
@@ -97,7 +97,7 @@ class MockEppTest {
         String paymentId = objectMapper.readTree(payResult.getResponse().getContentAsString()).get("payment_id").asText();
 
         // Step 2: Create EPP Plan
-        EppCreateRequest eppReq = new EppCreateRequest(paymentId, null, null, 12, "Tuition Plan");
+        EppCreateRequest eppReq = new EppCreateRequest(paymentId, null, null, null, 12, "Tuition Plan");
 
         MvcResult eppResult = mockMvc.perform(post("/api/v1/epp")
                         .header("X-API-Key", API_KEY)
@@ -157,7 +157,7 @@ class MockEppTest {
         String paymentId = objectMapper.readTree(payResult.getResponse().getContentAsString()).get("payment_id").asText();
 
         // Attempt EPP creation on Debit card
-        EppCreateRequest eppReq = new EppCreateRequest(paymentId, null, null, 12, "Tuition Plan");
+        EppCreateRequest eppReq = new EppCreateRequest(paymentId, null, null, null, 12, "Tuition Plan");
 
         mockMvc.perform(post("/api/v1/epp")
                         .header("X-API-Key", API_KEY)
@@ -187,7 +187,7 @@ class MockEppTest {
 
         String paymentId = objectMapper.readTree(payResult.getResponse().getContentAsString()).get("payment_id").asText();
 
-        EppCreateRequest eppReq = new EppCreateRequest(paymentId, null, null, 6, "Fees");
+        EppCreateRequest eppReq = new EppCreateRequest(paymentId, null, null, null, 6, "Fees");
 
         mockMvc.perform(post("/api/v1/epp")
                         .header("X-API-Key", API_KEY)

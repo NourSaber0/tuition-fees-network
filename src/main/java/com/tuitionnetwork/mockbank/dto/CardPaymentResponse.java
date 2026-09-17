@@ -15,7 +15,8 @@ public record CardPaymentResponse(
         @JsonProperty("auth_code") String authCode,
         @JsonProperty("rrn") String rrn,
         @JsonProperty("response_code") String responseCode,
-        @JsonProperty("response_message") String responseMessage
+        @JsonProperty("response_message") String responseMessage,
+        @JsonProperty("epp_plan_id") String eppPlanId
 ) {
     public record CardInfo(
             @JsonProperty("masked_number") String maskedNumber,

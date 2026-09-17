@@ -7,7 +7,7 @@ import java.util.List;
 public record EppQuoteResponse(
         @JsonProperty("amount") BigDecimal amount,
         @JsonProperty("currency") String currency,
-        @JsonProperty("quotes") List<QuoteItem> quotes
+        @JsonProperty("options") List<QuoteItem> quotes
 ) {
     public record QuoteItem(
             @JsonProperty("tenor_months") int tenorMonths,

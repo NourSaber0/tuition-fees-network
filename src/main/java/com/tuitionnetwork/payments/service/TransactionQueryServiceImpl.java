@@ -70,6 +70,9 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
     private final ReceiptRepository receiptRepository;
     private final FeeDeadlineService feeDeadlineService;
 
+    @Autowired(required = false)
+    private com.tuitionnetwork.mockbank.store.MockBankStore mockBankStore;
+
     @Autowired
     public TransactionQueryServiceImpl(PaymentRepository paymentRepository,
                                        FeeLineRepository feeLineRepository,
@@ -375,6 +378,23 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
 
             auditCustomerSearch(masked);
             return new CustomerFeesResponse(customer, feeDtos);
+        }
+
+        // 3. Check Bank Customer
+        if (mockBankStore != null) {
+            Optional<com.tuitionnetwork.mockbank.dto.CustomerLookupResponse> bankCustOpt = mockBankStore.getCustomerByNationalId(nationalId);
+            if (bankCustOpt.isPresent()) {
+                com.tuitionnetwork.mockbank.dto.CustomerLookupResponse bankCust = bankCustOpt.get();
+                CustomerDto customer = new CustomerDto(
+                        bankCust.fullNameEn(),
+                        masked,
+                        "CIB Bank Customer",
+                        "Bank Account",
+                        "—"
+                );
+                auditCustomerSearch(masked);
+                return new CustomerFeesResponse(customer, List.of());
+            }
         }
 
         throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Customer not found for National ID: " + masked);

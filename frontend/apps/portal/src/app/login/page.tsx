@@ -18,9 +18,6 @@ const PASS_REQS = [
 const STRENGTH_LABEL = ["", "Weak", "Weak", "Fair", "Good", "Strong"];
 const STRENGTH_COLOR = ["", "#EF4444", "#EF4444", "#F59E0B", "#22C55E", "#003087"];
 
-const S_BASE = { borderColor: "#DDE4EE", background: "#FAFBFD" };
-const S_FOCUS = { borderColor: "#003087", background: "#FAFBFD", boxShadow: "0 0 0 3px rgba(0,48,135,0.10)" };
-
 function InputField({
   type = "text",
   value,
@@ -38,7 +35,6 @@ function InputField({
   icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   right?: React.ReactNode;
 }) {
-  const [focused, setFocused] = useState(false);
   return (
     <div className="relative">
       {Icon && <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300 pointer-events-none" />}
@@ -48,10 +44,8 @@ function InputField({
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={onKeyDown}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        className={`w-full border rounded-lg text-sm text-gray-700 placeholder-gray-300 focus:outline-none transition-colors py-2.5 ${Icon ? "pl-9" : "px-3"} ${right ? "pr-10" : "pr-4"}`}
-        style={focused ? S_FOCUS : S_BASE}
+        className={`w-full border border-[#DDE4EE] bg-[#FAFBFD] rounded-lg text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:border-[#003087] focus:ring-2 focus:ring-[#003087]/15 transition-colors py-2.5 ${Icon ? "pl-9" : "px-3"} ${right ? "pr-10" : "pr-4"}`}
+        suppressHydrationWarning
       />
       {right && <div className="absolute right-3 top-1/2 -translate-y-1/2">{right}</div>}
     </div>
@@ -77,14 +71,8 @@ function PrimaryBtn({
       type={type}
       onClick={onClick}
       disabled={off}
-      className="w-full font-semibold py-2.5 rounded-lg text-sm text-white transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-      style={{ background: "#003087" }}
-      onMouseEnter={(e) => {
-        if (!off) (e.currentTarget as HTMLButtonElement).style.background = "#002060";
-      }}
-      onMouseLeave={(e) => {
-        if (!off) (e.currentTarget as HTMLButtonElement).style.background = "#003087";
-      }}
+      className="w-full font-semibold py-2.5 rounded-lg text-sm text-white transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed bg-[#003087] hover:bg-[#002060]"
+      suppressHydrationWarning
     >
       {loading ? (
         <>
@@ -100,7 +88,7 @@ function PrimaryBtn({
 
 function ErrorBanner({ msg }: { msg: string }) {
   return (
-    <div className="flex items-center gap-2 rounded-lg px-3 py-2.5 mb-4 text-sm" style={{ background: "#FEF2F2", border: "1px solid #FCA5A5", color: "#B91C1C" }}>
+    <div className="flex items-center gap-2 rounded-lg px-3 py-2.5 mb-4 text-sm bg-red-50 border border-red-300 text-red-700" suppressHydrationWarning>
       <XCircleIcon className="w-4 h-4 shrink-0" />
       {msg}
     </div>
@@ -109,7 +97,7 @@ function ErrorBanner({ msg }: { msg: string }) {
 
 function SuccessBanner({ msg }: { msg: string }) {
   return (
-    <div className="flex items-center gap-2 rounded-lg px-3 py-2.5 mb-4 text-sm" style={{ background: "#ECFDF5", border: "1px solid #6EE7B7", color: "#065F46" }}>
+    <div className="flex items-center gap-2 rounded-lg px-3 py-2.5 mb-4 text-sm bg-emerald-50 border border-emerald-300 text-emerald-800" suppressHydrationWarning>
       <CheckCircleIcon className="w-4 h-4 shrink-0" />
       {msg}
     </div>
@@ -118,7 +106,7 @@ function SuccessBanner({ msg }: { msg: string }) {
 
 function AuthCard({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl p-8" style={{ background: "#FFFFFF", border: "1px solid #DDE4EE", boxShadow: "0 4px 24px rgba(0,48,135,0.07)" }}>
+    <div className="rounded-2xl p-8 bg-white border border-[#DDE4EE] shadow-[0_4px_24px_rgba(0,48,135,0.07)]" suppressHydrationWarning>
       {children}
     </div>
   );
@@ -126,7 +114,7 @@ function AuthCard({ children }: { children: React.ReactNode }) {
 
 function FieldLabel({ children }: { children: string }) {
   return (
-    <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "#6B7A8D" }}>
+    <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5 text-[#6B7A8D]" suppressHydrationWarning>
       {children}
     </label>
   );
@@ -136,10 +124,8 @@ function BackButton({ onClick, label = "Back to sign in" }: { onClick: () => voi
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-1 text-xs mb-6 transition-colors"
-      style={{ color: "#aab5c4" }}
-      onMouseEnter={(e) => (e.currentTarget.style.color = "#6B7A8D")}
-      onMouseLeave={(e) => (e.currentTarget.style.color = "#aab5c4")}
+      className="flex items-center gap-1 text-xs mb-6 transition-colors text-[#aab5c4] hover:text-[#6B7A8D]"
+      suppressHydrationWarning
     >
       <ChevronLeftIcon className="w-3.5 h-3.5" />
       {label}
@@ -152,9 +138,8 @@ function EyeToggle({ shown, onClick }: { shown: boolean; onClick: () => void }) 
     <button
       type="button"
       onClick={onClick}
-      style={{ color: "#aab5c4" }}
-      onMouseEnter={(e) => (e.currentTarget.style.color = "#6B7A8D")}
-      onMouseLeave={(e) => (e.currentTarget.style.color = "#aab5c4")}
+      className="text-[#aab5c4] hover:text-[#6B7A8D] transition-colors"
+      suppressHydrationWarning
     >
       <EyeIcon className="w-4 h-4" />
       <span className="sr-only">{shown ? "Hide password" : "Show password"}</span>
@@ -167,15 +152,25 @@ export default function LoginPage() {
   const { login, verifyMfa, resendMfa, trustDevice, forgotPassword, resetPassword } = useAuth();
 
   const [state, setState] = useState<LoginState>("credentials");
-  const [username, setUsername] = useState(() =>
-    typeof window !== "undefined" ? window.localStorage.getItem("tuition.auth.rememberedUsername") ?? "" : ""
-  );
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(() =>
-    typeof window !== "undefined" ? window.localStorage.getItem("tuition.auth.rememberedUsername") !== null : false
-  );
+  const [rememberMe, setRememberMe] = useState(false);
   const [rememberDevice, setRememberDevice] = useState(false);
+
+  // Sync remembered username on client mount without triggering synchronous effect render
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (typeof window !== "undefined") {
+        const remembered = window.localStorage.getItem("tuition.auth.rememberedUsername");
+        if (remembered) {
+          setUsername((prev) => prev || remembered);
+          setRememberMe(true);
+        }
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
 
   const [forgotEmail, setForgotEmail] = useState("");
   const [resetToken, setResetToken] = useState("");
@@ -381,41 +376,39 @@ export default function LoginPage() {
       onKeyDown={(e) => handleOtpKeyDown(i, e)}
       onPaste={(e) => handleOtpPaste(e, i)}
       disabled={otpExpired}
-      className="w-full h-12 text-center text-lg font-bold border rounded-lg focus:outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-      style={{
-        borderColor: digit ? "#003087" : "#DDE4EE",
-        color: "#003087",
-        background: digit ? "#EBF1FB" : "#FAFBFD",
-        boxShadow: digit ? "0 0 0 2px rgba(0,48,135,0.12)" : "none",
-      }}
+      className={`w-full h-12 text-center text-lg font-bold border rounded-lg focus:outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed text-[#003087] ${
+        digit ? "border-[#003087] bg-[#EBF1FB] ring-2 ring-[#003087]/15" : "border-[#DDE4EE] bg-[#FAFBFD]"
+      }`}
+      suppressHydrationWarning
     />
   ));
 
   return (
-    <div className="min-h-full flex flex-1" style={{ background: "#F4F6F9" }}>
+    <div className="min-h-full flex flex-1 bg-[#F4F6F9]" suppressHydrationWarning>
       {/* Left branding panel - ported from the Figma export's Login.tsx */}
-      <div className="hidden lg:flex w-[44%] flex-col relative overflow-hidden" style={{ background: "#003087" }}>
+      <div className="hidden lg:flex w-[44%] flex-col relative overflow-hidden bg-[#003087]" suppressHydrationWarning>
         <div
-          className="absolute inset-0 opacity-[0.035]"
+          className="absolute inset-0 opacity-[0.035] pointer-events-none"
           style={{
             backgroundImage: "repeating-linear-gradient(45deg,#F7941D 0,#F7941D 1px,transparent 0,transparent 50%)",
             backgroundSize: "28px 28px",
           }}
+          suppressHydrationWarning
         />
-        <div className="absolute bottom-0 left-0 right-0 h-2/5" style={{ background: "linear-gradient(to top, #002060, transparent)" }} />
+        <div className="absolute bottom-0 left-0 right-0 h-2/5 bg-gradient-to-t from-[#002060] to-transparent pointer-events-none" suppressHydrationWarning />
         <div className="relative z-10 flex flex-col h-full p-12">
-          <div className="mb-auto" style={{ width: "fit-content" }}>
-            <Image src="/cib-logo.png" alt="CIB" width={220} height={92} style={{ height: 48, width: "auto", objectFit: "contain" }} priority />
+          <div className="mb-auto w-fit">
+            <Image src="/cib-logo.png" alt="CIB" width={220} height={92} className="h-12 w-auto object-contain" priority />
           </div>
           <div className="mb-auto mt-12">
             <h1 className="text-[2.1rem] font-light text-white leading-tight mb-4">
               School Payments
               <br />
-              <span className="font-bold" style={{ color: "#F7941D" }}>
+              <span className="font-bold text-[#F7941D]">
                 Tuition Network Portal
               </span>
             </h1>
-            <p className="text-sm leading-relaxed max-w-xs" style={{ color: "rgba(255,255,255,0.52)" }}>
+            <p className="text-sm leading-relaxed max-w-xs text-white/50">
               One sign-in for CIB Back-Office staff and School Portal admins alike - your account decides which portal
               you land in, not a screen you pick.
             </p>
@@ -426,11 +419,11 @@ export default function LoginPage() {
               { label: "Daily Collection", value: "EGP 2.4M" },
               { label: "Success Rate", value: "98.2%" },
             ].map((s) => (
-              <div key={s.label} className="rounded-xl p-4" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.10)" }}>
-                <div className="font-bold text-xl" style={{ color: "#F7941D" }}>
+              <div key={s.label} className="rounded-xl p-4 bg-white/[0.07] border border-white/10" suppressHydrationWarning>
+                <div className="font-bold text-xl text-[#F7941D]">
                   {s.value}
                 </div>
-                <div className="text-xs mt-1" style={{ color: "rgba(255,255,255,0.42)" }}>
+                <div className="text-xs mt-1 text-white/40">
                   {s.label}
                 </div>
               </div>
@@ -442,8 +435,8 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-sm">
           <div className="flex lg:hidden items-center gap-2 justify-center mb-8">
-            <Image src="/cib-logo.png" alt="CIB" width={140} height={58} style={{ height: 36, width: "auto", objectFit: "contain" }} />
-            <span className="font-bold text-base" style={{ color: "#003087" }}>
+            <Image src="/cib-logo.png" alt="CIB" width={140} height={58} className="h-9 w-auto object-contain" />
+            <span className="font-bold text-base text-[#003087]">
               Tuition Network
             </span>
           </div>
@@ -451,10 +444,10 @@ export default function LoginPage() {
           {state === "credentials" && (
             <AuthCard>
               <div className="mb-7">
-                <h2 className="text-xl font-bold" style={{ color: "#003087" }}>
+                <h2 className="text-xl font-bold text-[#003087]">
                   Sign in to your account
                 </h2>
-                <p className="text-sm mt-1" style={{ color: "#6B7A8D" }}>
+                <p className="text-sm mt-1 text-[#6B7A8D]">
                   Authorized personnel only
                 </p>
               </div>
@@ -497,12 +490,11 @@ export default function LoginPage() {
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
-                      className="w-3.5 h-3.5"
-                      style={{ accentColor: "#003087" }}
+                      className="w-3.5 h-3.5 accent-[#003087]"
                       checked={rememberMe}
                       onChange={(e) => setRememberMe(e.target.checked)}
                     />
-                    <span className="text-xs" style={{ color: "#6B7A8D" }}>
+                    <span className="text-xs text-[#6B7A8D]">
                       Remember me
                     </span>
                   </label>
@@ -512,20 +504,17 @@ export default function LoginPage() {
                       setState("forgot");
                       setError("");
                     }}
-                    className="text-xs font-semibold transition-colors"
-                    style={{ color: "#003087" }}
-                    onMouseEnter={(e) => (e.currentTarget.style.color = "#F7941D")}
-                    onMouseLeave={(e) => (e.currentTarget.style.color = "#003087")}
+                    className="text-xs font-semibold text-[#003087] hover:text-[#F7941D] transition-colors"
                   >
                     Forgot password?
                   </button>
                 </div>
                 <PrimaryBtn type="submit" label={loading ? "Signing in..." : "Sign In"} loading={loading} />
               </form>
-              <p className="text-center text-[10px] mt-5" style={{ color: "#C4CDDA" }}>
-                Demo - Bank: <span className="font-mono">mohamed.ali@cibeg.com / CIB@2026</span>
+              <p className="text-center text-[10px] mt-5 text-[#aab5c4]">
+                Demo - Bank: <span className="font-mono text-gray-600">mohamed.ali@cibeg.com / CIB@2026</span>
                 <br />
-                Demo - School: <span className="font-mono">admin@nis.edu.eg / Password123!</span>
+                Demo - School: <span className="font-mono text-gray-600">admin@nis.edu.eg / Password123!</span>
               </p>
             </AuthCard>
           )}
@@ -542,16 +531,16 @@ export default function LoginPage() {
                 label="Back"
               />
               <div className="mb-7">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4" style={{ background: "#EBF1FB" }}>
-                  <KeyIcon className="w-6 h-6" style={{ color: "#003087" }} />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 bg-[#EBF1FB]">
+                  <KeyIcon className="w-6 h-6 text-[#003087]" />
                 </div>
-                <h2 className="text-xl font-bold" style={{ color: "#003087" }}>
+                <h2 className="text-xl font-bold text-[#003087]">
                   Two-factor verification
                 </h2>
-                <p className="text-sm mt-1" style={{ color: "#6B7A8D" }}>
+                <p className="text-sm mt-1 text-[#6B7A8D]">
                   Enter the 6-digit code sent to {otpHint || "your registered device"}
                 </p>
-                <p className="text-xs mt-2 font-mono" style={{ color: "#aab5c4" }}>
+                <p className="text-xs mt-2 font-mono text-[#aab5c4]">
                   Demo code: 123456
                 </p>
               </div>
@@ -568,12 +557,11 @@ export default function LoginPage() {
                 <label className="flex items-center gap-2 cursor-pointer mb-4">
                   <input
                     type="checkbox"
-                    className="w-3.5 h-3.5"
-                    style={{ accentColor: "#003087" }}
+                    className="w-3.5 h-3.5 accent-[#003087]"
                     checked={rememberDevice}
                     onChange={(e) => setRememberDevice(e.target.checked)}
                   />
-                  <span className="text-xs" style={{ color: "#6B7A8D" }}>
+                  <span className="text-xs text-[#6B7A8D]">
                     Remember this device for 30 days
                   </span>
                 </label>
@@ -584,16 +572,13 @@ export default function LoginPage() {
                   <button
                     onClick={handleResend}
                     disabled={loading}
-                    className="text-xs font-semibold transition-colors disabled:opacity-50"
-                    style={{ color: "#003087" }}
-                    onMouseEnter={(e) => (e.currentTarget.style.color = "#F7941D")}
-                    onMouseLeave={(e) => (e.currentTarget.style.color = "#003087")}
+                    className="text-xs font-semibold text-[#003087] hover:text-[#F7941D] transition-colors disabled:opacity-50"
                   >
                     Resend OTP
                   </button>
                 ) : (
-                  <span className="text-xs font-semibold tabular-nums" style={{ color: "#aab5c4" }}>
-                    Resend OTP <span style={{ color: "#6B7A8D" }}>({fmt(countdown)})</span>
+                  <span className="text-xs font-semibold tabular-nums text-[#aab5c4]">
+                    Resend OTP <span className="text-[#6B7A8D]">({fmt(countdown)})</span>
                   </span>
                 )}
               </div>
@@ -609,10 +594,10 @@ export default function LoginPage() {
                 }}
               />
               <div className="mb-7">
-                <h2 className="text-xl font-bold" style={{ color: "#003087" }}>
+                <h2 className="text-xl font-bold text-[#003087]">
                   Reset your password
                 </h2>
-                <p className="text-sm mt-1" style={{ color: "#6B7A8D" }}>
+                <p className="text-sm mt-1 text-[#6B7A8D]">
                   Enter your email and we&apos;ll send a reset link
                 </p>
               </div>
@@ -645,13 +630,13 @@ export default function LoginPage() {
           {state === "sent" && (
             <AuthCard>
               <div className="text-center">
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5" style={{ background: "#ECFDF5" }}>
-                  <CheckCircleIcon className="w-7 h-7" style={{ color: "#059669" }} />
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5 bg-emerald-50">
+                  <CheckCircleIcon className="w-7 h-7 text-emerald-600" />
                 </div>
-                <h2 className="text-xl font-bold mb-2" style={{ color: "#003087" }}>
+                <h2 className="text-xl font-bold mb-2 text-[#003087]">
                   Check your email
                 </h2>
-                <p className="text-sm mb-6" style={{ color: "#6B7A8D" }}>
+                <p className="text-sm mb-6 text-[#6B7A8D]">
                   A reset link was sent to <strong className="text-gray-700">{forgotEmail}</strong>. This environment
                   doesn&apos;t deliver real email yet - the reset token is written to the backend&apos;s server log
                   instead of an inbox.
@@ -661,14 +646,11 @@ export default function LoginPage() {
                     setState("reset");
                     setError("");
                   }}
-                  className="w-full font-semibold py-2.5 rounded-lg text-sm transition-all mb-3"
-                  style={{ background: "#EBF1FB", color: "#003087", border: "1px solid rgba(0,48,135,0.15)" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "#D6E4F5")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "#EBF1FB")}
+                  className="w-full font-semibold py-2.5 rounded-lg text-sm transition-all mb-3 bg-[#EBF1FB] text-[#003087] border border-[#003087]/15 hover:bg-[#D6E4F5]"
                 >
                   I have the reset token →
                 </button>
-                <button onClick={() => setState("credentials")} className="text-sm font-semibold transition-colors" style={{ color: "#003087" }}>
+                <button onClick={() => setState("credentials")} className="text-sm font-semibold text-[#003087] transition-colors">
                   Back to sign in
                 </button>
               </div>
@@ -684,13 +666,13 @@ export default function LoginPage() {
                 }}
               />
               <div className="mb-6">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4" style={{ background: "#EBF1FB" }}>
-                  <LockIcon className="w-6 h-6" style={{ color: "#003087" }} />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 bg-[#EBF1FB]">
+                  <LockIcon className="w-6 h-6 text-[#003087]" />
                 </div>
-                <h2 className="text-xl font-bold" style={{ color: "#003087" }}>
+                <h2 className="text-xl font-bold text-[#003087]">
                   Set new password
                 </h2>
-                <p className="text-sm mt-1" style={{ color: "#6B7A8D" }}>
+                <p className="text-sm mt-1 text-[#6B7A8D]">
                   Choose a new secure password for your account
                 </p>
               </div>
@@ -748,31 +730,32 @@ export default function LoginPage() {
                     right={<EyeToggle shown={showConfPw} onClick={() => setShowConfPw(!showConfPw)} />}
                   />
                   {confirmPass && newPassword !== confirmPass && (
-                    <p className="text-[11px] mt-1" style={{ color: "#EF4444" }}>
+                    <p className="text-[11px] mt-1 text-red-500">
                       Passwords do not match
                     </p>
                   )}
                   {confirmPass && newPassword === confirmPass && (
-                    <p className="text-[11px] mt-1" style={{ color: "#059669" }}>
+                    <p className="text-[11px] mt-1 text-emerald-600">
                       Passwords match ✓
                     </p>
                   )}
                 </div>
 
-                <div className="rounded-lg p-3" style={{ background: "#F8FAFD", border: "1px solid #E8EDF5" }}>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "#6B7A8D" }}>
+                <div className="rounded-lg p-3 bg-[#F8FAFD] border border-[#E8EDF5]">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-2 text-[#6B7A8D]">
                     Password requirements
                   </p>
                   <div className="space-y-1.5">
                     {PASS_REQS.map((req, idx) => {
                       const met = reqResults[idx];
                       return (
-                        <div key={idx} className="flex items-center gap-2 text-xs" style={{ color: met ? "#059669" : "#9CA3AF" }}>
+                        <div key={idx} className={`flex items-center gap-2 text-xs ${met ? "text-emerald-600" : "text-gray-400"}`}>
                           <span
-                            className="w-4 h-4 rounded-full flex items-center justify-center shrink-0"
-                            style={{ background: met ? "#ECFDF5" : "#F3F4F6", border: `1px solid ${met ? "#A7F3D0" : "#E5E7EB"}` }}
+                            className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${
+                              met ? "bg-emerald-50 border border-emerald-200 text-emerald-600" : "bg-gray-100 border border-gray-200"
+                            }`}
                           >
-                            {met ? <CheckIcon className="w-2.5 h-2.5" style={{ color: "#059669" }} /> : <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#D1D5DB" }} />}
+                            {met ? <CheckIcon className="w-2.5 h-2.5" /> : <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />}
                           </span>
                           {req.label}
                         </div>
@@ -789,13 +772,13 @@ export default function LoginPage() {
           {state === "reset-success" && (
             <AuthCard>
               <div className="text-center">
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5" style={{ background: "#ECFDF5" }}>
-                  <CheckCircleIcon className="w-7 h-7" style={{ color: "#059669" }} />
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5 bg-emerald-50">
+                  <CheckCircleIcon className="w-7 h-7 text-emerald-600" />
                 </div>
-                <h2 className="text-xl font-bold mb-2" style={{ color: "#003087" }}>
+                <h2 className="text-xl font-bold mb-2 text-[#003087]">
                   Password reset successfully
                 </h2>
-                <p className="text-sm mb-6" style={{ color: "#6B7A8D" }}>
+                <p className="text-sm mb-6 text-[#6B7A8D]">
                   Your password has been updated. You can now sign in with your new credentials.
                 </p>
                 <PrimaryBtn
@@ -813,8 +796,8 @@ export default function LoginPage() {
             </AuthCard>
           )}
 
-          <p className="text-center text-[11px] mt-6" style={{ color: "#aab5c4" }}>
-            &copy; {new Date().getFullYear()} Commercial International Bank Egypt S.A.E &middot; Authorized Access Only
+          <p className="text-center text-[11px] mt-6 text-[#aab5c4]">
+            &copy; 2026 Commercial International Bank Egypt S.A.E &middot; Authorized Access Only
           </p>
         </div>
       </div>

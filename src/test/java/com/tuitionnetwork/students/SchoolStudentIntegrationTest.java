@@ -159,7 +159,7 @@ class SchoolStudentIntegrationTest {
         tokenFinanceA = jwtTokenProvider.generateToken(new SecurityUserPrincipal(
                 financeA.getId(), financeA.getEmail(), financeA.getName(),
                 UserRole.ROLE_SCHOOL_FINANCE,
-                List.of(UserRole.ROLE_SCHOOL_FINANCE, UserRole.ROLE_INSTITUTION_ADMIN),
+                List.of(UserRole.ROLE_SCHOOL_FINANCE),
                 schoolA.getId()
         ));
 

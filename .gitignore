@@ -39,3 +39,19 @@ node_modules/
 .pnpm-store/
 .turbo/
 .next/
+playwright-report/
+test-results/
+
+# Python
+venv/
+python_tests/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS / macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*

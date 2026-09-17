@@ -133,35 +133,75 @@ Each portal's `layout.tsx` also re-checks the role on every load (not just at lo
 **Endpoints:** `/reconciliation/summary`, `/reconciliation/runs`, `/reconciliation/exceptions`, `/reconciliation/exceptions/{id}` (PATCH, `/assign`) | **Size:** M
 - [ ] Summary counts, runs list, and exception management. Backend module is 100% merged and verified.
 
-### BO-P6 - EPP Plans
+### BO-P6 - EPP Plans ✅ DONE
 **Screen:** `EPP.tsx` -> `app/bank/epp/`
-**Endpoints:** `/epp/plans`, `/plans/{id}/schedule`, `/quote`, `/cards/validate`, `/plans` (create) | **Size:** M
+**Endpoints:** `/epp/summary`, `/epp/plans`, `/epp/plans/{id}`, `/epp/plans/{id}/schedule`, `/epp/quote`, `/epp/cards/validate` | **Size:** M
+- [x] List with KPI summary, search/status/tenor filters, real pagination.
+- [x] Create wizard adapted to the real backend contract: an EPP plan converts an EXISTING successful CIB credit-card payment (`sourcePaymentId`), it isn't a brand-new charge - so step 1 searches/selects an eligible payment instead of Figma's blank card+student form.
+- [x] Card validation via `/epp/cards/validate` (real BIN classifier, not Figma's demo BINs) and live pricing via `/epp/quote` (real backend rate: 0% for 3-month tenor, 14% flat p.a. otherwise, 1% admin fee capped at EGP 500).
+- [x] Detail view: real pricing breakdown, progress bars, and installment schedule (recorded installments where they exist, projected otherwise).
+- [x] Cancel Plan action via `PATCH /epp/plans/{id}`.
+- [x] Real business-rule errors (principal range, one plan per payment, max 2 plans/student, card/payment eligibility) mapped to readable messages instead of raw backend codes.
 
-### BO-P7 - Reports
+### BO-P7 - Reports ✅ DONE
 **Screen:** `Reports.tsx` -> `app/bank/reports/`
-**Endpoints:** `/reports/catalogue`, `/reports/generate`, `/reports/jobs/{id}[/download]`, `/reports/history` | **Size:** M
-- [ ] Bank Back-Office reports generate synchronously (`200 OK`) with immediate table preview and export.
+**Endpoints:** `/reports/catalogue`, `/reports/generate`, `/reports/jobs/{id}[/download]`, `/reports/history`, `/institutions` | **Size:** M
+- [x] Bank Back-Office reports generate synchronously (`200 OK`) with immediate table preview and export.
+- [x] Fully catalogue-driven: category tabs, per-report formats, context filters, and `available`/`unavailableReason` all come from `GET /reports/catalogue` - not Figma's hardcoded 12-report list (2 of Figma's "Deadlines" reports don't exist server-side and were dropped; nothing else was invented).
+- [x] Real filter value domains, not Figma's guesses: `FeeType` display names (Tuition / Bus subscription / Books & materials / Activities), `PaymentStatus` labels (Successful / Pending / Failed / Refunded), `PaymentMethod` labels (CIB Account / Credit Card / EPP). Reconciliation status is a free-text input since real run statuses aren't a fixed enum.
+- [x] Recent Reports history panel (`GET /reports/history`) with per-entry download.
+- [x] Backend currently only accepts `format=CSV` for real generation even though the catalogue advertises PDF/XLSX too - selecting a non-CSV format surfaces the backend's real rejection via a friendly mapped message instead of a raw error code.
 
-### BO-P8 - Notifications
+### BO-P8 - Notifications ✅ DONE
 **Screens:** `Notifications.tsx` + header bell in `PortalShell.tsx`
 **Endpoints:** `/notifications`, `/notifications/unread-count`, `/notifications/{id}/read`, `/notifications/read-all`, `/notifications/{id}` (DELETE) | **Size:** S
+- [x] Feed + type filter tabs driven by the real `NotifType` enum (`FAILED_PAYMENT`, `RECON_EXCEPTION`, `INSTITUTION_ISSUE`, `NEW_INSTITUTION`, `SYSTEM_ALERT` - only 5 values; Figma's invented "Deadline Warnings" 6th type doesn't exist server-side and was correctly dropped rather than faked).
+- [x] Mark read / mark all read / dismiss, all against the real endpoints.
+- [x] Action CTA navigates to `/bank/{action.screen}` using the real screen strings `BackOfficeNotificationPublisher` publishes (`transactions`, `reconciliation`, `schools`) - a generic template, not a hardcoded per-screen map, so it stays correct as new notification-producing screens are added.
+- [x] Header bell badge already wired from BO-P2/dashboard work.
+- Note: `GET /notifications/stream` (SSE) exists server-side for live push but wasn't wired up in this pass - the feed is poll/refetch on mutation, consistent with the rest of the app.
 
-### BO-P9 - Audit Logs
+### BO-P9 - Audit Logs ✅ DONE
 **Screen:** `AuditLogs.tsx` -> `app/bank/audit-logs/`
-**Endpoints:** `/audit-logs` (list/detail/stats/export) | **Size:** S
-- [ ] Backend module is 100% merged and verified (`AuditLogController.java`).
+**Endpoints:** `/audit-logs` (list/stats/roles/export) | **Size:** S
+- [x] Backend module is 100% merged and verified (`AuditLogController.java`).
+- [x] Filterable, expandable audit table (search/role/severity/date range), role dropdown driven by the real `GET /audit-logs/roles` rather than Figma's guessed role names.
+- [x] Severity stat bar matches the backend's real `stats()` semantics: computed from the date range only, unaffected by role/search/severity filters - same as Figma's own (unfiltered) severity counts, just backed by real data now.
+- [x] CSV export via `GET /audit-logs/export`.
+- [x] Verified live against real audit entries generated by earlier BO-P3/BO-P5/BO-P6/BO-P7/BO-P8 testing sessions, including the SHA-256-hashed NID recorded on `SEARCH_NATIONAL_ID` entries.
 
-### BO-P10 - Users & Roles
+### BO-P10 - Users & Roles ✅ DONE
 **Screen:** `Users.tsx` -> `app/bank/users/`
-**Endpoints:** `/users` (list/create/patch/activate/deactivate), `/roles` | **Size:** M
+**Endpoints:** `/users` (list/create/patch/activate/deactivate/reset-password), `/users/summary`, `/roles` | **Size:** M
+<<<<<<< HEAD
+- [x] Bank employee CRUD (add/edit/deactivate/reactivate), gated by `user.role === "bank-admin"` matching the backend's own permission model.
+- [x] Role Permissions panel driven by the real `GET /roles` (`BankRole` enum's actual route-segment permissions per role) rather than Figma's fictional text permission descriptions - verified live that switching to "Reconciliation" correctly shows only Dashboard/Reconciliation/Notifications checked.
+- [x] Reset Password action (`POST /users/{id}/reset-password`) - a real backend capability Figma's screen didn't include.
+- [x] Role-count summary cards from the real `GET /users/summary`.
+=======
+- [x] Bank employee CRUD gated by `user.role === "bank-admin"`, real role-permission matrix from `GET /roles`, Reset Password action. Branch `feat/bank-users-roles`, PR pending.
+>>>>>>> f0f18a4 (feat(bank): complete Deadline & Priority Badges (BO-P12))
 
-### BO-P11 - Settings
+### BO-P11 - Settings ✅ DONE
 **Screen:** `Settings.tsx` -> `app/bank/settings/`
 **Endpoints:** `/settings/fee-types` (list/create/patch), `/settings/payment-statuses`, `/settings/epp` (get/put), `/settings/notifications` (get/put), `/settings/institutions` (get/put) | **Size:** M
+<<<<<<< HEAD
+- [x] Fee Types: list + add + inline quick-toggle (taxable/active) + full edit form, all real DB-backed CRUD (Figma's table was fully static).
+- [x] Payment Statuses: all 6 real statuses (`PaymentStatusInfo.ALL`) - Figma only modeled 4, missing Refunded and Reversed.
+- [x] EPP Configuration: tenors, amount limits, per-tenor interest rates, a real separate admin-fee rate + cap (Figma only had one flat admin fee rate, no cap), require-approval, max plans/student - all persisted via `PUT /settings/epp` with the backend's real validation (min<max, ≥1 tenor enabled, 0-100% rates, etc.) surfaced inline.
+- [x] Notification Settings: event triggers + delivery channels, including a real editable "In-app" toggle (Figma hardcoded it always-on and disabled).
+- [x] School Configuration: toggles, upload limits, and allowed formats - verified live that unchecking all formats surfaces the backend's real "At least one upload format must be allowed" validation.
+- Note: `EppSettingsDto` is fully read/write and persisted, but per its own javadoc it isn't yet wired into `EppPricing`'s actual quote calculation (still hardcoded flat 14% p.a. / 0% for 3-month tenor) - a real backend gap to flag for BO-P6 follow-up, not something this ticket could or should paper over.
+=======
+- [x] All 5 tabs real and DB-persisted (fee types, payment statuses, EPP config, notification settings, school config). Branch `feat/bank-settings`, PR pending.
+>>>>>>> f0f18a4 (feat(bank): complete Deadline & Priority Badges (BO-P12))
 
-### BO-P12 - Payment Deadline, Priority & Late Penalty
+### BO-P12 - Payment Deadline, Priority & Late Penalty ✅ DONE
 **Screens:** `Transactions.tsx` deadline columns + `@tuition/ui/src/priority.ts` | **Size:** S
-- [ ] Backend returns `dueDate`, `priority`, `penaltyEGP`, `totalDueEGP`. Use presentational helpers from `@tuition/ui` (`dueDateLabel`, `PRIORITY_BADGE_CLASSES`).
+- [x] Backend returns `dueDate`, `priority`, `penaltyEGP`, `totalDueEGP`. Presentational helpers from `@tuition/ui` (`dueDateLabel`, `PRIORITY_BADGE_CLASSES`) were already correct and already wired into the dashboard queue and the transaction detail view.
+- [x] Audit found and fixed two real gaps: the transactions list's "DUE DATE & PRIORITY" column header promised a priority badge that was never actually rendered (added it), and the dashboard's 5 deadline KPI cards were static non-clickable divs despite the backend supporting `dueBucket=today|this-week|overdue` and `priority=URGENT|OVERDUE` transaction filters (made 4 of them real links into a pre-filtered Transactions view, with a "Filtered from dashboard" chip shown there).
+- [x] Verified live end-to-end: clicked each KPI card, confirmed the real API request carried the right filter param and the list matched.
+- Flagged separately (out of scope here): `PATCH /fees/{id}/due-date`, a real audited due-date-override action, has no frontend surface anywhere - needs design work since a payment can allocate across multiple fee lines. Branch `feat/bank-deadline-priority-badges`, PR pending.
 
 ---
 
@@ -256,16 +296,16 @@ Each portal's `layout.tsx` also re-checks the role on every load (not just at lo
 | **P0** | shared | Monorepo & foundation | M | ✅ Complete | Next.js 16, `@tuition/ui`, `@tuition/api-client`, config |
 | **AUTH** | shared | Sign-In & Role Routing | M | ✅ Complete | Shared `/login`, MFA OTP, role-based portal routing, CORS |
 | **BO-P2** | Bank | Dashboard | S | ✅ Complete | 9 KPIs, SVG trend chart, breakdown, recent transactions |
-| **BO-P3** | Bank | Institution Management | L | Ready | List, register, tabs (Students/Application/Integration) |
+| **BO-P3** | Bank | Institution Management | L | ✅ Complete | List, register, tabs (Students/Application/Integration) - Farida |
 | **BO-P4** | Bank | Transactions & Payments | L | Ready | Multi-step payment, receipt, idempotency |
-| **BO-P5** | Bank | Reconciliation | M | Ready | Runs, exceptions, summary counts |
-| **BO-P6** | Bank | EPP Plans | M | Ready | Plan schedule, card validation, quote |
-| **BO-P7** | Bank | Reports | M | Ready | Sync `200 OK` report generation & download |
-| **BO-P8** | Bank | Notifications | S | Ready | Unread badge, notification list & actions |
-| **BO-P9** | Bank | Audit Logs | S | Ready | Backend `AuditLogController` merged and ready |
-| **BO-P10** | Bank | Users & Roles | M | Ready | Bank employee CRUD and permissions |
-| **BO-P11** | Bank | Settings | M | Ready | Fee types, payment statuses, system settings |
-| **BO-P12** | Bank | Deadline / Priority / Penalty | S | Ready | UI priority badges in place; integrate in transaction lists |
+| **BO-P5** | Bank | Reconciliation | M | ✅ Complete | Runs, exceptions, summary counts - Farida |
+| **BO-P6** | Bank | EPP Plans | M | ✅ Complete | Plan schedule, card validation, quote, create wizard, cancel |
+| **BO-P7** | Bank | Reports | M | ✅ Complete | Catalogue-driven, sync `200 OK` generation, preview, history, download |
+| **BO-P8** | Bank | Notifications | S | ✅ Complete | Unread badge, notification feed, mark read, dismiss |
+| **BO-P9** | Bank | Audit Logs | S | ✅ Complete | Filterable/expandable table, real roles, stats, CSV export |
+| **BO-P10** | Bank | Users & Roles | M | ✅ Complete | Bank employee CRUD, real role permissions, reset password |
+| **BO-P11** | Bank | Settings | M | ✅ Complete | Fee types, payment statuses, EPP/notification/school config |
+| **BO-P12** | Bank | Deadline / Priority / Penalty | S | ✅ Complete | Priority badges completed in transaction list + dashboard KPI deep-links |
 | **SP-P2** | School | Dashboard | S | ⏳ In Progress | Shell & routing ready; dashboard widgets next |
 | **SP-P3** | School | Student Management | L | ✅ Complete | Active & deactivated roster, guardian linking |
 | **SP-P4** | School | Fee Management | L | Ready | Categorized fees, penalty snapshot, create/edit |

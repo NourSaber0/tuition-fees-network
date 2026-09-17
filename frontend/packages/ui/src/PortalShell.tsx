@@ -25,6 +25,9 @@ export interface PortalShellProps {
   user: PortalUser
   onLogout: () => void
   children: React.ReactNode
+  /** Where the header bell links to - typically the notifications nav item's href. */
+  notificationsHref?: string
+  unreadNotifications?: number
 }
 
 /**
@@ -34,13 +37,21 @@ export interface PortalShellProps {
  * navItems (callers filter by user.permissions), so this component itself
  * has no notion of roles.
  */
-export function PortalShell({ brandLabel, navItems, user, onLogout, children }: PortalShellProps) {
+export function PortalShell({
+  brandLabel,
+  navItems,
+  user,
+  onLogout,
+  children,
+  notificationsHref,
+  unreadNotifications = 0,
+}: PortalShellProps) {
   const pathname = usePathname()
   const active = navItems.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
   const title = active?.label ?? brandLabel
 
   return (
-    <div className="flex h-full overflow-hidden" style={{ background: 'var(--cib-bg)' }}>
+    <div className="flex-1 flex h-screen h-[100dvh] w-full overflow-hidden" style={{ background: 'var(--cib-bg)' }}>
       <aside className="w-60 flex flex-col shrink-0 h-full" style={{ background: 'var(--cib-blue)' }}>
         <div className="h-16 flex items-center px-5 shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <div className="flex items-center gap-2 select-none">
@@ -121,7 +132,7 @@ export function PortalShell({ brandLabel, navItems, user, onLogout, children }: 
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full overflow-hidden">
         <header
           className="h-16 flex items-center px-6 justify-between shrink-0"
           style={{ background: 'var(--cib-card)', borderBottom: '1px solid var(--cib-border)' }}
@@ -133,9 +144,24 @@ export function PortalShell({ brandLabel, navItems, user, onLogout, children }: 
             </span>
           </div>
           <div className="flex items-center gap-4">
-            <button className="relative p-2 rounded-lg transition-colors" style={{ color: 'var(--cib-text-muted)' }}>
+            <div className="text-right hidden sm:block">
+              <div className="text-xs" style={{ color: 'var(--cib-text-muted)' }}>
+                {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+              </div>
+              <div className="text-[10px] text-right" style={{ color: '#aab5c4' }}>
+                Cairo, Egypt &middot; EGP
+              </div>
+            </div>
+            <Link
+              href={notificationsHref ?? '#'}
+              className="relative p-2 rounded-lg transition-colors"
+              style={{ color: 'var(--cib-text-muted)' }}
+            >
               <BellIcon className="w-5 h-5" />
-            </button>
+              {unreadNotifications > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full" style={{ background: 'var(--cib-orange)' }} />
+              )}
+            </Link>
             <div className="w-px h-8" style={{ background: 'var(--cib-border)' }} />
             <div className="flex items-center gap-2">
               <div
@@ -156,8 +182,8 @@ export function PortalShell({ brandLabel, navItems, user, onLogout, children }: 
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto">
-          <div className="p-6 min-h-full">{children}</div>
+        <main className="flex-1 overflow-y-auto min-h-0 overscroll-contain">
+          <div className="p-6">{children}</div>
         </main>
       </div>
     </div>

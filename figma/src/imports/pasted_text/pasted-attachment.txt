@@ -1,0 +1,727 @@
+==================================================
+11. RECONCILIATION
+==================================================
+
+Do not break the existing reconciliation system.
+
+Reconciliation should continue comparing the actual payment amounts.
+
+If a payment includes a penalty, clearly distinguish:
+
+Original Fee
+Penalty
+Total Collected
+
+The penalty must not incorrectly appear as part of the original tuition/fee amount.
+
+==================================================
+12. EPP
+==================================================
+
+Do not automatically apply this 5% penalty to EPP installments unless the existing business rules explicitly support it.
+
+Instead, inspect the existing EPP implementation and make sure the deadline/priority system does not break EPP schedules.
+
+If an EPP installment has a due date, it can have its own deadline status and priority, but do not invent additional EPP penalty rules.
+
+==================================================
+13. ROLE-BASED ACCESS
+==================================================
+
+Keep the existing three bank roles:
+
+BANK_ADMIN
+BANK_OPERATIONS
+BANK_FINANCE
+
+Do NOT create a separate reconciliation role.
+
+Deadline and priority information can be viewed by authorized bank users.
+
+Payment/penalty actions must respect the existing role permissions.
+
+Do not bypass backend authorization.
+
+==================================================
+14. DATA MODEL
+==================================================
+
+If a backend/database exists, add the required fields to the appropriate payment/fee model.
+
+Recommended fields:
+
+dueDate
+priority
+penaltyAmount
+penaltyAppliedAt
+gracePeriodEndsAt
+daysOverdue
+totalAmountDue
+
+Do not store values that can become inconsistent if they can safely be calculated.
+
+Use the database/backend as the source of truth.
+
+==================================================
+15. EDGE CASES
+==================================================
+
+Handle:
+
+- Payment made before deadline
+- Payment made on deadline
+- Payment made after deadline
+- Partial payment before deadline
+- Partial payment after deadline
+- Fully paid fee
+- Already overdue fee
+- Duplicate penalty application
+- Due date changed by authorized user
+- Payment made after penalty was applied
+- Zero remaining balance
+
+A fully paid fee must NOT receive a late penalty.
+
+A payment that has already received the 5% penalty must NOT receive another 5% penalty.
+
+==================================================
+16. TESTING
+==================================================
+
+Create tests for the business logic.
+
+At minimum test:
+
+1. Payment 30+ days before deadline → LOW
+2. Payment 20 days before deadline → MEDIUM
+3. Payment 10 days before deadline → HIGH
+4. Payment 3 days before deadline → URGENT
+5. Payment due today → URGENT
+6. Payment 1 day overdue → OVERDUE + 5%
+7. Payment 7 days overdue → OVERDUE + 5%
+8. Payment 8 days overdue → penalty remains 5%
+9. Fully paid payment → no penalty
+10. Partial payment → penalty calculated from remaining amount
+11. Re-running penalty calculation → does not duplicate penalty
+12. Payment made after penalty → balances update correctly
+
+==================================================
+17. FINAL REPORT
+==================================================
+
+After implementation, tell me:
+
+1. Which files you changed
+2. Which UI screens changed
+3. Which database models changed
+4. Which API endpoints were added/changed
+5. Which business logic was added
+6. Which tests were added
+7. Any assumptions you made
+8. Any remaining work required
+
+Do not just say "implemented".
+
+Show me the exact changes.
+One thing I'd recommend
+
+For your project, I'd actually call this:
+
+Payment Deadline & Priority Management
+
+and make the flow visually obvious:
+
+🟢 Normal → 🟠 Approaching Deadline → 🔴 Urgent → 🚨 Overdue → +5% Penalty
+
+That will make your Bank Back Office feel much more like a real operational system, rather than just a collection of tables.
+
+give me a prompt to give it to figma ai 
+
+Absolutely. Since you're giving this to Figma AI/Make, I’d make the prompt focused specifically on the UI/UX changes, not backend implementation.
+
+Copy this entire prompt into Figma Make:
+
+I want you to update the existing Bank Back Office Portal UI to introduce a new PAYMENT DEADLINE, PAYMENT PRIORITY, and LATE PENALTY system.
+
+IMPORTANT:
+Do NOT redesign the existing Bank Back Office.
+Do NOT change the existing visual identity, colors, typography, sidebar, navigation structure, cards, tables, or overall design language.
+
+Keep everything that already exists and works.
+
+Only modify the relevant screens and components to add the new functionality below.
+
+==================================================
+1. PAYMENT DEADLINE
+==================================================
+
+Every outstanding fee/payment should have a clear payment deadline.
+
+Add a "Due Date" wherever outstanding payments/fees are displayed.
+
+Examples:
+
+Due: 15 Sep 2026
+Due in 12 days
+Due Today
+3 days overdue
+
+The deadline should be visually easy to understand.
+
+Use the existing design system and status/badge components.
+
+Do NOT create a completely new visual style.
+
+==================================================
+2. AUTOMATIC PAYMENT PRIORITY
+==================================================
+
+Payments should automatically receive a priority based on how close they are to their deadline.
+
+Use these exact rules:
+
+MORE THAN 30 DAYS BEFORE DEADLINE
+→ LOW
+
+15–30 DAYS BEFORE DEADLINE
+→ MEDIUM
+
+7–14 DAYS BEFORE DEADLINE
+→ HIGH
+
+1–6 DAYS BEFORE DEADLINE
+→ URGENT
+
+DUE TODAY
+→ URGENT
+
+1–7 DAYS AFTER DEADLINE
+→ OVERDUE
+
+The priority should be automatically determined from the due date.
+
+The user should NOT manually choose the priority.
+
+Make the priority visually obvious using the existing badge/status style.
+
+Example:
+
+LOW
+MEDIUM
+HIGH
+URGENT
+OVERDUE
+
+==================================================
+3. LATE PAYMENT PENALTY
+==================================================
+
+When a payment passes its deadline, mark it as OVERDUE and apply a 5% late penalty.
+
+The penalty must be calculated from the outstanding amount.
+
+Example:
+
+Original Fee:
+10,000 EGP
+
+Already Paid:
+2,000 EGP
+
+Outstanding:
+8,000 EGP
+
+5% Penalty:
+400 EGP
+
+Total Due:
+8,400 EGP
+
+Show these values separately.
+
+Do NOT change the original fee amount.
+
+Display:
+
+Original Outstanding: 8,000 EGP
+Late Penalty (5%): 400 EGP
+Total Due: 8,400 EGP
+
+==================================================
+4. ONE-WEEK GRACE PERIOD
+==================================================
+
+The 5% penalty applies during the first 7 days after the payment deadline.
+
+Example:
+
+Due Date: 15 Sep
+
+16 Sep:
+1 day overdue
+5% penalty
+
+18 Sep:
+3 days overdue
+5% penalty
+
+21 Sep:
+6 days overdue
+5% penalty
+
+22 Sep:
+7 days overdue
+5% penalty
+
+After 7 days:
+
+Show:
+
+OVERDUE
+Grace Period Ended
+
+Keep the existing 5% penalty.
+
+DO NOT add another penalty after the first 7 days.
+
+Do not invent any additional penalty rules.
+
+==================================================
+5. PAYMENT TABLE
+==================================================
+
+Update the existing Transactions/Payments table.
+
+Do NOT remove existing useful columns.
+
+Add the following information where it fits naturally:
+
+Due Date
+Priority
+Days Remaining / Days Overdue
+Penalty
+Total Due
+
+Example:
+
+Reference | Customer | Institution | Amount | Due Date | Priority | Penalty | Status
+
+Example row:
+
+TX-20260901
+Ahmed Mohamed
+Cairo International School
+10,000 EGP
+15 Sep 2026
+HIGH
+0 EGP
+Pending
+
+Overdue example:
+
+TX-20260801
+Sara Ahmed
+Nasr City Academy
+8,000 EGP
+15 Aug 2026
+OVERDUE
+400 EGP
+Overdue
+
+==================================================
+6. PAYMENT FILTERS
+==================================================
+
+Add deadline-related filters to the existing payment/transaction filtering system.
+
+Add:
+
+All
+Due Today
+Due This Week
+High Priority
+Urgent
+Overdue
+
+Also allow filtering by:
+
+Due Date
+Priority
+Payment Status
+Institution
+
+Keep the existing filters.
+
+Do NOT remove existing filters unless absolutely necessary.
+
+==================================================
+7. PAYMENT DETAILS
+==================================================
+
+Update the existing Payment/Transaction Details view.
+
+Add a clear section:
+
+PAYMENT DEADLINE
+
+Due Date:
+15 Sep 2026
+
+Status:
+3 DAYS OVERDUE
+
+Priority:
+OVERDUE
+
+Original Amount:
+10,000 EGP
+
+Paid:
+2,000 EGP
+
+Outstanding:
+8,000 EGP
+
+Late Penalty:
+400 EGP
+
+Total Due:
+8,400 EGP
+
+If the payment is overdue, show a clear warning:
+
+"Payment deadline exceeded. A 5% late penalty has been applied."
+
+Make this warning fit the existing UI.
+
+==================================================
+8. DASHBOARD
+==================================================
+
+Update the existing Bank Back Office Dashboard.
+
+Do NOT rebuild the dashboard.
+
+Add useful deadline-related KPI information.
+
+Add cards for:
+
+Due Today
+Due This Week
+Urgent Payments
+Overdue Payments
+Penalties Applied
+
+Use the existing dashboard card design.
+
+Also add a section called:
+
+"Payment Priority"
+
+This should show the payments that require the most attention.
+
+Sort them in this order:
+
+1. OVERDUE
+2. DUE TODAY
+3. URGENT
+4. HIGH
+5. MEDIUM
+6. LOW
+
+Within the same priority, show the earliest deadline first.
+
+==================================================
+9. PRIORITY VISUALIZATION
+==================================================
+
+Make priority immediately understandable.
+
+Use the existing UI's visual language.
+
+Suggested meaning:
+
+LOW
+Normal / no immediate action
+
+MEDIUM
+Payment deadline approaching
+
+HIGH
+Needs attention soon
+
+URGENT
+Deadline very close
+
+OVERDUE
+Deadline passed
+
+Do not introduce excessive colors or redesign the existing theme.
+
+==================================================
+10. INSTITUTION / SCHOOL VIEW
+==================================================
+
+Where the Bank Back Office views institution/school payment activity, include deadline-related information where appropriate.
+
+For example:
+
+Institution
+Outstanding Amount
+Due Date
+High Priority Payments
+Overdue Payments
+Penalty Amount
+
+This should help bank employees identify institutions with overdue collections.
+
+==================================================
+11. REPORTS
+==================================================
+
+Update relevant existing reports to include:
+
+Due Date
+Priority
+Overdue Status
+Penalty Amount
+Total Amount Due
+
+Add useful report filters:
+
+Due Date
+Priority
+Overdue
+
+Do NOT create unnecessary new report pages if the existing Reports screen can accommodate these filters.
+
+==================================================
+12. NOTIFICATIONS
+==================================================
+
+Use the existing Notifications system.
+
+Add deadline-related notification examples such as:
+
+"Payment deadline approaching"
+"Payment due today"
+"Payment overdue"
+"5% late penalty applied"
+
+Example:
+
+⚠ Payment Overdue
+
+Transaction:
+TX-20260801
+
+Institution:
+Nasr City Academy
+
+Amount:
+8,000 EGP
+
+Penalty:
+400 EGP
+
+[View Payment]
+
+Make the notification clickable and connected to the existing payment details screen.
+
+==================================================
+13. RECONCILIATION
+==================================================
+
+Do NOT redesign or break the existing Reconciliation module.
+
+If a payment includes a late penalty, make the amounts clear.
+
+Show separately:
+
+Original Fee
+Penalty
+Total Collected
+
+The penalty should NOT be confused with the original tuition/fee amount.
+
+Keep the existing:
+
+Matched
+Pending
+Exception
+Exception Queue
+Investigate
+
+functionality.
+
+==================================================
+14. EPP
+==================================================
+
+Do NOT invent a new EPP penalty system.
+
+Keep the existing EPP functionality.
+
+If EPP installments already have due dates, display their deadline/priority where appropriate.
+
+But do NOT automatically apply the 5% penalty to EPP installments unless an existing screen already specifically supports that rule.
+
+==================================================
+15. FULLY PAID PAYMENTS
+==================================================
+
+A fully paid payment must NOT receive a late penalty.
+
+If:
+
+Outstanding = 0 EGP
+
+then:
+
+Penalty = 0 EGP
+Priority = PAID
+Status = PAID
+
+Even if the original due date has passed.
+
+==================================================
+16. PARTIAL PAYMENTS
+==================================================
+
+Make sure the UI correctly represents partial payments.
+
+Example:
+
+Original Fee:
+20,000 EGP
+
+Paid:
+5,000 EGP
+
+Outstanding:
+15,000 EGP
+
+Deadline passes.
+
+5% Penalty:
+750 EGP
+
+Total Due:
+15,750 EGP
+
+Show the calculation clearly.
+
+==================================================
+17. ROLE-BASED ACCESS
+==================================================
+
+Keep the existing bank roles:
+
+BANK_ADMIN
+BANK_OPERATIONS
+BANK_FINANCE
+
+IMPORTANT:
+
+DO NOT create a separate "Reconciliation" role.
+
+Reconciliation is a module, not a fourth bank role.
+
+Deadline and priority information can be viewed by authorized bank employees.
+
+Any existing role-based permissions must remain intact.
+
+==================================================
+18. STATES
+==================================================
+
+Make sure the UI supports these states:
+
+PAID
+PENDING
+DUE TODAY
+HIGH PRIORITY
+URGENT
+OVERDUE
+GRACE PERIOD ENDED
+
+Add appropriate:
+
+- Empty states
+- Error states
+- Loading states
+- Confirmation states
+
+where appropriate.
+
+==================================================
+19. SAMPLE DATA
+==================================================
+
+Update the existing mock/sample data so the new UI can actually demonstrate the feature.
+
+Include examples of:
+
+- Low priority
+- Medium priority
+- High priority
+- Urgent
+- Due today
+- Overdue
+- Partial payment
+- Fully paid payment
+- Payment with 5% penalty
+- Payment at 7 days overdue
+
+Make sure the numbers shown in cards, tables and details are internally consistent.
+
+==================================================
+20. IMPORTANT — DO NOT CHANGE EXISTING FUNCTIONALITY
+==================================================
+
+Before making changes, inspect the existing application.
+
+Do NOT:
+
+- Remove existing modules
+- Remove existing navigation
+- Remove existing reconciliation functionality
+- Remove existing EPP functionality
+- Remove existing payment functionality
+- Remove existing institution functionality
+- Remove existing reports
+- Remove existing notifications
+- Remove existing roles
+
+Only enhance the existing UI with the new deadline/priority/penalty functionality.
+
+==================================================
+21. FINAL RESPONSE
+==================================================
+
+After making the changes, tell me exactly what you changed.
+
+Give me:
+
+1. Screens modified
+2. Components modified
+3. New UI elements added
+4. New payment states added
+5. New filters added
+6. New dashboard elements added
+7. New notification states added
+8. Sample data changed
+9. Any existing functionality that was NOT changed
+10. Any assumptions you had to make
+
+Do NOT simply say "Done".
+
+Give me a clear change summary.
+
+One important note: this is a new business rule you're adding. The original requirements cover payment/partial payment and accurate balances, but the specific deadline + 5% penalty + 7-day grace period isn't part of the original user stories. So this prompt intentionally treats it as your new feature rather than claiming it's an existing requirement.
+
+I’d run this in Figma after making a new version/branch, so you can easily revert if Make changes something you didn't want.
+
+Your file library is full. New files won't be saved to your library, but you can still use them in this chat. To store new files for later, free up space or upgrade your storage.
+Upgrade
+Manage

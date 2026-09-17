@@ -130,26 +130,23 @@ public class SchoolStudentServiceImpl implements SchoolStudentService {
         }
 
         String studentRef;
-        if (request.studentRef() == null || request.studentRef().isBlank() ||
-                studentRepository.findByInstitutionIdAndStudentRef(institutionId, request.studentRef().trim()).isPresent()) {
+        if (request.studentRef() == null || request.studentRef().isBlank()) {
             studentRef = generateUniqueStudentRef(institutionId);
+        } else if (studentRepository.findByInstitutionIdAndStudentRef(institutionId, request.studentRef().trim()).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "duplicate_student_ref");
         } else {
             studentRef = request.studentRef().trim();
         }
 
         String nationalId = request.nationalId() != null ? request.nationalId().trim() : null;
-        String nidHash;
-        String nidEncrypted;
-        if (nationalId != null && !nationalId.isBlank()) {
-            if (nationalId.length() != 14 || !nationalId.chars().allMatch(Character::isDigit)) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "validation_failed: National ID must be exactly 14 numeric digits");
-            }
-            nidHash = computeHmac(nationalId);
-            nidEncrypted = "enc_" + nationalId;
-        } else {
-            nidHash = computeHmac(UUID.randomUUID().toString());
-            nidEncrypted = "enc_unspecified";
+        if (nationalId == null || nationalId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "National ID is required. Please provide a valid 14-digit National ID.");
         }
+        if (nationalId.length() != 14 || !nationalId.chars().allMatch(Character::isDigit)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "validation_failed: National ID must be exactly 14 numeric digits");
+        }
+        String nidHash = computeHmac(nationalId);
+        String nidEncrypted = "enc_" + nationalId;
 
         // Handle Guardian association if parent info is supplied
         UUID guardianId = null;

@@ -8,6 +8,7 @@ import {
   EmptyState,
   PRIORITY_BADGE_CLASSES,
   dueDateLabel,
+  formatIsoDate,
   SchoolIcon,
   UsersIcon,
   TransactionIcon,
@@ -19,6 +20,7 @@ import {
   ReconcileIcon,
   EPPIcon,
   ChevronRightIcon,
+  AlertIcon,
 } from "@tuition/ui";
 import type {
   DashboardSummaryResponse,
@@ -32,6 +34,19 @@ const STATUS_STYLE: Record<string, string> = {
   Successful: "bg-green-50 text-green-700 border-green-200",
   Pending: "bg-amber-50 text-amber-700 border-amber-200",
   Failed: "bg-red-50 text-red-700 border-red-200",
+};
+
+/**
+ * The backend's /dashboard/institution-status only ever returns these 4
+ * fixed labels (see DashboardServiceImpl.getInstitutionStatus) - safe to
+ * map colors by exact label, unlike the priority/status maps above which
+ * key off enum-backed values.
+ */
+const INSTITUTION_STATUS_COLOR: Record<string, string> = {
+  Active: "#22C55E",
+  "Pending Approval": "#60A5FA",
+  "Under Review": "#FBBF24",
+  Suspended: "#F87171",
 };
 
 function money(n: number): string {
@@ -68,6 +83,7 @@ export default function BankDashboardPage() {
   const [institutionStatus, setInstitutionStatus] = useState<InstitutionStatusResponse | null>(null);
   const [recentTx, setRecentTx] = useState<RecentTransactionsResponse | null>(null);
   const [deadlines, setDeadlines] = useState<DeadlineSummaryResponse | null>(null);
+  const [pendingExceptions, setPendingExceptions] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [hoveredDay, setHoveredDay] = useState<number | null>(null);
 
@@ -78,13 +94,15 @@ export default function BankDashboardPage() {
       apiClient.get<InstitutionStatusResponse>("/dashboard/institution-status"),
       apiClient.get<RecentTransactionsResponse>("/dashboard/recent-transactions?limit=6"),
       apiClient.get<DeadlineSummaryResponse>("/dashboard/deadline-summary"),
+      apiClient.get<{ pendingExceptions: number }>("/reconciliation/summary"),
     ])
-      .then(([s, w, i, r, d]) => {
+      .then(([s, w, i, r, d, recon]) => {
         setSummary(s);
         setWeekly(w);
         setInstitutionStatus(i);
         setRecentTx(r);
         setDeadlines(d);
+        setPendingExceptions(recon.pendingExceptions);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load dashboard"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -179,11 +197,11 @@ export default function BankDashboardPage() {
   ];
 
   const deadlineKpis = [
-    { title: "Due Today", value: deadlines.dueToday, dot: "bg-orange-500" },
-    { title: "Due This Week", value: deadlines.dueThisWeek, dot: "bg-amber-500" },
-    { title: "Urgent", value: deadlines.urgent, dot: "bg-orange-400" },
-    { title: "Overdue", value: deadlines.overdue, dot: "bg-red-500" },
-    { title: "Penalties Applied", value: `EGP ${money(deadlines.penaltiesAppliedEGP)}`, dot: "bg-red-600" },
+    { title: "Due Today", value: deadlines.dueToday, dot: "bg-orange-500", href: "/bank/transactions?dueBucket=today" },
+    { title: "Due This Week", value: deadlines.dueThisWeek, dot: "bg-amber-500", href: "/bank/transactions?dueBucket=this-week" },
+    { title: "Urgent", value: deadlines.urgent, dot: "bg-orange-400", href: "/bank/transactions?priority=URGENT" },
+    { title: "Overdue", value: deadlines.overdue, dot: "bg-red-500", href: "/bank/transactions?priority=OVERDUE" },
+    { title: "Penalties Applied", value: `EGP ${money(deadlines.penaltiesAppliedEGP)}`, dot: "bg-red-600", href: null },
   ];
 
   const Y_MAX = niceCeil(Math.max(...weekly.series.map((p) => p.amountEGP), 1));
@@ -212,14 +230,27 @@ export default function BankDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-[17px] font-semibold" style={{ color: "var(--cib-text)" }}>
-          {greeting}, {firstName}
-        </h1>
-        <p className="text-sm mt-0.5" style={{ color: "var(--cib-text-muted)" }}>
-          Here&apos;s a network-wide summary for today,{" "}
-          {new Date(summary.asOf).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-[17px] font-semibold" style={{ color: "var(--cib-text)" }}>
+            {greeting}, {firstName}
+          </h1>
+          <p className="text-sm mt-0.5" style={{ color: "var(--cib-text-muted)" }}>
+            Here&apos;s a network-wide summary for today,{" "}
+            {new Date(summary.asOf).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
+          </p>
+        </div>
+        {pendingExceptions > 0 && (
+          <div className="flex items-center gap-2 rounded-lg px-3 py-1.5" style={{ background: "#FEF3E6", border: "1px solid #FDBA74" }}>
+            <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: "var(--cib-orange)" }} />
+            <span className="text-xs font-semibold" style={{ color: "var(--cib-orange-dark)" }}>
+              {pendingExceptions} reconciliation exception{pendingExceptions !== 1 ? "s" : ""} need attention
+            </span>
+            <Link href="/bank/reconciliation" style={{ color: "var(--cib-orange-dark)" }} className="transition-colors hover:opacity-70">
+              <ChevronRightIcon className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-3 gap-4">
@@ -248,22 +279,37 @@ export default function BankDashboardPage() {
       </div>
 
       <div className="grid grid-cols-5 gap-3">
-        {deadlineKpis.map((kpi) => (
-          <div key={kpi.title} className="bg-white rounded-xl border px-4 py-3.5 hover:shadow-md transition-shadow" style={{ borderColor: "#E8EDF5" }}>
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <span className={`w-2 h-2 rounded-full shrink-0 ${kpi.dot}`} />
-              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider leading-none">{kpi.title}</span>
+        {deadlineKpis.map((kpi) => {
+          const content = (
+            <>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${kpi.dot}`} />
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider leading-none">{kpi.title}</span>
+              </div>
+              <div className="text-xl font-bold leading-none" style={{ color: "var(--cib-text)" }}>
+                {kpi.value}
+              </div>
+            </>
+          );
+          const className = "bg-white rounded-xl border px-4 py-3.5 hover:shadow-md transition-shadow block";
+          return kpi.href ? (
+            <Link key={kpi.title} href={kpi.href} className={className} style={{ borderColor: "#E8EDF5" }}>
+              {content}
+            </Link>
+          ) : (
+            <div key={kpi.title} className={className} style={{ borderColor: "#E8EDF5" }}>
+              {content}
             </div>
-            <div className="text-xl font-bold leading-none" style={{ color: "var(--cib-text)" }}>
-              {kpi.value}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="bg-white rounded-xl border overflow-hidden" style={{ borderColor: "#E8EDF5" }}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center">
+              <AlertIcon className="w-4 h-4 text-red-500" />
+            </div>
             <h3 className="text-sm font-semibold" style={{ color: "var(--cib-text)" }}>
               Payment Priority - Action Required
             </h3>
@@ -280,7 +326,7 @@ export default function BankDashboardPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[#F8FAFD]">
-                  {["Student", "Institution", "Fee", "Amount", "Due Date", "Status", "Penalty"].map((h) => (
+                  {["Ref / Student", "Institution", "Fee", "Amount", "Due Date", "Status", "Penalty"].map((h) => (
                     <th key={h} className="text-left px-5 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
                       {h}
                     </th>
@@ -293,14 +339,18 @@ export default function BankDashboardPage() {
                     key={item.feeLineId}
                     className={`hover:bg-[#F8FAFD] transition-colors ${item.priority === "OVERDUE" ? "bg-red-50/40" : item.daysToDue === 0 ? "bg-orange-50/40" : ""}`}
                   >
-                    <td className="px-5 py-3.5 text-xs text-gray-600">{item.student}</td>
+                    <td className="px-5 py-3.5">
+                      <div className="font-mono text-xs text-[var(--cib-blue)] font-semibold">FEE-{item.feeLineId.slice(0, 8).toUpperCase()}</div>
+                      <div className="text-xs text-gray-600 mt-0.5">{item.student}</div>
+                    </td>
                     <td className="px-5 py-3.5 text-xs text-gray-600 whitespace-nowrap">{item.institution}</td>
                     <td className="px-5 py-3.5 text-xs text-gray-500">{item.feeType}</td>
                     <td className="px-5 py-3.5 text-xs font-mono font-bold text-gray-800 whitespace-nowrap">EGP {money(item.outstandingEGP)}</td>
                     <td className="px-5 py-3.5 whitespace-nowrap">
-                      <div className="text-xs text-gray-600 font-mono">{item.dueDate}</div>
+                      <div className="text-xs text-gray-600 font-mono">{formatIsoDate(item.dueDate)}</div>
                       <div className={`text-[10px] mt-0.5 font-medium ${item.priority === "OVERDUE" ? "text-red-600" : "text-orange-600"}`}>
                         {dueDateLabel(item.daysToDue)}
+                        {item.priority === "OVERDUE" && item.daysToDue <= -7 && " · Grace ended"}
                       </div>
                     </td>
                     <td className="px-5 py-3.5 whitespace-nowrap">
@@ -443,7 +493,7 @@ export default function BankDashboardPage() {
                   <span className="text-xs font-bold text-gray-700">{item.count}</span>
                 </div>
                 <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${item.pct}%`, background: "var(--cib-blue)" }} />
+                  <div className="h-full rounded-full" style={{ width: `${item.pct}%`, background: INSTITUTION_STATUS_COLOR[item.label] ?? "var(--cib-blue)" }} />
                 </div>
               </div>
             ))}
@@ -474,7 +524,7 @@ export default function BankDashboardPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[#F8FAFD]">
-                  {["Institution", "Student", "Fee", "Amount", "Method", "Time", "Status"].map((h) => (
+                  {["Transaction ID", "Institution", "Student", "Fee", "Amount", "Method", "Time", "Status"].map((h) => (
                     <th key={h} className="text-left px-5 py-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
                       {h}
                     </th>
@@ -484,6 +534,7 @@ export default function BankDashboardPage() {
               <tbody className="divide-y divide-gray-50">
                 {recentTx.data.map((tx) => (
                   <tr key={tx.id} className="hover:bg-[#F8FAFD] transition-colors">
+                    <td className="px-5 py-3.5 font-mono text-xs text-[var(--cib-blue)] font-medium whitespace-nowrap">TXN-{tx.id.slice(0, 8).toUpperCase()}</td>
                     <td className="px-5 py-3.5 text-xs text-gray-700 whitespace-nowrap">{tx.institution}</td>
                     <td className="px-5 py-3.5 text-xs text-gray-600 whitespace-nowrap">{tx.student}</td>
                     <td className="px-5 py-3.5 text-xs text-gray-500 whitespace-nowrap">{tx.feeType}</td>
