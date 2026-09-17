@@ -4,7 +4,7 @@
 **API Specification Reference:** [`Bank-Back-Office-API-Contract.md`](file:///Users/nourahmed/downloads/demo/docs/Bank-Back-Office-API-Contract.md) & [`1_MASTER_SPEC.md`](file:///Users/nourahmed/downloads/demo/docs/1_MASTER_SPEC.md)  
 **Backend Framework:** Spring Boot 4.1.1 / Java 25 / Spring Security / Spring Data JPA / Hibernate  
 **Base URL:** `/api/v1` (with root path aliases provided for Back-Office compatibility)  
-**Total Documented Endpoints:** 96 endpoints across 12 implementation phases and core portals.
+**Total Documented Endpoints:** 145+ endpoints across 18 implementation phases, School Portal, AI Assistant, Core Banking, and Mock Bank specifications.
 
 ---
 
@@ -22,8 +22,14 @@
 11. [Phase 10: Bank Users & Role-Based Access Control (RBAC)](#11-phase-10-bank-users--role-based-access-control-rbac)
 12. [Phase 11: System Settings & Configurable Parameters](#12-phase-11-system-settings--configurable-parameters)
 13. [Phase 12: Payment Deadlines, Priority Queues & Late Penalties](#13-phase-12-payment-deadlines-priority-queues--late-penalties)
-14. [Core Citizen & Institution Portal Endpoints](#14-core-citizen--institution-portal-endpoints)
-15. [Summary of Excluded Endpoints](#15-summary-of-excluded-endpoints)
+14. [Phase 13: School Portal Student Lifecycle & Rosters](#14-phase-13-school-portal-student-lifecycle--rosters)
+15. [Phase 14: School Fee Management & Invoicing](#15-phase-14-school-fee-management--invoicing)
+16. [Phase 15: Bulk Fee Roster Ingestion (CSV Upload Engine)](#16-phase-15-bulk-fee-roster-ingestion-csv-upload-engine)
+17. [Phase 16: CIB AI Assistant & Knowledge Engine](#17-phase-16-cib-ai-assistant--knowledge-engine)
+18. [Phase 17: Core Banking T24 Ledger SOAP/REST Integration](#18-phase-17-core-banking-t24-ledger-soaprest-integration)
+19. [Phase 18: In-Memory Mock Banking Services Engine](#19-phase-18-in-memory-mock-banking-services-engine)
+20. [Core Citizen & Institution Portal Endpoints](#20-core-citizen--institution-portal-endpoints)
+21. [Summary of Excluded Endpoints](#21-summary-of-excluded-endpoints)
 
 ---
 
@@ -142,7 +148,25 @@ All mutating and sensitive read endpoints enforce banking-grade guardrails and z
 
 ---
 
-### 2.4 `POST /auth/forgot-password` (Alias: `/api/v1/auth/forgot-password`)
+### 2.4 `POST /auth/mfa/trust-device` (Alias: `/api/v1/auth/mfa/trust-device`)
+- **Roles:** Authenticated User (possession of valid accessToken).
+- **What Does It Do?** Issues a cryptographically signed, long-lived device trust cookie (`cib_trusted_device`, 30 days validity). Subsequent logins from the same device and browser fingerprint bypass the 6-digit SMS OTP challenge, provided the device has not been revoked.
+- **The Need For It:** Minimizes login friction for trusted bank teller workstations while upholding strict device fingerprinting compliance.
+- **What Info/Data It Needs:**
+  - **Headers:** `Authorization: Bearer <accessToken>`
+  - **Body (JSON):**
+    ```json
+    {
+      "deviceName": "Branch-Zamalek-Teller-04",
+      "fingerprint": "fp_98a7c2e4..."
+    }
+    ```
+- **Return Data & Status Codes:**
+  - `200 OK`: `{ "status": "TRUSTED", "expiresInDays": 30 }`
+
+---
+
+### 2.5 `POST /auth/forgot-password` (Alias: `/api/v1/auth/forgot-password`)
 - **Roles:** Public.
 - **What Does It Do?** Initiates password recovery. If the email corresponds to an active bank employee, generates a single-use 15-minute cryptographically secure reset token and dispatches an email link.
 - **The Need For It:** Enables self-service password recovery for bank personnel while strictly avoiding user enumeration vulnerabilities.
@@ -166,7 +190,7 @@ All mutating and sensitive read endpoints enforce banking-grade guardrails and z
 
 ---
 
-### 2.5 `POST /auth/reset-password` (Alias: `/api/v1/auth/reset-password`)
+### 2.6 `POST /auth/reset-password` (Alias: `/api/v1/auth/reset-password`)
 - **Roles:** Public (with valid reset token).
 - **What Does It Do?** Validates reset token authenticity and expiration. Enforces 5-part password complexity rules (minimum 8 characters, at least 1 uppercase letter, 1 lowercase letter, 1 digit, and 1 special symbol). Verifies against historical password reuse, hashes the new password with BCrypt, and marks the token used.
 - **The Need For It:** Finalizes self-service credential restoration with enterprise password policy enforcement.
@@ -190,7 +214,7 @@ All mutating and sensitive read endpoints enforce banking-grade guardrails and z
 
 ---
 
-### 2.6 `POST /auth/refresh` (Alias: `/api/v1/auth/refresh`)
+### 2.7 `POST /auth/refresh` (Alias: `/api/v1/auth/refresh`)
 - **Roles:** Authenticated (Possessing active Refresh Token).
 - **What Does It Do?** Validates active refresh token, checks that user account is still active and unlocked, performs refresh token rotation (deletes old token, issues new token), and returns a fresh JWT access token.
 - **The Need For It:** Provides seamless user sessions without requiring re-login every 15 minutes, while maintaining short-lived access tokens to limit exposure if intercepted.
@@ -211,7 +235,7 @@ All mutating and sensitive read endpoints enforce banking-grade guardrails and z
 
 ---
 
-### 2.7 `POST /auth/logout` (Alias: `/api/v1/auth/logout`)
+### 2.8 `POST /auth/logout` (Alias: `/api/v1/auth/logout`)
 - **Roles:** Authenticated (`ROLE_BACK_OFFICE`).
 - **What Does It Do?** Revokes the caller's active refresh token, terminates the server session, and clears authentication contexts.
 - **The Need For It:** Essential security requirement to immediately invalidate sessions upon operator logoff, preventing session hijacking on shared bank workstations.
@@ -226,7 +250,7 @@ All mutating and sensitive read endpoints enforce banking-grade guardrails and z
 
 ---
 
-### 2.8 `GET /auth/me` (Alias: `/api/v1/auth/me`)
+### 2.9 `GET /auth/me` (Alias: `/api/v1/auth/me`)
 - **Roles:** Authenticated (`ROLE_BACK_OFFICE`).
 - **What Does It Do?** Resolves the current caller's identity from the JWT Bearer token and returns their profile details, department, role, and permission matrix.
 - **The Need For It:** Drives portal initialization in `Portal.tsx` to render user profile widgets, navigation options, and client-side route authorization gates.
@@ -708,6 +732,15 @@ All mutating and sensitive read endpoints enforce banking-grade guardrails and z
 
 ---
 
+### 5.8 `GET /payments/export` (Alias: `/api/v1/payments/export`)
+- **Roles:** `ROLE_BACK_OFFICE`, `ROLE_SCHOOL_ADMIN`, `ROLE_SCHOOL_FINANCE`.
+- **What Does It Do?** Streams a CSV export of tuition and back-office payments, filtered by school, date range, payment status, fee category, or payment method.
+- **The Need For It:** Financial reconciliation and audit export for school bursars and bank accountants.
+- **Return Data & Status Codes:**
+  - `200 OK`: `Content-Type: text/csv; charset=UTF-8`, `Content-Disposition: attachment; filename="payments-export.csv"`.
+
+---
+
 ## 6. Phase 5: Reconciliation, Settlement & Payout Runs
 
 ### 6.1 `GET /api/v1/reconciliation/summary`
@@ -1067,6 +1100,22 @@ All mutating and sensitive read endpoints enforce banking-grade guardrails and z
 
 ---
 
+### 9.5 `GET /notifications/reminders` (Alias: `/api/v1/notifications/reminders`)
+- **Roles:** `ROLE_BACK_OFFICE`, `ROLE_SCHOOL_ADMIN`.
+- **What Does It Do?** Lists automated tuition payment reminders scheduled for delivery (7-day prior notice, due-date alert, and overdue penalty warning).
+- **Return Data & Status Codes:**
+  - `200 OK`: Array of scheduled reminder items.
+
+---
+
+### 9.6 `GET /notifications/preferences` & `PUT /notifications/preferences` (Alias: `/api/v1/notifications/preferences`)
+- **Roles:** `ROLE_BACK_OFFICE`, `ROLE_SCHOOL_ADMIN`, `ROLE_SCHOOL_FINANCE`.
+- **What Does It Do?** Reads and updates notification channel preferences (SMS, Email, Web In-App push notifications) for transaction receipts and payment milestone events.
+- **Return Data & Status Codes:**
+  - `200 OK`: Current notification settings object.
+
+---
+
 ## 10. Phase 9: Audit Logs & Regulatory Compliance
 
 ### 10.1 `GET /api/v1/audit-logs` & `.../audit-logs/{id}`
@@ -1219,6 +1268,14 @@ All mutating and sensitive read endpoints enforce banking-grade guardrails and z
 
 ---
 
+### 11.7 `POST /users/{id}/activate` (Alias: `/api/v1/users/{id}/activate`)
+- **Roles:** `ROLE_BANK_ADMIN`, `ROLE_SCHOOL_ADMIN`.
+- **What Does It Do?** Re-activates a previously suspended user account, restoring login privileges and resetting the failed login attempts counter.
+- **Return Data & Status Codes:**
+  - `200 OK`: `{ "id": "...", "status": "Active", "message": "User activated successfully" }`.
+
+---
+
 ## 12. Phase 11: System Settings & Configurable Parameters
 
 ### 12.1 `GET /api/v1/settings/fee-types` & `POST /api/v1/settings/fee-types` (Alias: `/settings/...`)
@@ -1312,6 +1369,22 @@ All mutating and sensitive read endpoints enforce banking-grade guardrails and z
 
 ---
 
+### 12.5 `GET /settings/profile` (Alias: `/api/v1/settings/profile`)
+- **Roles:** Authenticated User.
+- **What Does It Do?** Retrieves profile, role claims, department, and assigned institution details for the authenticated user.
+- **Return Data & Status Codes:**
+  - `200 OK`: User profile summary.
+
+---
+
+### 12.6 `POST /settings/change-password` (Alias: `/api/v1/settings/change-password`)
+- **Roles:** Authenticated User.
+- **What Does It Do?** Self-service password change. Enforces strong password criteria (min 8 chars, uppercase, lowercase, digit, special character).
+- **Return Data & Status Codes:**
+  - `200 OK`: `{ "status": "SUCCESS", "message": "Password updated successfully" }`.
+
+---
+
 ## 13. Phase 12: Payment Deadlines, Priority Queues & Late Penalties
 
 ### 13.1 `PATCH /api/v1/fees/{id}/due-date` (Alias: `/fees/{id}/due-date`)
@@ -1361,9 +1434,396 @@ All mutating and sensitive read endpoints enforce banking-grade guardrails and z
 
 ---
 
-## 14. Core Citizen & Institution Portal Endpoints
+## 14. Phase 13: School Portal Student Lifecycle & Rosters
 
-### 14.1 `GET /api/v1/guardian/dues`
+### 14.1 `GET /students` (Alias: `/api/v1/students`)
+- **Roles:** `ROLE_SCHOOL_ADMIN`, `ROLE_SCHOOL_FINANCE`, `ROLE_INSTITUTION_ADMIN`.
+- **What Does It Do?** Returns a paginated roster of enrolled students scoped strictly to the authenticated user's school institution. Supports full-text student name searching, grade level filtering, and customizable page sizes.
+- **The Need For It:** Serves as the primary operational student roster table on the School Portal `/school/students` view.
+- **What Info/Data It Needs:**
+  - **Query Parameters:**
+    - `search` (string, optional): Search keyword against student name or student ID reference.
+    - `grade` (string, optional): e.g. `Grade 10`, `Grade 11`.
+    - `page` (integer, default: 1): 1-indexed page number.
+    - `pageSize` or `size` (integer, default: 25): Records per page.
+- **What Info/Data It Creates / Alters:** None (Read-only query).
+- **Return Data & Status Codes:**
+  - `200 OK`:
+    ```json
+    {
+      "data": [
+        {
+          "id": "9aa45bc6-59fc-4adc-9d7d-cfab959bb43b",
+          "studentRef": "STU-1001",
+          "name": "Sara Ahmed",
+          "grade": "Grade 10",
+          "section": "A",
+          "status": "Active",
+          "nationalIdMasked": "312******01042",
+          "guardianName": "Mona Samir Abdelrahman",
+          "outstandingBalanceEGP": 28480.00
+        }
+      ],
+      "page": 1,
+      "pageSize": 25,
+      "total": 420,
+      "totalPages": 17
+    }
+    ```
+  - `401 Unauthorized`: Missing or invalid Bearer token.
+  - `403 Forbidden`: User does not possess school institution authorities.
+
+---
+
+### 14.2 `GET /students/{id}` (Alias: `/api/v1/students/{id}`)
+- **Roles:** `ROLE_SCHOOL_ADMIN`, `ROLE_SCHOOL_FINANCE`, `ROLE_INSTITUTION_ADMIN`.
+- **What Does It Do?** Retrieves full profile details for a specific student, including academic placement, masked national ID, parent contact details, fee balance summary, and enrollment timestamp.
+- **The Need For It:** Powers the Student Profile Drawer and detail modal on the School Portal.
+- **What Info/Data It Needs:**
+  - **Path Parameter:** `id` (Student UUID).
+- **What Info/Data It Creates / Alters:** None.
+- **Return Data & Status Codes:**
+  - `200 OK`: Detailed `StudentDetailDto` object.
+  - `404 Not Found`: Student ID does not exist within the school.
+  - `403 Forbidden`: Tenant breach (attempting to access a student belonging to a different school).
+
+---
+
+### 14.3 `POST /students` (Alias: `/api/v1/students`)
+- **Roles:** `ROLE_SCHOOL_ADMIN`, `ROLE_INSTITUTION_ADMIN` (School Finance is prohibited with `403 Forbidden`).
+- **What Does It Do?** Enrolls a new student into the school. Validates Egyptian National ID formatting, computes irreversible HMAC-SHA256 hash for secure database lookup, masks the plaintext ID (`298******01023`), and links the student to their legal guardian record.
+- **The Need For It:** Onboards new admissions into the school roster while maintaining strict compliance with Egyptian Data Protection Law No. 151 of 2020.
+- **What Info/Data It Needs:**
+  - **Body (JSON):**
+    ```json
+    {
+      "studentRef": "STU-2026-981",
+      "name": "Karim Mahmoud El-Sayed",
+      "grade": "Grade 10",
+      "section": "B",
+      "nationalId": "31208150109923",
+      "parentName": "Mahmoud El-Sayed",
+      "parentPhone": "+20 10 1234 5678",
+      "parentEmail": "mahmoud.parent@example.com"
+    }
+    ```
+- **What Info/Data It Creates / Alters:**
+  - Creates new `Student` record in PostgreSQL database.
+  - Links or resolves `Guardian` record by National ID HMAC.
+  - Logs `STUDENT_ENROLLED` audit event (`severity = INFO`).
+- **Return Data & Status Codes:**
+  - `201 Created`: Created student profile with masked national ID.
+  - `400 Bad Request`: Missing mandatory fields or malformed national ID.
+  - `403 Forbidden`: Role is `ROLE_SCHOOL_FINANCE` or bank user.
+  - `409 Conflict`: Duplicate student reference identifier.
+
+---
+
+### 14.4 `PATCH /students/{id}` (Alias: `/api/v1/students/{id}`)
+- **Roles:** `ROLE_SCHOOL_ADMIN`, `ROLE_INSTITUTION_ADMIN`.
+- **What Does It Do?** Updates mutable student placement details such as grade level, classroom section, and parent contact information.
+- **The Need For It:** Facilitates end-of-year grade promotions and student contact updates.
+- **What Info/Data It Needs:**
+  - **Path Parameter:** `id` (Student UUID).
+  - **Body (JSON):** `{ "grade": "Grade 11", "section": "A" }`
+- **What Info/Data It Creates / Alters:**
+  - Updates `students` table record and logs `STUDENT_UPDATED` audit entry.
+- **Return Data & Status Codes:**
+  - `200 OK`: Updated student profile.
+  - `404 Not Found`: Student does not exist.
+
+---
+
+### 14.5 `POST /students/{id}/deactivate` & `POST /students/{id}/reactivate`
+- **Roles:** `ROLE_SCHOOL_ADMIN`, `ROLE_INSTITUTION_ADMIN`.
+- **What Does It Do?** Soft-deactivates (withdraws/transfers out) or reactivates a student record. When deactivated, future automated billing runs exclude the student, but historical payment ledger integrity is preserved.
+- **The Need For It:** Handles student transfers, withdrawals, or leaves of absence without destroying financial ledger history.
+- **What Info/Data It Needs:**
+  - **Path Parameter:** `id` (Student UUID).
+  - **Body (JSON, optional):** `{ "reason": "Transferred to Cairo British Academy" }`
+- **What Info/Data It Creates / Alters:**
+  - Updates `Student.status = Inactive / Active`.
+  - Logs `STUDENT_DEACTIVATED` / `STUDENT_REACTIVATED` audit event.
+- **Return Data & Status Codes:**
+  - `200 OK`: `{ "id": "...", "status": "Inactive", "message": "Student deactivated successfully" }`.
+
+---
+
+### 14.6 `GET /students/{id}/statement`
+- **Roles:** `ROLE_SCHOOL_ADMIN`, `ROLE_SCHOOL_FINANCE`, `ROLE_INSTITUTION_ADMIN`.
+- **What Does It Do?** Generates an official, certified Tuition Account Statement for a student, showing the opening balance, chronologically billed fee lines, payments received with transaction references, and remaining outstanding balance.
+- **The Need For It:** Required by parents for corporate tuition reimbursement, embassy visa requirements, or tax deductions.
+- **Return Data & Status Codes:**
+  - `200 OK`: JSON account statement or binary PDF export.
+
+---
+
+### 14.7 `GET /students/search` (Alias: `/api/v1/students/search`)
+- **Roles:** `ROLE_SCHOOL_ADMIN`, `ROLE_SCHOOL_FINANCE`, `ROLE_INSTITUTION_ADMIN`.
+- **What Does It Do?** Real-time auto-complete endpoint searching active students by name, reference code, or national ID hash. Used in Fee Assignment dropdowns.
+- **Return Data & Status Codes:**
+  - `200 OK`: List of matching `{ "id": "...", "name": "...", "studentRef": "...", "grade": "..." }`.
+
+---
+
+### 14.8 `GET /students/deactivated` (Alias: `/api/v1/students/deactivated`)
+- **Roles:** `ROLE_SCHOOL_ADMIN`, `ROLE_INSTITUTION_ADMIN`.
+- **What Does It Do?** Retrieves the historical archive of deactivated and transferred-out students with withdrawal dates and audit reasons.
+- **Return Data & Status Codes:**
+  - `200 OK`: Paginated list of deactivated student summaries.
+
+---
+
+### 14.9 `GET /students/{id}/fees` & `GET /students/{id}/payments`
+- **Roles:** `ROLE_SCHOOL_ADMIN`, `ROLE_SCHOOL_FINANCE`, `ROLE_INSTITUTION_ADMIN`.
+- **What Does It Do?** Returns the complete ledger of fees billed and payments settled for an individual student.
+- **Return Data & Status Codes:**
+  - `200 OK`: Detailed array of fee lines and associated payment receipt vouchers.
+
+---
+
+### 14.10 `GET /students/{id}/guardians`, `POST`, `DELETE`
+- **Roles:** `ROLE_SCHOOL_ADMIN`, `ROLE_INSTITUTION_ADMIN`.
+- **What Does It Do?** Manages multiple legal guardian associations for a student (primary parent, secondary guardian, emergency contact) with relationship metadata.
+- **Return Data & Status Codes:**
+  - `200 OK` / `201 Created`: Guardian mapping details.
+
+---
+
+## 15. Phase 14: School Fee Management & Invoicing
+
+### 15.1 `GET /fees` (Alias: `/api/v1/fees`)
+- **Roles:** `ROLE_SCHOOL_ADMIN`, `ROLE_SCHOOL_FINANCE`, `ROLE_INSTITUTION_ADMIN`.
+- **What Does It Do?** Lists all fee lines scoped to the school. Supports filtering by fee category (`Tuition`, `Bus`, `Books`, `Activities`), academic year term, payment status (`Active`, `Paid`, `Cancelled`), and student ID.
+- **The Need For It:** Core financial ledger table on the School Portal `/school/fee-management` page.
+- **Return Data & Status Codes:**
+  - `200 OK`: PageResponse containing fee line summaries with `totalAmount`, `paidAmount`, `remainingAmount`, and `status`.
+
+---
+
+### 15.2 `POST /fees` (Alias: `/api/v1/fees`)
+- **Roles:** `ROLE_SCHOOL_ADMIN`, `ROLE_SCHOOL_FINANCE`, `ROLE_INSTITUTION_ADMIN`.
+- **What Does It Do?** Creates an individual fee invoice line for an enrolled student. Sets academic term, mandatory category, principal amount in EGP, and contractual due date.
+- **The Need For It:** Issues invoices for mid-year admissions, optional bus subscriptions, or specialized learning materials.
+- **What Info/Data It Needs:**
+  - **Body (JSON):**
+    ```json
+    {
+      "studentId": "9aa45bc6-59fc-4adc-9d7d-cfab959bb43b",
+      "name": "Bus Transportation - Term 2",
+      "category": "Bus",
+      "amountEGP": 6000.00,
+      "term": "Term 2 · 2026",
+      "dueDate": "2026-11-30"
+    }
+    ```
+- **What Info/Data It Creates / Alters:**
+  - Creates new `FeeLine` record with `paidAmount = 0.00`, `remainingAmount = 6000.00`, `status = ACTIVE`.
+  - Increments student total outstanding balance.
+- **Return Data & Status Codes:**
+  - `201 Created`: Fee detail record.
+  - `400 Bad Request`: Negative amount, missing mandatory fields, or past due date.
+  - `403 Forbidden`: Bank operator attempting to issue school fee.
+
+---
+
+### 15.3 `POST /fees/{id}/cancel` (Alias: `/api/v1/fees/{id}/cancel`)
+- **Roles:** `ROLE_SCHOOL_ADMIN`, `ROLE_INSTITUTION_ADMIN`.
+- **What Does It Do?** Cancels an unpaid fee line. **Fintech Paranoia Guardrail:** If the fee line has already been locked into an Easy Payment Plan (EPP) with the bank, cancellation is strictly blocked (`422 Unprocessable Entity`).
+- **Return Data & Status Codes:**
+  - `200 OK`: `{ "status": "Cancelled", "message": "Fee line successfully cancelled" }`.
+  - `422 Unprocessable Entity`: Locked in active EPP financing plan.
+
+---
+
+### 15.4 `GET /fees/stats` (Alias: `/api/v1/fees/stats`)
+- **Roles:** `ROLE_SCHOOL_ADMIN`, `ROLE_SCHOOL_FINANCE`, `ROLE_INSTITUTION_ADMIN`.
+- **What Does It Do?** Returns aggregated financial KPI metrics for the school: total billed fees volume, collected fees, outstanding receivables, overdue balance, and collection percentage.
+- **Return Data & Status Codes:**
+  - `200 OK`: `{ "totalBilledEGP": 12500000.00, "collectedEGP": 8750000.00, "outstandingEGP": 3750000.00, "collectionRate": 70.0 }`.
+
+---
+
+### 15.5 `GET /fee-categories` (Alias: `/api/v1/fee-categories`)
+- **Roles:** `ROLE_SCHOOL_ADMIN`, `ROLE_SCHOOL_FINANCE`, `ROLE_INSTITUTION_ADMIN`, `ROLE_BACK_OFFICE`.
+- **What Does It Do?** Returns standardized fee categories configured across the network: `Tuition`, `Bus Transportation`, `Books & Materials`, `Uniforms`, `Activities`, and `Boarding`.
+- **Return Data & Status Codes:**
+  - `200 OK`: Array of category metadata objects.
+
+---
+
+### 15.6 `POST /fees/{id}/apply-penalty` & `GET /fees/{id}/penalty-info`
+- **Roles:** `ROLE_SCHOOL_ADMIN`, `ROLE_INSTITUTION_ADMIN`.
+- **What Does It Do?** `POST` applies a manual contractual 5% penalty to an overdue fee line. `GET` previews penalty calculations and grace period status.
+- **Return Data & Status Codes:**
+  - `200 OK`: Updated fee line detail with penalty breakdown.
+
+---
+
+## 16. Phase 15: Bulk Fee Roster Ingestion (CSV Upload Engine)
+
+### 16.1 `GET /fee-uploads/template` (Alias: `/api/v1/fee-uploads/template`)
+- **Roles:** `ROLE_SCHOOL_ADMIN`, `ROLE_SCHOOL_FINANCE`, `ROLE_INSTITUTION_ADMIN`.
+- **What Does It Do?** Downloads the official CIB-standardized CSV fee roster template with pre-configured header rows (`student_id,amount,fee_type,due_date,term,academic_year`).
+- **The Need For It:** Ensures school bursars upload data conforming to the backend ingestion parser format.
+- **Return Data & Status Codes:**
+  - `200 OK`: `Content-Type: text/csv; charset=UTF-8`, `Content-Disposition: attachment; filename="cib-fee-upload-template.csv"`.
+
+---
+
+### 16.2 `POST /fee-uploads` (Alias: `/api/v1/fee-uploads`)
+- **Roles:** `ROLE_SCHOOL_ADMIN`, `ROLE_SCHOOL_FINANCE`, `ROLE_INSTITUTION_ADMIN`.
+- **What Does It Do?** Uploads a multi-row CSV fee roster file. Implements two-stage batch ingestion:
+  1. Validates every row (checks student reference existence in school, positive non-zero numeric amount, recognized fee category, valid future due date).
+  2. If errors are found, creates an upload batch in `REJECTED` or `PARTIALLY_ACCEPTED` status and stores row-by-row error reasons.
+  3. If valid, persists fee lines in a single transactional batch and updates school ledger totals.
+- **What Info/Data It Needs:**
+  - **Headers:** `Content-Type: multipart/form-data`
+  - **Form Data:** `file` (CSV file upload).
+- **Return Data & Status Codes:**
+  - `201 Created`:
+    ```json
+    {
+      "uploadId": "upl_89ab3c...",
+      "filename": "rowad-tuition-term2.csv",
+      "totalRows": 450,
+      "acceptedRows": 448,
+      "rejectedRows": 2,
+      "status": "COMPLETED",
+      "uploadedAt": "2026-09-17T14:30:00Z"
+    }
+    ```
+  - `400 Bad Request`: Empty file or unreadable CSV syntax.
+
+---
+
+### 16.3 `GET /fee-uploads/{uploadId}/errors` & `GET /fee-uploads/{uploadId}/errors/export`
+- **Roles:** `ROLE_SCHOOL_ADMIN`, `ROLE_SCHOOL_FINANCE`, `ROLE_INSTITUTION_ADMIN`.
+- **What Does It Do?** Retrieves detailed error listings for any rejected rows in an ingestion job (e.g. `Row 42: Unknown studentRef 'STU-9999'`, `Row 87: Negative amount '-500'`). The export endpoint downloads a pre-filled correction CSV containing only the failed rows.
+- **Return Data & Status Codes:**
+  - `200 OK`: JSON error array or downloadable CSV.
+
+---
+
+### 16.4 `GET /fee-uploads/{uploadId}/rows` & `GET /fee-uploads/history`
+- **Roles:** `ROLE_SCHOOL_ADMIN`, `ROLE_SCHOOL_FINANCE`, `ROLE_INSTITUTION_ADMIN`.
+- **What Does It Do?** `GET /{uploadId}/rows` returns row-level parsing statuses for an uploaded batch. `GET /history` lists all historical upload jobs with completion timestamps.
+- **Return Data & Status Codes:**
+  - `200 OK`: Paginated row-level status array or historical batch list.
+
+---
+
+## 17. Phase 16: CIB AI Assistant & Knowledge Engine
+
+### 17.1 `POST /api/chat`
+- **Roles:** Public / Authenticated.
+- **What Does It Do?** Natural language conversational AI interface powered by the CIB Retrieval-Augmented Generation (RAG) assistant. Retrieves authoritative context from university specifications, CIB banking rules, and CBE financial regulations, generating precise, grounded answers with citations.
+- **The Need For It:** Empowers parents, school bursars, and bank branch staff to ask natural questions (e.g. *"What are the EPP installment options for tuition above 10,000 EGP?"*, *"How does the 5% late penalty work?"*) and receive immediate, compliant answers.
+- **What Info/Data It Needs:**
+  - **Body (JSON):**
+    ```json
+    {
+      "message": "Can I split my 15,000 EGP tuition fee into 12 monthly installments?",
+      "sessionId": "sess_123456"
+    }
+    ```
+- **Return Data & Status Codes:**
+  - `200 OK`:
+    ```json
+    {
+      "response": "Yes, CIB Easy Payment Plans (EPP) allow tuition fees of 12,000 EGP or higher on eligible credit cards to be converted into 6, 12, 18, 24, or 36 monthly installments. For 12 months, the monthly rate is approximately 1.5% with zero upfront down-payment.",
+      "sources": ["CIB_EPP_POLICY_2026", "TUITION_NETWORK_SPEC_SEC_7"],
+      "sessionId": "sess_123456"
+    }
+    ```
+
+---
+
+### 17.2 `GET /api/chat/health`
+- **Roles:** Public / Health Check.
+- **What Does It Do?** Liveness probe for the AI assistant subsystem. Returns `{"status": "ok"}` when the assistant controller and local fallback engine are initialized.
+- **Return Data & Status Codes:**
+  - `200 OK`: `{ "status": "ok" }`.
+
+---
+
+## 18. Phase 17: Core Banking T24 Ledger SOAP/REST Integration
+
+### 18.1 `GET /api/v1/t24/billing/retrieve`
+- **Roles:** `ROLE_BACK_OFFICE`.
+- **What Does It Do?** Interfaces with CIB's Temenos T24 core banking host. Retrieves the core banking billing record, account status, and transaction settlement balance for a customer.
+- **The Need For It:** Syncs the Tuition Network ledger with CIB's core banking mainframe.
+- **Return Data & Status Codes:**
+  - `200 OK`: T24 billing item detail with core account balance.
+
+---
+
+### 18.2 `POST /api/v1/t24/billing/request`
+- **Roles:** `ROLE_BACK_OFFICE`.
+- **What Does It Do?** Emits a payment settlement request into the T24 banking ledger, creating an official posting voucher and updating branch reconciliation registers.
+- **Return Data & Status Codes:**
+  - `200 OK`: `{ "status": "SUCCESS", "t24VoucherNumber": "VCH-2026-99120" }`.
+
+---
+
+### 18.3 `GET /api/v1/t24/billing/wsdl`
+- **Roles:** Public / Core Banking Host.
+- **What Does It Do?** Exposes the formal Web Services Description Language (WSDL) SOAP contract definition for the `CustomerBilling` enterprise service bus interface.
+- **Return Data & Status Codes:**
+  - `200 OK`: XML WSDL document (`Content-Type: application/xml`).
+
+---
+
+## 19. Phase 18: In-Memory Mock Banking Services Engine
+
+These endpoints implement the simulated CIB core banking engine inside `src/main/java/com/tuitionnetwork/mockbank/` per the Women in Tech internship specification:
+
+### 19.1 `POST /api/v1/moi/validate`
+- **Roles:** Public / API Key (`X-API-Key: wit-intern-2026`).
+- **What Does It Do?** Validates an Egyptian National ID against the simulated Ministry of Interior database. Checks century, birthdate, governorate, check digits, and age restrictions (minimum age 21 for credit products).
+- **Test Triggers:**
+  - Serial digits 10-13 = `0000`: Returns `NOT_FOUND`.
+  - Serial digits 10-13 = `8888`: Returns `DECEASED`.
+  - Serial digits 10-13 = `9999`: Returns `BLOCKED`.
+- **Return Data & Status Codes:**
+  - `200 OK`: `MoiVerificationResponse` with `valid`, `eligible`, `parsed` details, and `reasons`.
+
+---
+
+### 19.2 `POST /api/v1/payments/cards` & `POST /api/v1/payments/cards/{id}/3ds`
+- **Roles:** API Key (`X-API-Key: wit-intern-2026`).
+- **What Does It Do?** Simulates credit card authorization, 3D-Secure challenges (OTP `123456`), captures, refunds, and voids. Validates Luhn checksum and evaluates card behavior triggers (card `4111...` approves, card ending `0002` declines, card ending `0003` requires 3DS).
+- **Return Data & Status Codes:**
+  - `201 Created`: Card payment response with status `AUTHORISED`, `CAPTURED`, or `PENDING_3DS`.
+
+---
+
+### 19.3 `GET /api/v1/epp/quotes` & `POST /api/v1/epp`
+- **Roles:** API Key (`X-API-Key: wit-intern-2026`).
+- **What Does It Do?** Quotes and books Easy Payment Plans on credit cards across 6, 12, 18, 24, and 36 months tenors.
+- **Return Data & Status Codes:**
+  - `200 OK`: Available installment quotes with monthly payment and interest breakdowns.
+
+---
+
+### 19.4 `GET /api/v1/customers` & `POST /api/v1/backoffice/payments`
+- **Roles:** API Key (`X-API-Key: wit-intern-2026`).
+- **What Does It Do?** Simulates a branch teller looking up a bank customer's accounts and debiting an existing checking account (e.g. `acc_mona_current`).
+- **Return Data & Status Codes:**
+  - `200 OK`: Customer profile with accounts and card limits.
+  - `201 Created`: Debit transaction voucher.
+
+---
+
+### 19.5 `GET /api/v1/test-data` & `POST /api/v1/admin/reset`
+- **Roles:** Public / Test Utility.
+- **What Does It Do?** `GET /test-data` outputs the catalog of all pre-configured test cards, seeded National IDs, and expected outcomes. `POST /admin/reset` clears all in-memory mock bank transactions back to a clean slate.
+- **Return Data & Status Codes:**
+  - `200 OK`: Test data catalog or reset confirmation.
+
+---
+
+## 20. ### 14.1 `GET /api/v1/guardian/dues`
 - **Roles:** `ROLE_GUARDIAN`, `ROLE_BACK_OFFICE`.
 - **What Does It Do?** Public / Parent mobile portal endpoint to query open tuition and service dues by parent Egyptian National ID.
 - **The Need For It:** Enables parents to view their children's pending school fees in the citizen mobile app or web portal.
@@ -1392,7 +1852,7 @@ All mutating and sensitive read endpoints enforce banking-grade guardrails and z
 
 ---
 
-## 15. Summary of Excluded Endpoints
+## 21. Summary of Excluded Endpoints
 
 Per explicit business policy and banking architecture specifications, the following endpoints are intentionally **excluded** from the application:
 
@@ -1403,4 +1863,4 @@ Per explicit business policy and banking architecture specifications, the follow
 
 ---
 
-*This document serves as the authoritative API technical specification for all 12 phases of the CIB Tuition & Services Fees Collection Network.*
+*This document serves as the authoritative, complete API technical specification for all 18 phases, core portals, AI subsystems, and integrations of the CIB Tuition & Services Fees Collection Network.*
