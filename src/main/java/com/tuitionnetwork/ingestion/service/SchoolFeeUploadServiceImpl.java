@@ -25,11 +25,13 @@ import com.tuitionnetwork.notifications.service.SchoolNotificationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
+import com.tuitionnetwork.ingestion.event.FeeCreatedEvent;
 
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
@@ -59,6 +61,7 @@ public class SchoolFeeUploadServiceImpl implements SchoolFeeUploadService {
     private final StudentRepository studentRepository;
     private final IdentityResolverService identityResolverService;
     private final AuditLogRepository auditLogRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Autowired(required = false)
     private SchoolNotificationService schoolNotificationService;
@@ -71,7 +74,8 @@ public class SchoolFeeUploadServiceImpl implements SchoolFeeUploadService {
             FeeLineRepository feeLineRepository,
             @Autowired(required = false) StudentRepository studentRepository,
             @Autowired(required = false) IdentityResolverService identityResolverService,
-            @Autowired(required = false) AuditLogRepository auditLogRepository) {
+            @Autowired(required = false) AuditLogRepository auditLogRepository,
+            ApplicationEventPublisher eventPublisher) {
         this.csvUploadRepository = csvUploadRepository;
         this.uploadRowRepository = uploadRowRepository;
         this.uploadErrorRepository = uploadErrorRepository;
@@ -79,6 +83,7 @@ public class SchoolFeeUploadServiceImpl implements SchoolFeeUploadService {
         this.studentRepository = studentRepository;
         this.identityResolverService = identityResolverService;
         this.auditLogRepository = auditLogRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     public void setSchoolNotificationService(SchoolNotificationService schoolNotificationService) {
@@ -637,7 +642,12 @@ public class SchoolFeeUploadServiceImpl implements SchoolFeeUploadService {
         feeLine.setStatus(FeeStatus.OUTSTANDING);
         feeLine.setCurrency("EGP");
         feeLine.setRowIdempotencyKey(rowKey);
-        return feeLineRepository.save(feeLine);
+        
+        FeeLine savedFee = feeLineRepository.save(feeLine);
+        if (eventPublisher != null) {
+            eventPublisher.publishEvent(new FeeCreatedEvent(savedFee));
+        }
+        return savedFee;
     }
 
     private Optional<Student> findStudent(UUID schoolId, String studentRef) {

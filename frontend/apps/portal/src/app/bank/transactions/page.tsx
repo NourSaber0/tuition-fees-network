@@ -117,6 +117,13 @@ export default function TransactionsPage() {
   const [amountInput, setAmountInput] = useState("");
   const [amountError, setAmountError] = useState<string | null>(null);
   const [payMethod, setPayMethod] = useState<PayMethodChoice>("ACCOUNT_DEBIT");
+  const [paymentMode, setPaymentMode] = useState<"CIB" | "BRANCH_POS" | "EXTERNAL_CARD">("CIB");
+  const [extCardNumber, setExtCardNumber] = useState("");
+  const [extCardHolder, setExtCardHolder] = useState("");
+  const [extExpiry, setExtExpiry] = useState("");
+  const [extCvv, setExtCvv] = useState("");
+  const [posTerminalId, setPosTerminalId] = useState("POS-CIB-BR01");
+  const [posAuthRef, setPosAuthRef] = useState("");
   const [isEpp, setIsEpp] = useState(false);
   const [eppTenor, setEppTenor] = useState<number>(6);
   const [paymentLoading, setPaymentLoading] = useState(false);
@@ -353,10 +360,14 @@ export default function TransactionsPage() {
       : [...selectedFeeIds, feeId];
     setSelectedFeeIds(updated);
 
-    const sum = (customerData?.fees ?? [])
+    const sumPrincipal = (customerData?.fees ?? [])
       .filter((f) => updated.includes(f.id))
       .reduce((acc, f) => acc + (f.remainingEGP ?? 0), 0);
-    setAmountInput(sum > 0 ? String(sum) : "");
+    const sumPenalty = (customerData?.fees ?? [])
+      .filter((f) => updated.includes(f.id))
+      .reduce((acc, f) => acc + (f.penaltyEGP ?? 0), 0);
+    const totalDue = sumPrincipal + sumPenalty;
+    setAmountInput(totalDue > 0 ? String(totalDue) : "");
   };
 
   // Wizard Step 4: Submit Payment
@@ -370,23 +381,64 @@ export default function TransactionsPage() {
     setPaymentLoading(true);
     setPaymentError(null);
 
-    const selectedCard = bankCustomer?.cards?.find((c) => c.card_id === selectedSourceId);
-    let resolvedMethod = payMethod === "CARD" ? "CIB_CREDIT_CARD" : "CIB_ACCOUNT";
-    if (selectedCard && selectedCard.type === "DEBIT") {
-      resolvedMethod = "CIB_DEBIT_CARD";
-    }
-
     const idempKey = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `idemp-${Date.now()}`;
-    const payload: BackOfficePaymentRequest = {
-      nationalId: customerData.customer.nationalId || nationalIdInput.trim(),
-      feeIds: selectedFeeIds,
-      amountEGP: amt,
-      method: resolvedMethod,
-      sourceId: selectedSourceId || (payMethod === "CARD" ? "card_cib" : "acc_cib"),
-      creditPaymentType: payMethod === "CARD" && isEpp ? "epp" : "full",
-      eppTenor: payMethod === "CARD" && isEpp ? eppTenor : undefined,
-      processedBy: user?.name ?? "Mohamed Ali",
-    };
+    let payload: BackOfficePaymentRequest;
+
+    if (paymentMode === "BRANCH_POS") {
+      payload = {
+        nationalId: customerData.customer.nationalId || nationalIdInput.trim(),
+        feeIds: selectedFeeIds,
+        amountEGP: amt,
+        method: "POS Terminal (Visa/Mastercard/Meeza)",
+        posTerminalId: posTerminalId || "POS-CIB-BR01",
+        posAuthRef: posAuthRef || `AUTH-POS-${Math.floor(100000 + Math.random() * 900000)}`,
+        channel: "Branch POS",
+        creditPaymentType: "full",
+        processedBy: user?.name ?? "Branch Teller",
+      };
+    } else if (paymentMode === "EXTERNAL_CARD") {
+      const cleanNum = extCardNumber.replace(/\s+/g, "");
+      if (!cleanNum || cleanNum.length < 13) {
+        setPaymentError("Please enter a valid 16-digit card number.");
+        setPaymentLoading(false);
+        return;
+      }
+      const parts = extExpiry.split("/");
+      const expMonth = parts.length > 0 ? parseInt(parts[0], 10) : 12;
+      const rawYear = parts.length > 1 ? parseInt(parts[1], 10) : 2030;
+      const expYear = isNaN(rawYear) ? 2030 : (rawYear < 100 ? 2000 + rawYear : rawYear);
+
+      payload = {
+        nationalId: customerData.customer.nationalId || nationalIdInput.trim(),
+        feeIds: selectedFeeIds,
+        amountEGP: amt,
+        method: "External Card",
+        cardNumber: cleanNum,
+        cardHolderName: extCardHolder.trim() || customerData.customer.name || "External Cardholder",
+        expiryMonth: isNaN(expMonth) ? 12 : expMonth,
+        expiryYear: expYear,
+        cvv: extCvv.trim() || "123",
+        creditPaymentType: "full",
+        processedBy: user?.name ?? "Branch Teller",
+      };
+    } else {
+      const selectedCard = bankCustomer?.cards?.find((c) => c.card_id === selectedSourceId);
+      let resolvedMethod = payMethod === "CARD" ? "CIB_CREDIT_CARD" : "CIB_ACCOUNT";
+      if (selectedCard && selectedCard.type === "DEBIT") {
+        resolvedMethod = "CIB_DEBIT_CARD";
+      }
+
+      payload = {
+        nationalId: customerData.customer.nationalId || nationalIdInput.trim(),
+        feeIds: selectedFeeIds,
+        amountEGP: amt,
+        method: resolvedMethod,
+        sourceId: selectedSourceId || (payMethod === "CARD" ? "card_cib" : "acc_cib"),
+        creditPaymentType: payMethod === "CARD" && isEpp ? "epp" : "full",
+        eppTenor: payMethod === "CARD" && isEpp ? eppTenor : undefined,
+        processedBy: user?.name ?? "Branch Teller",
+      };
+    }
 
     try {
       const res = await apiClient.post<BackOfficePaymentResponse>("/payments", payload, {
@@ -452,16 +504,27 @@ export default function TransactionsPage() {
     setAmountInput("");
     setAmountError(null);
     setPayMethod("ACCOUNT_DEBIT");
+    setPaymentMode("CIB");
+    setExtCardNumber("");
+    setExtCardHolder("");
+    setExtExpiry("");
+    setExtCvv("");
+    setPosAuthRef("");
     setIsEpp(false);
     setPaymentError(null);
     setPaymentSuccess(null);
   };
 
-  const selectedFeesSum = (customerData?.fees ?? [])
+  const selectedFeesPrincipalSum = (customerData?.fees ?? [])
     .filter((f) => selectedFeeIds.includes(f.id))
     .reduce((sum, f) => sum + (f.remainingEGP ?? 0), 0);
+  const selectedFeesPenaltySum = (customerData?.fees ?? [])
+    .filter((f) => selectedFeeIds.includes(f.id))
+    .reduce((sum, f) => sum + (f.penaltyEGP ?? 0), 0);
+  const selectedFeesTotalDueSum = selectedFeesPrincipalSum + selectedFeesPenaltySum;
+  const selectedFeesSum = selectedFeesTotalDueSum;
   const payAmountNum = parseFloat(amountInput) || 0;
-  const isPartial = payAmountNum > 0 && payAmountNum < selectedFeesSum;
+  const isPartial = payAmountNum > 0 && payAmountNum < selectedFeesTotalDueSum;
 
   /* ─────────────────────────────────────────────────────────────
      VIEW 1: TRANSACTION DETAIL (Figma 1:1)
@@ -661,13 +724,35 @@ export default function TransactionsPage() {
                         </span>
                       </div>
                       {penalty > 0 && (
-                        <div className="flex justify-between text-xs">
-                          <span className={`font-semibold ${detailTx.status === "Successful" ? "text-gray-600" : "text-red-600"}`}>
-                            {detailTx.status === "Successful" ? "Late Penalty (Paid)" : "Late Penalty (5%)"}
-                          </span>
-                          <span className={`font-mono font-bold ${detailTx.status === "Successful" ? "text-gray-700" : "text-red-600"}`}>
-                            + EGP {formatMoney(penalty)}
-                          </span>
+                        <div className="space-y-2 pt-1 border-t border-gray-100">
+                          {detailTx.penaltyPaidEGP != null && detailTx.penaltyPaidEGP > 0 ? (
+                            <div className="flex justify-between text-xs">
+                              <span className="font-semibold text-emerald-700 flex items-center gap-1.5">
+                                Late Penalty (Paid)
+                                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase">
+                                  Paid
+                                </span>
+                              </span>
+                              <span className="font-mono font-bold text-emerald-700">
+                                + EGP {formatMoney(detailTx.penaltyPaidEGP)}
+                              </span>
+                            </div>
+                          ) : null}
+
+                          {(detailTx.penaltyRemainingEGP != null && detailTx.penaltyRemainingEGP > 0) ||
+                          (!detailTx.penaltyPaidEGP || detailTx.penaltyPaidEGP === 0) ? (
+                            <div className="flex justify-between text-xs">
+                              <span className="font-semibold text-amber-800 flex items-center gap-1.5">
+                                Late Penalty (Unpaid)
+                                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-200 uppercase">
+                                  Uncollected
+                                </span>
+                              </span>
+                              <span className="font-mono font-bold text-amber-700">
+                                + EGP {formatMoney(detailTx.penaltyRemainingEGP ?? penalty)}
+                              </span>
+                            </div>
+                          ) : null}
                         </div>
                       )}
                       {detailTx.status !== "Successful" && (
@@ -982,7 +1067,7 @@ export default function TransactionsPage() {
                     <thead>
                       <tr className="bg-[#F8FAFD]">
                         <th className="w-10 px-4 py-2.5" />
-                        {["Fee", "Original", "Remaining", "Status", "Due Date"].map((h) => (
+                        {["Student", "Fee", "Original", "Remaining", "Late Penalty (5%)", "Total Due", "Status", "Due Date"].map((h) => (
                           <th
                             key={h}
                             className="text-left px-4 py-2.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider"
@@ -995,6 +1080,10 @@ export default function TransactionsPage() {
                     <tbody className="divide-y divide-gray-50">
                       {customerData.fees.map((fee) => {
                         const isSelected = selectedFeeIds.includes(fee.id);
+                        const isOverdue = fee.priority === "OVERDUE" || (fee.penaltyEGP != null && fee.penaltyEGP > 0) || (fee.dueDate ? fee.dueDate < new Date().toISOString().slice(0, 10) : false);
+                        const penalty = fee.penaltyEGP ?? (isOverdue ? Math.round((fee.remainingEGP ?? 0) * 0.05) : 0);
+                        const totalDue = (fee.remainingEGP ?? 0) + penalty;
+
                         return (
                           <tr
                             key={fee.id}
@@ -1011,20 +1100,63 @@ export default function TransactionsPage() {
                                 className="w-4 h-4 rounded border-gray-300 text-[#003087] cursor-pointer accent-[#003087]"
                               />
                             </td>
+                            <td className="px-4 py-3">
+                              {fee.studentName ? (
+                                <div className="flex flex-col">
+                                  <span className="text-xs font-semibold text-gray-900">{fee.studentName}</span>
+                                  {fee.studentGrade && (
+                                    <span className="text-[10px] text-gray-500 font-medium">{fee.studentGrade}</span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-xs text-gray-400">—</span>
+                              )}
+                            </td>
                             <td className="px-4 py-3 text-xs text-gray-700 font-medium">{fee.name}</td>
                             <td className="px-4 py-3 text-xs font-mono text-gray-600">
                               EGP {formatMoney(fee.originalAmountEGP)}
                             </td>
-                            <td className="px-4 py-3 text-xs font-mono font-bold text-[var(--cib-blue)]">
+                            <td className="px-4 py-3 text-xs font-mono font-bold text-gray-800">
                               EGP {formatMoney(fee.remainingEGP)}
                             </td>
+                            <td className="px-4 py-3 text-xs font-mono">
+                              {penalty > 0 ? (
+                                <div className="flex flex-col">
+                                  <span className="text-amber-600 font-bold">+ EGP {formatMoney(penalty)}</span>
+                                  <span className="text-[9px] text-amber-600 font-medium">5% late fee</span>
+                                </div>
+                              ) : (
+                                <span className="text-gray-400 font-mono">—</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-xs font-mono font-bold text-[#003087]">
+                              EGP {formatMoney(totalDue)}
+                            </td>
                             <td className="px-4 py-3">
-                              <span className="text-[11px] font-semibold px-2 py-0.5 rounded border bg-amber-50 text-amber-700 border-amber-200">
-                                {fee.remainingEGP === 0 ? "Paid" : fee.remainingEGP === fee.originalAmountEGP ? "Unpaid" : "Partial"}
-                              </span>
+                              {isOverdue && fee.remainingEGP > 0 ? (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-rose-50 text-rose-700 border-rose-200 inline-flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                                  Overdue
+                                </span>
+                              ) : fee.remainingEGP === 0 ? (
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded border bg-emerald-50 text-emerald-700 border-emerald-200">
+                                  Paid
+                                </span>
+                              ) : fee.remainingEGP === fee.originalAmountEGP ? (
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded border bg-amber-50 text-amber-700 border-amber-200">
+                                  Unpaid
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
+                                  Partial
+                                </span>
+                              )}
                             </td>
                             <td className="px-4 py-3 text-xs font-mono text-gray-500">
                               {fee.dueDate ? formatIsoDate(fee.dueDate) : "—"}
+                              {isOverdue && (
+                                <span className="text-[9px] text-rose-600 block font-medium">Past Due</span>
+                              )}
                             </td>
                           </tr>
                         );
@@ -1034,15 +1166,28 @@ export default function TransactionsPage() {
                 </div>
               </div>
 
-              {/* Summary bar */}
+              {/* Summary bar with transparent breakdown */}
               <div className="flex items-center justify-between bg-[#F4F6F9] rounded-xl border border-[#E8EDF5] px-5 py-3.5">
-                <div className="text-sm">
+                <div className="text-xs sm:text-sm">
                   <span className="text-gray-500">
                     {selectedFeeIds.length} fee{selectedFeeIds.length !== 1 ? "s" : ""} selected ·{" "}
                   </span>
-                  <span className="font-semibold text-[#1B2A4A]">
-                    Total: EGP {formatMoney(selectedFeesSum)}
-                  </span>
+                  {selectedFeesPenaltySum > 0 ? (
+                    <span>
+                      <span className="text-gray-700">Principal: <strong className="font-mono text-gray-900">EGP {formatMoney(selectedFeesPrincipalSum)}</strong></span>
+                      <span className="text-amber-700 font-medium ml-2">
+                        + Late Penalty (5%): <strong className="font-mono text-amber-800">+EGP {formatMoney(selectedFeesPenaltySum)}</strong>
+                      </span>
+                      <span className="text-gray-400 mx-2">=</span>
+                      <span className="font-bold text-[#003087]">
+                        Total Due: EGP {formatMoney(selectedFeesTotalDueSum)}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="font-bold text-[#1B2A4A]">
+                      Total: EGP {formatMoney(selectedFeesSum)}
+                    </span>
+                  )}
                 </div>
                 <button
                   disabled={selectedFeeIds.length === 0}
@@ -1078,7 +1223,14 @@ export default function TransactionsPage() {
                         i > 0 ? "border-t border-gray-50" : ""
                       }`}
                     >
-                      <span className="text-gray-700 font-medium">{fee.name}</span>
+                      <div className="flex flex-col">
+                        <span className="text-gray-700 font-medium">{fee.name}</span>
+                        {fee.studentName && (
+                          <span className="text-[10px] text-gray-500 font-medium">
+                            Student: {fee.studentName} {fee.studentGrade ? `(${fee.studentGrade})` : ""}
+                          </span>
+                        )}
+                      </div>
                       <span className="font-mono font-semibold text-gray-800">
                         EGP {formatMoney(fee.remainingEGP)}
                       </span>
@@ -1210,15 +1362,37 @@ export default function TransactionsPage() {
                   .filter((f) => selectedFeeIds.includes(f.id))
                   .map((fee) => (
                     <div key={fee.id} className="px-5 py-3 flex items-center justify-between">
-                      <span className="text-xs text-gray-500">{fee.name}</span>
+                      <div className="flex flex-col">
+                        <span className="text-xs text-gray-700 font-medium">{fee.name}</span>
+                        {fee.studentName && (
+                          <span className="text-[10px] text-gray-400">
+                            Student: {fee.studentName} {fee.studentGrade ? `(${fee.studentGrade})` : ""}
+                          </span>
+                        )}
+                      </div>
                       <span className="text-sm font-mono text-gray-700">
                         EGP {formatMoney(fee.remainingEGP)}
                       </span>
                     </div>
                   ))}
+                {!isPartial && selectedFeesPenaltySum > 0 && (
+                  <div className="px-5 py-2 flex items-center justify-between border-t border-gray-100 bg-[#FFFBEB]">
+                    <span className="text-xs text-amber-700 font-medium">Late Penalty</span>
+                    <span className="text-sm font-mono text-amber-700">EGP {formatMoney(selectedFeesPenaltySum)}</span>
+                  </div>
+                )}
+                
+                {isEpp && (
+                  <div className="px-5 py-2 flex items-center justify-between border-t border-gray-100 bg-[#F4F8FF]">
+                    <span className="text-xs text-[#003087] font-medium">EPP Interest / Admin Fees (Est.)</span>
+                    <span className="text-sm font-mono text-[#003087]">EGP {formatMoney(Math.round(payAmountNum * 0.12))}</span>
+                  </div>
+                )}
+
                 <div className="px-5 py-3 flex items-center justify-between bg-[#F8FAFD]">
                   <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
-                    Amount to Pay
+                    Total Charge
+
                     {isPartial && (
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200">
                         Partial
@@ -1231,238 +1405,462 @@ export default function TransactionsPage() {
                 </div>
               </div>
 
-              {/* Method choice / Stored Accounts & Cards */}
+              {/* Method choice: CIB Accounts, Branch POS Terminal, or External Card */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block">
-                    Select Payment Source
+                    Payment Method
                   </label>
-                  {bankCustomer && (
+                  {bankCustomer && paymentMode === "CIB" && (
                     <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                      Verified CIB Register
+                      Verified CIB Customer
                     </span>
                   )}
                 </div>
 
-                {bankCustomer?.accounts && bankCustomer.accounts.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold text-gray-700">Bank Accounts</p>
-                    <div className="space-y-2">
-                      {bankCustomer.accounts.map((acc) => {
-                        const isActive = acc.status === "ACTIVE";
-                        const isSelected = selectedSourceId === acc.account_id;
-                        return (
-                          <div
-                            key={acc.account_id}
-                            onClick={() => {
-                              if (!isActive) return;
-                              setSelectedSourceId(acc.account_id);
-                              setPayMethod("ACCOUNT_DEBIT");
-                              setIsEpp(false);
-                            }}
-                            className={`p-3 rounded-xl border transition-all flex items-center justify-between ${
-                              !isActive
-                                ? "opacity-60 bg-gray-50 border-gray-200 cursor-not-allowed"
-                                : isSelected
-                                ? "border-[#003087] bg-[#EBF1FB] ring-1 ring-[#003087] cursor-pointer"
-                                : "border-[#E8EDF5] bg-white hover:border-gray-300 cursor-pointer"
-                            }`}
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
+                {/* 3-Way Mode Switcher */}
+                <div className="grid grid-cols-3 gap-1.5 p-1 bg-gray-100 rounded-xl border border-gray-200 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentMode("CIB");
+                      setIsEpp(false);
+                    }}
+                    className={`py-2 px-2 rounded-lg font-semibold transition-all text-center ${
+                      paymentMode === "CIB"
+                        ? "bg-white text-[#003087] shadow-xs border border-gray-200"
+                        : "text-gray-500 hover:text-gray-900"
+                    }`}
+                  >
+                    CIB Account/Card
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentMode("BRANCH_POS");
+                      setIsEpp(false);
+                    }}
+                    className={`py-2 px-2 rounded-lg font-semibold transition-all text-center flex items-center justify-center gap-1.5 ${
+                      paymentMode === "BRANCH_POS"
+                        ? "bg-white text-[#003087] shadow-xs border border-gray-200"
+                        : "text-gray-500 hover:text-gray-900"
+                    }`}
+                  >
+                    <CreditCardIcon className="w-3.5 h-3.5" />
+                    Branch POS
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentMode("EXTERNAL_CARD");
+                      setIsEpp(false);
+                    }}
+                    className={`py-2 px-2 rounded-lg font-semibold transition-all text-center ${
+                      paymentMode === "EXTERNAL_CARD"
+                        ? "bg-white text-[#003087] shadow-xs border border-gray-200"
+                        : "text-gray-500 hover:text-gray-900"
+                    }`}
+                  >
+                    External Card
+                  </button>
+                </div>
+
+                {/* MODE 1: CIB ACCOUNTS & CARDS */}
+                {paymentMode === "CIB" && (
+                  <div className="space-y-4">
+                    {bankCustomer?.accounts && bankCustomer.accounts.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold text-gray-700">Bank Accounts</p>
+                        <div className="space-y-2">
+                          {bankCustomer.accounts.map((acc) => {
+                            const isActive = acc.status === "ACTIVE";
+                            const isSelected = selectedSourceId === acc.account_id;
+                            return (
                               <div
-                                className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
-                                  isSelected ? "border-[#003087] bg-[#003087]" : "border-gray-300 bg-white"
+                                key={acc.account_id}
+                                onClick={() => {
+                                  if (!isActive) return;
+                                  setSelectedSourceId(acc.account_id);
+                                  setPayMethod("ACCOUNT_DEBIT");
+                                  setIsEpp(false);
+                                }}
+                                className={`p-3 rounded-xl border transition-all flex items-center justify-between ${
+                                  !isActive
+                                    ? "opacity-60 bg-gray-50 border-gray-200 cursor-not-allowed"
+                                    : isSelected
+                                    ? "border-[#003087] bg-[#EBF1FB] ring-1 ring-[#003087] cursor-pointer"
+                                    : "border-[#E8EDF5] bg-white hover:border-gray-300 cursor-pointer"
                                 }`}
                               >
-                                {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                              </div>
-                              <div className="min-w-0">
-                                <div className="text-xs font-bold text-gray-800 flex items-center gap-2">
-                                  <span>{acc.type} Account</span>
-                                  <span className="font-mono text-gray-500 font-normal">···{acc.account_number.slice(-4)}</span>
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div
+                                    className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                                      isSelected ? "border-[#003087] bg-[#003087]" : "border-gray-300 bg-white"
+                                    }`}
+                                  >
+                                    {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="text-xs font-bold text-gray-800 flex items-center gap-2">
+                                      <span>{acc.type} Account</span>
+                                      <span className="font-mono text-gray-500 font-normal">···{acc.account_number.slice(-4)}</span>
+                                    </div>
+                                    <div className="text-[11px] text-gray-500 mt-0.5 font-mono">
+                                      Available: <span className="font-semibold text-gray-700">EGP {formatMoney(acc.available_balance)}</span>
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="text-[11px] text-gray-500 mt-0.5 font-mono">
-                                  Available: <span className="font-semibold text-gray-700">EGP {formatMoney(acc.available_balance)}</span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="text-right shrink-0">
-                              <span
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${
-                                  isActive
-                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                    : "bg-rose-50 text-rose-700 border-rose-200"
-                                }`}
-                              >
-                                {acc.status}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {bankCustomer?.cards && bankCustomer.cards.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold text-gray-700">Stored Cards</p>
-                    <div className="space-y-2">
-                      {bankCustomer.cards.map((card) => {
-                        const isActive = card.status === "ACTIVE";
-                        const isSelected = selectedSourceId === card.card_id;
-                        const isCredit = card.type === "CREDIT";
-                        return (
-                          <div
-                            key={card.card_id}
-                            onClick={() => {
-                              if (!isActive) return;
-                              setSelectedSourceId(card.card_id);
-                              setPayMethod("CARD");
-                              if (!isCredit) setIsEpp(false);
-                            }}
-                            className={`p-3 rounded-xl border transition-all flex items-center justify-between ${
-                              !isActive
-                                ? "opacity-60 bg-gray-50 border-gray-200 cursor-not-allowed"
-                                : isSelected
-                                ? "border-[#003087] bg-[#EBF1FB] ring-1 ring-[#003087] cursor-pointer"
-                                : "border-[#E8EDF5] bg-white hover:border-gray-300 cursor-pointer"
-                            }`}
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div
-                                className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
-                                  isSelected ? "border-[#003087] bg-[#003087]" : "border-gray-300 bg-white"
-                                }`}
-                              >
-                                {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                              </div>
-                              <div className="min-w-0">
-                                <div className="text-xs font-bold text-gray-800 flex items-center gap-2">
-                                  <span>{card.scheme} {card.type}</span>
-                                  <span className="font-mono text-gray-500 font-normal">{card.masked_number}</span>
-                                </div>
-                                <div className="text-[11px] text-gray-500 mt-0.5">
-                                  {isCredit && card.available_limit != null && (
-                                    <span className="font-mono">
-                                      Limit: <span className="font-semibold text-gray-700">EGP {formatMoney(card.available_limit)}</span> ·{" "}
-                                    </span>
-                                  )}
-                                  <span>Exp: {card.expiry}</span>
-                                  {card.holder_name && ` · ${card.holder_name}`}
+                                <div className="text-right shrink-0">
+                                  <span
+                                    className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${
+                                      isActive
+                                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                        : "bg-rose-50 text-rose-700 border-rose-200"
+                                    }`}
+                                  >
+                                    {acc.status}
+                                  </span>
                                 </div>
                               </div>
-                            </div>
-                            <div className="text-right shrink-0">
-                              <span
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${
-                                  isActive
-                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                    : "bg-rose-50 text-rose-700 border-rose-200"
-                                }`}
-                              >
-                                {card.status}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* If no bank customer records found, fallback to generic options */}
-                {(!bankCustomer || ((bankCustomer.accounts?.length ?? 0) === 0 && (bankCustomer.cards?.length ?? 0) === 0)) && (
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { id: "ACCOUNT_DEBIT", label: "CIB Account Debit" },
-                      { id: "CARD", label: "CIB Card" },
-                    ].map((m) => (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => {
-                          setPayMethod(m.id as PayMethodChoice);
-                          if (m.id !== "CARD") setIsEpp(false);
-                        }}
-                        className={`py-2.5 text-xs font-semibold rounded-lg border transition-all ${
-                          payMethod === m.id
-                            ? "border-[#003087] bg-[#EBF1FB] text-[#003087]"
-                            : "border-[#DDE3EF] text-gray-500 hover:bg-gray-50"
-                        }`}
-                      >
-                        {m.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* EPP / Installment section for selected credit card */}
-                {payMethod === "CARD" && (
-                  <div className="rounded-xl border border-[#003087]/20 bg-[#F4F8FF] p-3.5 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-                        Payment Mode
-                      </p>
-                      {bankCustomer?.cards?.find((c) => c.card_id === selectedSourceId)?.type === "DEBIT" && (
-                        <span className="text-[11px] text-amber-600">Debit cards: Full payment only</span>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setIsEpp(false)}
-                        className={`py-2 text-xs font-semibold rounded-lg border transition-all ${
-                          !isEpp
-                            ? "border-[#003087] bg-[#EBF1FB] text-[#003087]"
-                            : "border-[#DDE3EF] text-gray-500 bg-white hover:bg-gray-50"
-                        }`}
-                      >
-                        Full Payment
-                      </button>
-                      <button
-                        type="button"
-                        disabled={bankCustomer?.cards?.find((c) => c.card_id === selectedSourceId)?.type === "DEBIT"}
-                        onClick={() => setIsEpp(true)}
-                        className={`py-2 text-xs font-semibold rounded-lg border transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
-                          isEpp
-                            ? "border-[#003087] bg-[#EBF1FB] text-[#003087]"
-                            : "border-[#DDE3EF] text-gray-500 bg-white hover:bg-gray-50"
-                        }`}
-                      >
-                        EPP / Installments
-                      </button>
-                    </div>
-
-                    {isEpp && (
-                      <div className="space-y-2 pt-1 border-t border-[#003087]/10">
-                        <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-                          Installment Tenor
-                        </p>
-                        <div className="grid grid-cols-4 gap-1.5">
-                          {[3, 6, 12, 18].map((t) => (
-                            <button
-                              key={t}
-                              type="button"
-                              onClick={() => setEppTenor(t)}
-                              className={`py-2 text-xs font-semibold rounded-lg border transition-all ${
-                                eppTenor === t
-                                  ? "border-[#003087] bg-[#EBF1FB] text-[#003087] font-bold"
-                                  : "border-[#DDE3EF] text-gray-600 bg-white hover:bg-gray-50"
-                              }`}
-                            >
-                              {t}m
-                            </button>
-                          ))}
-                        </div>
-                        <div className="flex items-center justify-between pt-1">
-                          <span className="text-[11px] text-gray-500">Est. monthly installment</span>
-                          <span className="text-xs font-bold font-mono text-[#003087]">
-                            EGP {formatMoney(Math.ceil(payAmountNum / eppTenor))} / month
-                          </span>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
+
+                    {bankCustomer?.cards && bankCustomer.cards.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold text-gray-700">Stored Cards</p>
+                        <div className="space-y-2">
+                          {bankCustomer.cards.map((card) => {
+                            const isActive = card.status === "ACTIVE";
+                            const isSelected = selectedSourceId === card.card_id;
+                            const isCredit = card.type === "CREDIT";
+                            return (
+                              <div
+                                key={card.card_id}
+                                onClick={() => {
+                                  if (!isActive) return;
+                                  setSelectedSourceId(card.card_id);
+                                  setPayMethod("CARD");
+                                  if (!isCredit) setIsEpp(false);
+                                }}
+                                className={`p-3 rounded-xl border transition-all flex items-center justify-between ${
+                                  !isActive
+                                    ? "opacity-60 bg-gray-50 border-gray-200 cursor-not-allowed"
+                                    : isSelected
+                                    ? "border-[#003087] bg-[#EBF1FB] ring-1 ring-[#003087] cursor-pointer"
+                                    : "border-[#E8EDF5] bg-white hover:border-gray-300 cursor-pointer"
+                                }`}
+                              >
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div
+                                    className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                                      isSelected ? "border-[#003087] bg-[#003087]" : "border-gray-300 bg-white"
+                                    }`}
+                                  >
+                                    {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="text-xs font-bold text-gray-800 flex items-center gap-2">
+                                      <span>{card.scheme} {card.type}</span>
+                                      <span className="font-mono text-gray-500 font-normal">{card.masked_number}</span>
+                                    </div>
+                                    <div className="text-[11px] text-gray-500 mt-0.5">
+                                      {isCredit && card.available_limit != null && (
+                                        <span className="font-mono">
+                                          Limit: <span className="font-semibold text-gray-700">EGP {formatMoney(card.available_limit)}</span> ·{" "}
+                                        </span>
+                                      )}
+                                      <span>Exp: {card.expiry}</span>
+                                      {card.holder_name && ` · ${card.holder_name}`}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <span
+                                    className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${
+                                      isActive
+                                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                        : "bg-rose-50 text-rose-700 border-rose-200"
+                                    }`}
+                                  >
+                                    {card.status}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {(!bankCustomer || ((bankCustomer.accounts?.length ?? 0) === 0 && (bankCustomer.cards?.length ?? 0) === 0)) && (
+                      <div className="p-4 rounded-xl border border-dashed border-gray-300 text-center space-y-2 bg-gray-50">
+                        <p className="text-xs text-gray-600">No pre-linked CIB accounts found for this customer.</p>
+                        <p className="text-[11px] text-gray-500">
+                          Use <strong>Branch POS</strong> or <strong>External Card</strong> to pay with any Visa, Mastercard, or Meeza card.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* EPP Option for CIB Credit Cards */}
+                    {payMethod === "CARD" && bankCustomer?.cards?.find((c) => c.card_id === selectedSourceId)?.type === "CREDIT" && (
+                      <div className="rounded-xl border border-[#003087]/20 bg-[#F4F8FF] p-3.5 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                            Payment Plan
+                          </p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsEpp(false)}
+                            className={`py-2 text-xs font-semibold rounded-lg border transition-all ${
+                              !isEpp
+                                ? "border-[#003087] bg-[#EBF1FB] text-[#003087]"
+                                : "border-[#DDE3EF] text-gray-500 bg-white hover:bg-gray-50"
+                            }`}
+                          >
+                            Full Payment
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setIsEpp(true)}
+                            className={`py-2 text-xs font-semibold rounded-lg border transition-all ${
+                              isEpp
+                                ? "border-[#003087] bg-[#EBF1FB] text-[#003087]"
+                                : "border-[#DDE3EF] text-gray-500 bg-white hover:bg-gray-50"
+                            }`}
+                          >
+                            CIB EPP Installments
+                          </button>
+                        </div>
+
+                        {isEpp && (
+                          <div className="space-y-2 pt-1 border-t border-[#003087]/10">
+                            <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                              Installment Tenor
+                            </p>
+                            <div className="grid grid-cols-4 gap-1.5">
+                              {[3, 6, 12, 18].map((t) => (
+                                <button
+                                  key={t}
+                                  type="button"
+                                  onClick={() => setEppTenor(t)}
+                                  className={`py-2 text-xs font-semibold rounded-lg border transition-all ${
+                                    eppTenor === t
+                                      ? "border-[#003087] bg-[#EBF1FB] text-[#003087] font-bold"
+                                      : "border-[#DDE3EF] text-gray-600 bg-white hover:bg-gray-50"
+                                  }`}
+                                >
+                                  {t}m
+                                </button>
+                              ))}
+                            </div>
+                            <div className="flex items-center justify-between pt-1">
+                              <span className="text-[11px] text-gray-500">Est. monthly installment</span>
+                              <span className="text-xs font-bold font-mono text-[#003087]">
+                                EGP {formatMoney(Math.ceil((payAmountNum * 1.12) / eppTenor))} / month
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* MODE 2: BRANCH POS TERMINAL */}
+                {paymentMode === "BRANCH_POS" && (
+                  <div className="space-y-4 p-4 rounded-xl border border-[#003087]/30 bg-[#F8FAFD]">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-xs font-bold text-gray-800">Counter POS Terminal</span>
+                      </div>
+                      <span className="text-[11px] font-mono text-[#003087] font-semibold bg-white px-2 py-0.5 rounded border border-gray-200">
+                        {posTerminalId}
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-white rounded-lg border border-gray-200 text-xs space-y-1.5">
+                      <div className="flex justify-between text-gray-600">
+                        <span>Terminal Status</span>
+                        <span className="font-semibold text-emerald-600">Ready for Card Tap / Insert</span>
+                      </div>
+                      <div className="flex justify-between text-gray-600">
+                        <span>Accepted Brands</span>
+                        <span className="font-semibold text-gray-800">Visa · Mastercard · Meeza</span>
+                      </div>
+                      <div className="flex justify-between text-gray-600 pt-1 border-t border-gray-100">
+                        <span>Terminal Amount</span>
+                        <span className="font-mono font-bold text-[#003087]">EGP {formatMoney(payAmountNum)}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-1">
+                        Simulate Card Tap / Custom Auth Code
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={posAuthRef}
+                          onChange={(e) => setPosAuthRef(e.target.value)}
+                          placeholder="Auto-generated (e.g. AUTH-POS-89214)"
+                          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono bg-white"
+                        />
+                      </div>
+                      <div className="flex gap-1.5 mt-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => setPosAuthRef(`AUTH-POS-${Math.floor(100000 + Math.random() * 900000)}`)}
+                          className="px-2.5 py-1 text-[11px] font-semibold bg-white border border-gray-200 rounded-md text-gray-700 hover:bg-gray-50"
+                        >
+                          💳 Tap Visa
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPosAuthRef(`AUTH-POS-${Math.floor(100000 + Math.random() * 900000)}`)}
+                          className="px-2.5 py-1 text-[11px] font-semibold bg-white border border-gray-200 rounded-md text-gray-700 hover:bg-gray-50"
+                        >
+                          💳 Tap Mastercard
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPosAuthRef(`AUTH-POS-${Math.floor(100000 + Math.random() * 900000)}`)}
+                          className="px-2.5 py-1 text-[11px] font-semibold bg-white border border-gray-200 rounded-md text-gray-700 hover:bg-gray-50"
+                        >
+                          🇪🇬 Tap Meeza
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* MODE 3: EXTERNAL CARD (ONLINE / MANUAL GATEWAY - SERVICE 2) */}
+                {paymentMode === "EXTERNAL_CARD" && (
+                  <div className="space-y-3.5 p-4 rounded-xl border border-gray-200 bg-white">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-bold text-gray-800">Card Payment Gateway</p>
+                      <span className="text-[10px] text-gray-500">Service 2 (Visa / MC / Meeza)</span>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-1">
+                        Cardholder Name
+                      </label>
+                      <input
+                        type="text"
+                        value={extCardHolder}
+                        onChange={(e) => setExtCardHolder(e.target.value)}
+                        placeholder={customerData.customer.name || "Mona Samir"}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs font-medium focus:outline-none focus:border-[#003087]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-1">
+                        16-Digit Card Number *
+                      </label>
+                      <input
+                        type="text"
+                        value={extCardNumber}
+                        maxLength={19}
+                        onChange={(e) => {
+                          const v = e.target.value.replace(/\D/g, "").slice(0, 16);
+                          const formatted = v.match(/.{1,4}/g)?.join(" ") ?? v;
+                          setExtCardNumber(formatted);
+                        }}
+                        placeholder="4111 1111 1111 1111"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono font-semibold focus:outline-none focus:border-[#003087]"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-1">
+                          Expiry (MM/YY) *
+                        </label>
+                        <input
+                          type="text"
+                          maxLength={5}
+                          value={extExpiry}
+                          onChange={(e) => {
+                            let v = e.target.value.replace(/\D/g, "");
+                            if (v.length > 2) v = v.slice(0, 2) + "/" + v.slice(2, 4);
+                            setExtExpiry(v);
+                          }}
+                          placeholder="12/30"
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:border-[#003087]"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-1">
+                          CVV *
+                        </label>
+                        <input
+                          type="password"
+                          maxLength={4}
+                          value={extCvv}
+                          onChange={(e) => setExtCvv(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                          placeholder="123"
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:border-[#003087]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Quick test cards helper */}
+                    <div className="pt-1">
+                      <p className="text-[10px] text-gray-400 mb-1.5 font-medium">Quick Test Cards (Mock Banking Services):</p>
+                      <div className="flex gap-1.5 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setExtCardNumber("4111 1111 1111 1111");
+                            setExtExpiry("12/30");
+                            setExtCvv("123");
+                          }}
+                          className="px-2 py-0.5 text-[10px] bg-blue-50 text-blue-700 rounded border border-blue-200 font-semibold"
+                        >
+                          Visa (Approved)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setExtCardNumber("5555 5555 5555 4444");
+                            setExtExpiry("12/30");
+                            setExtCvv("123");
+                          }}
+                          className="px-2 py-0.5 text-[10px] bg-orange-50 text-orange-700 rounded border border-orange-200 font-semibold"
+                        >
+                          Mastercard (Approved)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setExtCardNumber("5078 0312 3456 7890");
+                            setExtExpiry("12/30");
+                            setExtCvv("123");
+                          }}
+                          className="px-2 py-0.5 text-[10px] bg-emerald-50 text-emerald-700 rounded border border-emerald-200 font-semibold"
+                        >
+                          Meeza (Approved)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setExtCardNumber("4000 0000 0000 0002");
+                            setExtExpiry("12/30");
+                            setExtCvv("123");
+                          }}
+                          className="px-2 py-0.5 text-[10px] bg-rose-50 text-rose-700 rounded border border-rose-200 font-semibold"
+                        >
+                          Decline (Low Funds)
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1826,7 +2224,7 @@ export default function TransactionsPage() {
                   <th className="py-3 px-4">FEE TYPE</th>
                   <th className="py-3 px-4">AMOUNT</th>
                   <th className="py-3 px-4">METHOD</th>
-                  <th className="py-3 px-4">DUE DATE &amp; PRIORITY</th>
+                  <th className="py-3 px-4">DUE DATE &amp; FEE STATUS</th>
                   <th className="py-3 px-4">TIMESTAMP</th>
                   <th className="py-3 px-4">STATUS</th>
                   <th className="py-3 px-4 text-right">ACTIONS</th>
@@ -1877,32 +2275,57 @@ export default function TransactionsPage() {
                       </td>
 
                       {/* Method */}
-                      <td className="py-3 px-4 text-gray-600">
-                        {tx.method === "ACCOUNT_DEBIT" ? "Account Debit" : "CIB Card"}
+                      <td className="py-3 px-4 text-gray-600 font-medium">
+                        {tx.method === "POS Terminal"
+                          ? "POS Terminal"
+                          : tx.method === "ACCOUNT_DEBIT"
+                          ? "Account Debit"
+                          : tx.method === "EPP"
+                          ? "CIB EPP"
+                          : tx.method || "CIB Card"}
                       </td>
 
-                      {/* Due Date & Priority */}
+                      {/* Due Date & Fee Status */}
                       <td className="py-3 px-4">
                         {tx.dueDate ? (
                           <div className="space-y-1">
                             <div className="text-gray-600 font-mono text-[11px]">{formatIsoDate(tx.dueDate)}</div>
-                            {tx.daysToDue != null && tx.status !== "Successful" && (
-                              <div
-                                className={`text-[10px] font-medium ${
-                                  tx.daysToDue < 0 ? "text-red-600" : tx.daysToDue === 0 ? "text-orange-600" : "text-gray-400"
-                                }`}
-                              >
-                                {dueDateLabel(tx.daysToDue)}
-                              </div>
-                            )}
-                            {tx.priority && (
-                              <span
-                                className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border ${
-                                  PRIORITY_BADGE_CLASSES[tx.priority] ?? "bg-gray-100 text-gray-600 border-gray-200"
-                                }`}
-                              >
-                                {tx.priority}
-                              </span>
+                            {tx.status === "Successful" ? (
+                              tx.partial?.isPartial ? (
+                                <div className="space-y-0.5">
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border bg-amber-50 text-amber-700 border-amber-200">
+                                    Partial Payment
+                                  </span>
+                                  <div className="text-[10px] text-gray-400">
+                                    Fee Rem: EGP {formatMoney((tx.partial.totalFeeAmountEGP ?? 0) - (tx.amountEGP + (tx.partial.previouslyPaidEGP ?? 0)))}
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200">
+                                  Settled (Paid)
+                                </span>
+                              )
+                            ) : (
+                              <>
+                                {tx.daysToDue != null && (
+                                  <div
+                                    className={`text-[10px] font-medium ${
+                                      tx.daysToDue < 0 ? "text-red-600" : tx.daysToDue === 0 ? "text-orange-600" : "text-gray-400"
+                                    }`}
+                                  >
+                                    {dueDateLabel(tx.daysToDue)}
+                                  </div>
+                                )}
+                                {tx.priority && (
+                                  <span
+                                    className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border ${
+                                      PRIORITY_BADGE_CLASSES[tx.priority] ?? "bg-gray-100 text-gray-600 border-gray-200"
+                                    }`}
+                                  >
+                                    {tx.priority}
+                                  </span>
+                                )}
+                              </>
                             )}
                           </div>
                         ) : (

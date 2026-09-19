@@ -16,9 +16,11 @@ import java.util.Optional;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final IdentityUserDetailsService identityUserDetailsService;
 
-    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider) {
+    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider, IdentityUserDetailsService identityUserDetailsService) {
         this.jwtTokenProvider = jwtTokenProvider;
+        this.identityUserDetailsService = identityUserDetailsService;
     }
 
     @Override
@@ -31,9 +33,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             Optional<SecurityUserPrincipal> principalOpt = jwtTokenProvider.validateAndParseToken(token);
             if (principalOpt.isPresent()) {
                 SecurityUserPrincipal principal = principalOpt.get();
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+                
+                // CRITICAL FIX: Ensure user is still active in the database
+                Optional<SecurityUserPrincipal> activePrincipalOpt = identityUserDetailsService.loadUserById(principal.userId());
+                
+                if (activePrincipalOpt.isPresent()) {
+                    SecurityUserPrincipal activePrincipal = activePrincipalOpt.get();
+                    UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(activePrincipal, null, activePrincipal.getAuthorities());
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                }
             }
         }
         filterChain.doFilter(request, response);

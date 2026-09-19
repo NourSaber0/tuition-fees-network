@@ -11,6 +11,8 @@ public record ResolvedGuardianDto(
         String email,
         String phone,
         boolean cibAccountLinked,
+        String linkedAccountId,
+        String linkedCardId,
         List<ResolvedStudentDto> students
 ) {
 }

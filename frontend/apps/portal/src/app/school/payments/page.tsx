@@ -35,6 +35,7 @@ import type {
   SchoolPaymentItem,
   SchoolPaymentsResponse,
 } from "./types";
+import { SchoolPosModal } from "./SchoolPosModal";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -179,6 +180,9 @@ export default function SchoolPaymentsPage() {
   const [detail, setDetail] = useState<SchoolPaymentDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+
+  // School POS Modal
+  const [isPosModalOpen, setIsPosModalOpen] = useState(false);
 
   // -------------------------------------------------------------------------
   // Fetch payments list
@@ -481,17 +485,14 @@ export default function SchoolPaymentsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Payments</h1>
         </div>
 
-        {/* Export — the ONLY action button in this view */}
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={handleExport}
-          disabled={exporting}
-          className="flex items-center gap-2"
-        >
-          {exporting ? (
-            <LoadingSpinner size={16} />
-          ) : (
+        <div className="flex items-center gap-2">
+          {/* Collect Payment via School Counter POS Terminal */}
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => setIsPosModalOpen(true)}
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm"
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className="h-4 w-4"
@@ -500,15 +501,40 @@ export default function SchoolPaymentsPage() {
               stroke="currentColor"
               strokeWidth={2}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
-          )}
-          {exporting ? "Exporting…" : "Export CSV"}
-        </Button>
+            Collect Payment (School POS)
+          </Button>
+
+          {/* Export CSV */}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleExport}
+            disabled={exporting}
+            className="flex items-center gap-2"
+          >
+            {exporting ? (
+              <LoadingSpinner size={16} />
+            ) : (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"
+                />
+              </svg>
+            )}
+            {exporting ? "Exporting…" : "Export CSV"}
+          </Button>
+        </div>
       </div>
 
       {/* ------------------------------------------------------------------ */}
@@ -847,6 +873,13 @@ export default function SchoolPaymentsPage() {
           </div>
         )}
       </Modal>
+
+      {/* School POS Terminal Collection Modal */}
+      <SchoolPosModal
+        isOpen={isPosModalOpen}
+        onClose={() => setIsPosModalOpen(false)}
+        onSuccess={() => fetchPayments(filters, page)}
+      />
     </div>
   );
 }

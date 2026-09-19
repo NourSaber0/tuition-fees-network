@@ -89,3 +89,50 @@ export interface PaymentFilters {
   dateTo: string;
   studentId: string;
 }
+
+export interface StudentSearchItem {
+  id: string;
+  studentRef: string;
+  name: string;
+  grade: string;
+  section: string;
+  status: string;
+}
+
+export interface StudentFeeItem {
+  feeId: string;
+  name: string;
+  category: string;
+  term: string;
+  dueDate: string;
+  originalAmountEGP: number;
+  paidEGP: number;
+  remainingEGP: number;
+  status: string;
+}
+
+export interface StudentFeesResponse {
+  data: StudentFeeItem[];
+  totals?: {
+    totalFeesEGP: number;
+    totalPaidEGP: number;
+    totalOutstandingEGP: number;
+    overdueCount: number;
+  };
+}
+
+export interface SchoolPosPaymentResponse {
+  transactionId: string;
+  status: string;
+  amountPaidEGP: number;
+  isPartial: boolean;
+  remainingBalanceEGP: number;
+  method: string;
+  bankRef?: string;
+  authCode?: string;
+  receiptRef?: string;
+  originalFeeEGP?: number;
+  penaltyEGP?: number;
+  totalCollectedEGP?: number;
+  penaltyAppliedAt?: string;
+}

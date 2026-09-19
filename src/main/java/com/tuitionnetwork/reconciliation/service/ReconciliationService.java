@@ -18,7 +18,7 @@ public interface ReconciliationService {
 
     ReconciliationRunDto triggerRun(TriggerRunRequest request);
 
-    PageResponse<ReconciliationExceptionDto> listExceptions(String status, String priority, String assignedTo, Boolean includeResolved, int page, int pageSize);
+    PageResponse<ReconciliationExceptionDto> listExceptions(java.time.LocalDate dateFrom, java.time.LocalDate dateTo, String status, String priority, String assignedTo, Boolean includeResolved, int page, int pageSize);
 
     Optional<ReconciliationExceptionDetailDto> getException(UUID id);
 

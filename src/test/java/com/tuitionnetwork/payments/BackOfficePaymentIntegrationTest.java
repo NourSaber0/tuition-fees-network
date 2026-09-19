@@ -20,6 +20,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
@@ -37,6 +38,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@Import(com.tuitionnetwork.MockBankTestConfig.class)
 @SpringBootTest(classes = DemoApplication.class)
 @Transactional
 class BackOfficePaymentIntegrationTest {
@@ -389,5 +391,60 @@ class BackOfficePaymentIntegrationTest {
                         .header("X-API-Key", "wit-intern-2026").contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(username = "ops@cibeg.com", roles = {"BACK_OFFICE"})
+    void processPayment_withBranchPos_returns201() throws Exception {
+        String idempKey = UUID.randomUUID().toString();
+        String body = """
+                {
+                    "nationalId": "%s",
+                    "feeIds": ["%s"],
+                    "amountEGP": 5000.00,
+                    "method": "POS Terminal (Visa/Mastercard/Meeza)",
+                    "posTerminalId": "POS-BR01-CIB",
+                    "posAuthRef": "AUTH-POS-778899",
+                    "channel": "Branch POS",
+                    "processedBy": "EMP-001"
+                }
+                """.formatted(testNationalId, sampleFee.getId());
+
+        mockMvc.perform(post("/api/v1/payments")
+                        .header("Idempotency-Key", idempKey)
+                        .header("X-API-Key", "wit-intern-2026").contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("Successful"))
+                .andExpect(jsonPath("$.amountPaidEGP").value(5000.00))
+                .andExpect(jsonPath("$.authCode").value("AUTH-POS-778899"));
+    }
+
+    @Test
+    @WithMockUser(username = "ops@cibeg.com", roles = {"BACK_OFFICE"})
+    void processPayment_withExternalCard_returns201() throws Exception {
+        String idempKey = UUID.randomUUID().toString();
+        String body = """
+                {
+                    "nationalId": "%s",
+                    "feeIds": ["%s"],
+                    "amountEGP": 5000.00,
+                    "method": "External Card",
+                    "cardNumber": "4111 1111 1111 1111",
+                    "cardHolderName": "External Guardian",
+                    "expiryMonth": 12,
+                    "expiryYear": 2030,
+                    "cvv": "123",
+                    "processedBy": "EMP-001"
+                }
+                """.formatted(testNationalId, sampleFee.getId());
+
+        mockMvc.perform(post("/api/v1/payments")
+                        .header("Idempotency-Key", idempKey)
+                        .header("X-API-Key", "wit-intern-2026").contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("Successful"))
+                .andExpect(jsonPath("$.amountPaidEGP").value(5000.00));
     }
 }

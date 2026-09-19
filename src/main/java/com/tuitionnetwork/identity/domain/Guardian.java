@@ -38,6 +38,12 @@ public class Guardian {
     @Column(name = "cib_account_linked", nullable = false)
     private boolean cibAccountLinked = false;
 
+    @Column(name = "linked_account_id")
+    private String linkedAccountId;
+
+    @Column(name = "linked_card_id")
+    private String linkedCardId;
+
     public Guardian() {
     }
 
@@ -114,6 +120,22 @@ public class Guardian {
 
     public void setCibAccountLinked(boolean cibAccountLinked) {
         this.cibAccountLinked = cibAccountLinked;
+    }
+
+    public String getLinkedAccountId() {
+        return linkedAccountId;
+    }
+
+    public void setLinkedAccountId(String linkedAccountId) {
+        this.linkedAccountId = linkedAccountId;
+    }
+
+    public String getLinkedCardId() {
+        return linkedCardId;
+    }
+
+    public void setLinkedCardId(String linkedCardId) {
+        this.linkedCardId = linkedCardId;
     }
 
     @Override

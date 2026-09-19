@@ -173,7 +173,7 @@ export default function InstitutionDetailPage({ params }: { params: Promise<{ id
                 <Button size="sm" variant="danger" onClick={() => setPendingAction("reject")}>
                   Reject
                 </Button>
-                <Button size="sm" onClick={() => setPendingAction("approve")}>
+                <Button size="sm" className="bg-[#003087] hover:bg-[#002060] text-white px-3 py-1.5 font-medium shadow-sm" onClick={() => setPendingAction("approve")}>
                   Approve
                 </Button>
               </>

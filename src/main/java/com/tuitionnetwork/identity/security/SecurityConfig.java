@@ -26,14 +26,11 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final IdentityUserDetailsService identityUserDetailsService;
-    private final com.tuitionnetwork.mockbank.web.MockBankApiKeyFilter mockBankApiKeyFilter;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
-                          IdentityUserDetailsService identityUserDetailsService,
-                          com.tuitionnetwork.mockbank.web.MockBankApiKeyFilter mockBankApiKeyFilter) {
+                          IdentityUserDetailsService identityUserDetailsService) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.identityUserDetailsService = identityUserDetailsService;
-        this.mockBankApiKeyFilter = mockBankApiKeyFilter;
     }
 
     @Bean
@@ -63,7 +60,6 @@ public class SecurityConfig {
                 )
                 .httpBasic(Customizer.withDefaults())
                 .userDetailsService(identityUserDetailsService)
-                .addFilterBefore(mockBankApiKeyFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))

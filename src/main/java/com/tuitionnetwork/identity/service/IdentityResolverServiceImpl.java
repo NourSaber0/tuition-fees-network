@@ -7,6 +7,10 @@ import com.tuitionnetwork.identity.domain.Institution;
 import com.tuitionnetwork.identity.domain.Student;
 import com.tuitionnetwork.identity.dto.ResolvedGuardianDto;
 import com.tuitionnetwork.identity.dto.ResolvedStudentDto;
+import com.tuitionnetwork.identity.infrastructure.MockBankCustomerClient;
+import com.tuitionnetwork.identity.infrastructure.MockBankCustomerClient.AccountDto;
+import com.tuitionnetwork.identity.infrastructure.MockBankCustomerClient.CardDto;
+import com.tuitionnetwork.identity.infrastructure.MockBankMoiClient;
 import com.tuitionnetwork.identity.repository.GuardianRepository;
 import com.tuitionnetwork.identity.repository.InstitutionRepository;
 import com.tuitionnetwork.identity.repository.StudentRepository;
@@ -37,6 +41,8 @@ public class IdentityResolverServiceImpl implements IdentityResolverService {
     private final StudentRepository studentRepository;
     private final InstitutionRepository institutionRepository;
     private final AuditLogRepository auditLogRepository;
+    private final MockBankCustomerClient mockBankCustomerClient;
+    private final MockBankMoiClient mockBankMoiClient;
     private final String secretKey;
 
     @Autowired
@@ -45,11 +51,15 @@ public class IdentityResolverServiceImpl implements IdentityResolverService {
             StudentRepository studentRepository,
             InstitutionRepository institutionRepository,
             AuditLogRepository auditLogRepository,
+            MockBankMoiClient mockBankMoiClient,
+            MockBankCustomerClient mockBankCustomerClient,
             @Value("${app.security.hmac-secret:default-tuition-secret-key-32-chars-long!}") String secretKey) {
         this.guardianRepository = guardianRepository;
         this.studentRepository = studentRepository;
         this.institutionRepository = institutionRepository;
         this.auditLogRepository = auditLogRepository;
+        this.mockBankCustomerClient = mockBankCustomerClient;
+        this.mockBankMoiClient = mockBankMoiClient;
         this.secretKey = secretKey;
     }
 
@@ -58,13 +68,13 @@ public class IdentityResolverServiceImpl implements IdentityResolverService {
             StudentRepository studentRepository,
             InstitutionRepository institutionRepository,
             @Value("${app.security.hmac-secret:default-tuition-secret-key-32-chars-long!}") String secretKey) {
-        this(guardianRepository, studentRepository, institutionRepository, null, secretKey);
+        this(guardianRepository, studentRepository, institutionRepository, null, null, null, secretKey);
     }
 
     public IdentityResolverServiceImpl(
             GuardianRepository guardianRepository,
             @Value("${app.security.hmac-secret:default-tuition-secret-key-32-chars-long!}") String secretKey) {
-        this(guardianRepository, null, null, null, secretKey);
+        this(guardianRepository, null, null, null, null, null, secretKey);
     }
 
     @Override
@@ -103,12 +113,54 @@ public class IdentityResolverServiceImpl implements IdentityResolverService {
             auditLogRepository.save(auditLog);
         }
 
+        
+        if (mockBankMoiClient != null && !mockBankMoiClient.validateNationalId(rawNationalId)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.BAD_REQUEST, "MOI Validation Failed: Invalid National ID");
+        }
+
         Optional<Guardian> guardianOpt = guardianRepository.findByNationalIdHash(hmac);
         if (guardianOpt.isEmpty()) {
             return Optional.empty();
         }
 
         Guardian guardian = guardianOpt.get();
+
+        if (mockBankCustomerClient != null) {
+            try {
+                MockBankCustomerClient.CustomerResponse customerResponse = mockBankCustomerClient.getCustomerByNationalId(rawNationalId);
+                
+                boolean updated = false;
+                
+                if (customerResponse.accounts() != null) {
+                    for (AccountDto acc : customerResponse.accounts()) {
+                        if ("ACTIVE".equalsIgnoreCase(acc.status())) {
+                            guardian.setLinkedAccountId(acc.account_id());
+                            updated = true;
+                            break;
+                        }
+                    }
+                }
+                
+                if (customerResponse.cards() != null) {
+                    for (CardDto card : customerResponse.cards()) {
+                        if ("ACTIVE".equalsIgnoreCase(card.status())) {
+                            guardian.setLinkedCardId(card.card_id());
+                            updated = true;
+                            break;
+                        }
+                    }
+                }
+                
+                if (updated) {
+                    guardianRepository.save(guardian);
+                }
+                
+            } catch (Exception ignored) {
+                // Ignore if customer is not found in mock bank or service is down
+            }
+        }
+
         List<ResolvedStudentDto> studentDtos = loadStudentsForGuardian(guardian.getId());
 
         ResolvedGuardianDto dto = new ResolvedGuardianDto(
@@ -119,6 +171,8 @@ public class IdentityResolverServiceImpl implements IdentityResolverService {
                 guardian.getEmail(),
                 guardian.getPhone(),
                 guardian.isCibAccountLinked(),
+                guardian.getLinkedAccountId(),
+                guardian.getLinkedCardId(),
                 studentDtos
         );
 

@@ -17,6 +17,9 @@ import com.tuitionnetwork.identity.repository.GuardianRepository;
 import com.tuitionnetwork.identity.repository.InstitutionRepository;
 import com.tuitionnetwork.identity.repository.StudentRepository;
 import com.tuitionnetwork.identity.service.IdentityResolverService;
+import com.tuitionnetwork.t24.dto.T24BillingDto.RetrieveBillingResponse;
+import com.tuitionnetwork.t24.dto.T24BillingDto.BillingItem;
+import com.tuitionnetwork.t24.service.T24CustomerBillingService;
 import com.tuitionnetwork.payments.domain.Payment;
 import com.tuitionnetwork.payments.domain.PaymentAllocation;
 import com.tuitionnetwork.payments.domain.PaymentMethod;
@@ -71,7 +74,9 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
     private final FeeDeadlineService feeDeadlineService;
 
     @Autowired(required = false)
-    private com.tuitionnetwork.mockbank.store.MockBankStore mockBankStore;
+    private T24CustomerBillingService t24CustomerBillingService;
+    @Autowired(required = false)
+    private com.tuitionnetwork.identity.infrastructure.MockBankCustomerClient mockBankCustomerClient;
 
     @Autowired
     public TransactionQueryServiceImpl(PaymentRepository paymentRepository,
@@ -82,7 +87,8 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
                                        IdentityResolverService identityResolverService,
                                        @Autowired(required = false) AuditLogRepository auditLogRepository,
                                        ReceiptRepository receiptRepository,
-                                       FeeDeadlineService feeDeadlineService) {
+                                       FeeDeadlineService feeDeadlineService,
+                                       @Autowired(required = false) T24CustomerBillingService t24CustomerBillingService, com.tuitionnetwork.identity.infrastructure.MockBankCustomerClient mockBankCustomerClient) {
         this.paymentRepository = paymentRepository;
         this.feeLineRepository = feeLineRepository;
         this.studentRepository = studentRepository;
@@ -92,6 +98,8 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
         this.auditLogRepository = auditLogRepository;
         this.receiptRepository = receiptRepository;
         this.feeDeadlineService = feeDeadlineService;
+        this.t24CustomerBillingService = t24CustomerBillingService;
+        this.mockBankCustomerClient = mockBankCustomerClient;
     }
 
     @Override
@@ -271,6 +279,8 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
                 base.penaltyAppliedAt(),
                 base.graceEnded(),
                 base.totalDueEGP(),
+                base.penaltyPaidEGP(),
+                base.penaltyRemainingEGP(),
                 timeline,
                 allocations
         );
@@ -333,19 +343,56 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
                 inst = institutionRepository.findById(primaryStudent.getInstitutionId()).orElse(null);
             }
 
+            String gradeText;
+            if (students.size() == 1) {
+                String g = students.get(0).getGrade();
+                gradeText = (g != null && !g.isBlank()) ? g : "1 Enrolled Student";
+            } else if (students.size() > 1) {
+                gradeText = students.size() + " Enrolled Students";
+            } else {
+                gradeText = "Guardian Account";
+            }
+
             CustomerDto customer = new CustomerDto(
                     guardian.fullName(),
                     masked,
                     inst != null ? inst.getName() : "-",
                     inst != null && inst.getInstitutionType() != null ? inst.getInstitutionType().name() : "School",
-                    "Grade 10"
+                    gradeText
             );
 
             List<CustomerFeeItemDto> feeDtos = new ArrayList<>();
             for (Student student : students) {
                 List<FeeLine> fees = feeLineRepository.findByStudentId(student.getId());
                 for (FeeLine f : fees) {
-                    feeDtos.add(toCustomerFeeItemDto(f));
+                    feeDtos.add(toCustomerFeeItemDto(f, student.getFullName(), student.getGrade()));
+                }
+            }
+            
+            if (t24CustomerBillingService != null && guardian.linkedAccountId() != null) {
+                try {
+                    RetrieveBillingResponse t24Response = t24CustomerBillingService.retrieveCustomerDues(nationalId, guardian.linkedAccountId(), null);
+                    if (t24Response != null && "SUCCESS".equals(t24Response.status()) && t24Response.items() != null) {
+                        for (BillingItem item : t24Response.items()) {
+                            feeDtos.add(new CustomerFeeItemDto(
+                                    UUID.randomUUID().toString(),
+                                    item.studentName() != null ? item.studentName() : "External",
+                                    "External",
+                                    item.feeType() != null ? item.feeType() : "T24 Fee",
+                                    item.originalAmount() != null ? item.originalAmount() : item.remainingAmount(),
+                                    item.paidAmount() != null ? item.paidAmount() : BigDecimal.ZERO,
+                                    item.remainingAmount(),
+                                    item.status() != null ? item.status() : "OUTSTANDING",
+                                    true,
+                                    item.dueDate(),
+                                    "Normal",
+                                    0L,
+                                    BigDecimal.ZERO,
+                                    item.remainingAmount()
+                            ));
+                        }
+                    }
+                } catch (Exception ignored) {
                 }
             }
 
@@ -362,40 +409,29 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
                     ? institutionRepository.findById(student.getInstitutionId()).orElse(null)
                     : null;
 
+            String gradeText = (student.getGrade() != null && !student.getGrade().isBlank())
+                    ? student.getGrade()
+                    : "Student Account";
+
             CustomerDto customer = new CustomerDto(
                     student.getFullName(),
                     masked,
                     inst != null ? inst.getName() : "-",
                     inst != null && inst.getInstitutionType() != null ? inst.getInstitutionType().name() : "School",
-                    "Grade 10"
+                    gradeText
             );
 
             List<FeeLine> fees = feeLineRepository.findByStudentId(student.getId());
             List<CustomerFeeItemDto> feeDtos = new ArrayList<>();
             for (FeeLine f : fees) {
-                feeDtos.add(toCustomerFeeItemDto(f));
+                feeDtos.add(toCustomerFeeItemDto(f, student.getFullName(), student.getGrade()));
             }
 
             auditCustomerSearch(masked);
             return new CustomerFeesResponse(customer, feeDtos);
         }
 
-        // 3. Check Bank Customer
-        if (mockBankStore != null) {
-            Optional<com.tuitionnetwork.mockbank.dto.CustomerLookupResponse> bankCustOpt = mockBankStore.getCustomerByNationalId(nationalId);
-            if (bankCustOpt.isPresent()) {
-                com.tuitionnetwork.mockbank.dto.CustomerLookupResponse bankCust = bankCustOpt.get();
-                CustomerDto customer = new CustomerDto(
-                        bankCust.fullNameEn(),
-                        masked,
-                        "CIB Bank Customer",
-                        "Bank Account",
-                        "—"
-                );
-                auditCustomerSearch(masked);
-                return new CustomerFeesResponse(customer, List.of());
-            }
-        }
+        // 3. Mock Bank fallback removed.
 
         throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Customer not found for National ID: " + masked);
     }
@@ -443,10 +479,12 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
         }
     }
 
-    private CustomerFeeItemDto toCustomerFeeItemDto(FeeLine f) {
+    private CustomerFeeItemDto toCustomerFeeItemDto(FeeLine f, String studentName, String studentGrade) {
         FeeDeadlineSnapshot deadline = feeDeadlineService.computeSnapshot(f);
         return new CustomerFeeItemDto(
                 f.getId().toString(),
+                studentName,
+                studentGrade,
                 (f.getFeeType() != null ? f.getFeeType().name() : "Fee") + " - " + (f.getCollectionPeriod() != null ? f.getCollectionPeriod() : ""),
                 f.getTotalAmount(),
                 f.getPaidAmount() != null ? f.getPaidAmount() : BigDecimal.ZERO,
@@ -459,6 +497,19 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
                 deadline.penaltyEGP(),
                 deadline.totalDueEGP()
         );
+    }
+
+    private CustomerFeeItemDto toCustomerFeeItemDto(FeeLine f) {
+        String studentName = null;
+        String studentGrade = null;
+        if (f.getStudentId() != null) {
+            Optional<Student> st = studentRepository.findById(f.getStudentId());
+            if (st.isPresent()) {
+                studentName = st.get().getFullName();
+                studentGrade = st.get().getGrade();
+            }
+        }
+        return toCustomerFeeItemDto(f, studentName, studentGrade);
     }
 
     private TransactionDto mapToTransactionDto(Payment payment) {
@@ -508,13 +559,51 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
             }
         }
 
+        BigDecimal principalAllocated = BigDecimal.ZERO;
+        if (payment.getAllocations() != null) {
+            for (PaymentAllocation pa : payment.getAllocations()) {
+                if (pa.getAmountApplied() != null) {
+                    principalAllocated = principalAllocated.add(pa.getAmountApplied());
+                }
+            }
+        }
+        BigDecimal penaltyPaid = BigDecimal.ZERO;
+        if (payment.getTotalAmount() != null && payment.getTotalAmount().compareTo(principalAllocated) > 0) {
+            penaltyPaid = payment.getTotalAmount().subtract(principalAllocated);
+        }
+
+        FeeDeadlineSnapshot deadline = primaryFeeForDeadline != null
+                ? feeDeadlineService.computeSnapshot(primaryFeeForDeadline)
+                : null;
+
+        BigDecimal totalPenaltyOnFee = deadline != null && deadline.penaltyEGP() != null ? deadline.penaltyEGP() : BigDecimal.ZERO;
+        BigDecimal penaltyRemaining = totalPenaltyOnFee.subtract(penaltyPaid);
+        if (penaltyRemaining.compareTo(BigDecimal.ZERO) < 0) {
+            penaltyRemaining = BigDecimal.ZERO;
+        }
+
         String method = "CIB Account";
         if (payment.getPaymentMethod() != null) {
             switch (payment.getPaymentMethod()) {
-                case CREDIT_CARD -> method = "CIB Credit Card";
+                case CREDIT_CARD -> {
+                    if ((payment.getAuthCode() != null && payment.getAuthCode().contains("POS"))
+                            || (payment.getTransactionReference() != null && payment.getTransactionReference().contains("POS"))) {
+                        method = "POS Terminal";
+                    } else {
+                        method = "CIB Credit Card";
+                    }
+                }
                 case EPP_INSTALMENTS -> method = "EPP";
                 default -> method = "CIB Account";
             }
+        }
+
+        String channel = "Counter";
+        if (payment.getTransactionReference() != null && payment.getTransactionReference().contains("SCH")) {
+            channel = "School POS";
+        } else if ((payment.getAuthCode() != null && payment.getAuthCode().contains("POS"))
+                || (payment.getTransactionReference() != null && payment.getTransactionReference().contains("POS"))) {
+            channel = "Branch POS";
         }
 
         String status = "Pending";
@@ -538,10 +627,6 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
             partial = new PartialPaymentDto(originalAmount, previouslyPaid);
         }
 
-        FeeDeadlineSnapshot deadline = primaryFeeForDeadline != null
-                ? feeDeadlineService.computeSnapshot(primaryFeeForDeadline)
-                : null;
-
         return new TransactionDto(
                 payment.getId(),
                 institution,
@@ -557,7 +642,7 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
                 payment.getCreatedAt(),
                 partial,
                 payment.getIdempotencyKey(),
-                "Counter",
+                channel,
                 deadline != null ? deadline.dueDate() : null,
                 deadline != null ? deadline.priority().name() : null,
                 deadline != null ? deadline.daysToDue() : null,
@@ -565,7 +650,9 @@ public class TransactionQueryServiceImpl implements TransactionQueryService {
                 deadline != null ? deadline.penaltyEGP() : null,
                 deadline != null ? deadline.penaltyAppliedAt() : null,
                 deadline != null ? deadline.graceEnded() : null,
-                deadline != null ? deadline.totalDueEGP() : null
+                deadline != null ? deadline.totalDueEGP() : null,
+                penaltyPaid,
+                penaltyRemaining
         );
     }
 

@@ -112,15 +112,6 @@ public class PaymentSettlementService {
                             "exceeds remaining fee balance (" + remaining + " EGP) for FeeLine ID " + feeLine.getId() + "."
                     );
                 }
-
-                boolean isPartialPayment = due.amountToPay().compareTo(remaining) < 0;
-                boolean isPastDue = feeLine.getDueDate() != null && feeLine.getDueDate().isBefore(LocalDate.now());
-                if (isPartialPayment && isPastDue) {
-                    throw new PendingBusinessRuleException(
-                            "Pending Business Rule: Post-Deadline Partial Payments are undefined for overdue fee line " +
-                            "(FeeLine ID: " + feeLine.getId() + ", Due Date: " + feeLine.getDueDate() + ")."
-                    );
-                }
             }
         }
 

@@ -29,6 +29,9 @@ public interface FeeLineRepository extends JpaRepository<FeeLine, UUID> {
     @Query("select f from FeeLine f where f.remainingAmount > 0")
     List<FeeLine> findAllOutstanding();
 
+    @Query("select coalesce(sum(f.penaltyAmountEGP), 0) from FeeLine f where f.penaltyAppliedAt is not null")
+    BigDecimal sumTotalPenaltiesApplied();
+
     List<FeeLine> findByStudentIdAndStatusNot(UUID studentId, FeeStatus status);
 
     List<FeeLine> findByStudentId(UUID studentId);

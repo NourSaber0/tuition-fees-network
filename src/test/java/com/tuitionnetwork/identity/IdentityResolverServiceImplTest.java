@@ -50,6 +50,8 @@ class IdentityResolverServiceImplTest {
                 studentRepository,
                 institutionRepository,
                 auditLogRepository,
+                null,
+                org.mockito.Mockito.mock(com.tuitionnetwork.identity.infrastructure.MockBankCustomerClient.class),
                 SECRET_KEY
         );
     }

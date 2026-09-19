@@ -31,6 +31,8 @@ export interface TransactionDto {
   penaltyAppliedAt?: string;
   graceEnded?: boolean;
   totalDueEGP?: number;
+  penaltyPaidEGP?: number;
+  penaltyRemainingEGP?: number;
 }
 
 export interface TimelineEventDto {
@@ -74,6 +76,8 @@ export interface TransactionDetailDto {
   penaltyAppliedAt?: string;
   graceEnded?: boolean;
   totalDueEGP?: number;
+  penaltyPaidEGP?: number;
+  penaltyRemainingEGP?: number;
   timeline?: TimelineEventDto[];
   allocations?: AllocatedDueDetailDto[];
 }
@@ -103,9 +107,11 @@ export interface CustomerDto {
 
 export interface CustomerFeeItemDto {
   id: string;
+  studentName?: string;
+  studentGrade?: string;
   name: string;
   originalAmountEGP: number;
-  paidEGP: number;
+  paidAmountEGP: number;
   remainingEGP: number;
   status: string;
   eligible: boolean;
@@ -173,6 +179,14 @@ export interface BackOfficePaymentRequest {
   eppTenor?: number;
   cardToken?: string;
   processedBy?: string;
+  cardNumber?: string;
+  cardHolderName?: string;
+  expiryMonth?: number;
+  expiryYear?: number;
+  cvv?: string;
+  posTerminalId?: string;
+  posAuthRef?: string;
+  channel?: string;
 }
 
 export interface BackOfficePaymentResponse {

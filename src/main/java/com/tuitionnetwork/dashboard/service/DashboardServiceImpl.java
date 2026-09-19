@@ -30,6 +30,7 @@ import com.tuitionnetwork.payments.domain.PaymentStatus;
 import com.tuitionnetwork.payments.repository.EPPScheduleRepository;
 import com.tuitionnetwork.payments.repository.EppInstallmentRepository;
 import com.tuitionnetwork.payments.repository.PaymentRepository;
+import com.tuitionnetwork.reconciliation.repository.ReconciliationExceptionRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -60,6 +61,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final EppInstallmentRepository eppInstallmentRepository;
     private final FeeLineRepository feeLineRepository;
     private final FeeDeadlineService feeDeadlineService;
+    private final ReconciliationExceptionRepository reconciliationExceptionRepository;
 
     public DashboardServiceImpl(PaymentRepository paymentRepository,
                                  InstitutionRepository institutionRepository,
@@ -67,7 +69,8 @@ public class DashboardServiceImpl implements DashboardService {
                                  EPPScheduleRepository eppScheduleRepository,
                                  EppInstallmentRepository eppInstallmentRepository,
                                  FeeLineRepository feeLineRepository,
-                                 FeeDeadlineService feeDeadlineService) {
+                                 FeeDeadlineService feeDeadlineService,
+                                 ReconciliationExceptionRepository reconciliationExceptionRepository) {
         this.paymentRepository = paymentRepository;
         this.institutionRepository = institutionRepository;
         this.studentRepository = studentRepository;
@@ -75,6 +78,7 @@ public class DashboardServiceImpl implements DashboardService {
         this.eppInstallmentRepository = eppInstallmentRepository;
         this.feeLineRepository = feeLineRepository;
         this.feeDeadlineService = feeDeadlineService;
+        this.reconciliationExceptionRepository = reconciliationExceptionRepository;
     }
 
     @Override
@@ -109,6 +113,7 @@ public class DashboardServiceImpl implements DashboardService {
         long institutionsCount = institutionRepository.count();
         long studentsCount = studentRepository.count();
         long eppPlansCount = eppScheduleRepository.count();
+        long pendingReconCount = reconciliationExceptionRepository.countByStatusNot("Resolved");
         BigDecimal eppOutstandingEGP = eppInstallmentRepository.sumOutstandingAmount();
 
         DashboardKpis kpis = new DashboardKpis(
@@ -122,7 +127,7 @@ public class DashboardServiceImpl implements DashboardService {
                 new RateKpi(failedToday, ratePct(failedToday, todayTransactions),
                         trendPct(failedToday, failedYesterday)),
                 new KpiValue(pendingToday, trendPct(pendingToday, pendingYesterday)),
-                new KpiValue(0, 0.0),
+                new KpiValue(pendingReconCount, 0.0),
                 new EppPlansKpi(eppPlansCount, eppOutstandingEGP, 0.0)
         );
 
@@ -259,7 +264,7 @@ public class DashboardServiceImpl implements DashboardService {
         long dueThisWeek = 0;
         long urgent = 0;
         long overdue = 0;
-        BigDecimal penaltiesAppliedEGP = BigDecimal.ZERO;
+        BigDecimal penaltiesAppliedEGP = feeLineRepository.sumTotalPenaltiesApplied();
 
         record Scored(FeeLine feeLine, FeeDeadlineSnapshot snapshot, int sortRank) {
         }
@@ -279,9 +284,7 @@ public class DashboardServiceImpl implements DashboardService {
             if (snapshot.priority() == FeePriority.OVERDUE) {
                 overdue++;
             }
-            if (snapshot.penaltyAppliedAt() != null && snapshot.penaltyEGP() != null) {
-                penaltiesAppliedEGP = penaltiesAppliedEGP.add(snapshot.penaltyEGP());
-            }
+
             scored.add(new Scored(feeLine, snapshot, priorityRank(snapshot)));
         }
 

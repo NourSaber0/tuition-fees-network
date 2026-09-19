@@ -229,17 +229,33 @@ public class DemoDataSeeder implements CommandLineRunner {
         Guardian nour = new Guardian(nourHmac, "enc_" + nourNid, "Nour Khaled Fahmy", "nour.khaled@example.com", "01001234568", "Password123!", true);
         nour = guardianRepository.save(nour);
 
+        String youssefParentNid = "30007091301775";
+        String youssefParentHmac = identityResolverService.computeHmacSha256(youssefParentNid);
+        Guardian youssefParent = new Guardian(youssefParentHmac, "enc_" + youssefParentNid, "Youssef Adel Nabil", "youssef.adel@example.com", "01045678901", "Password123!", true);
+        youssefParent = guardianRepository.save(youssefParent);
+
+        String hebaNid = "28809252506666";
+        String hebaHmac = identityResolverService.computeHmacSha256(hebaNid);
+        Guardian heba = new Guardian(hebaHmac, "enc_" + hebaNid, "Heba Mostafa Zaki", "heba.mostafa@example.com", "01056789012", "Password123!", true);
+        heba = guardianRepository.save(heba);
+
         // 4. Students
         String saraNid = "31205150101042";
         Student sara = new Student(mona.getId(), nile.getId(), identityResolverService.computeHmacSha256(saraNid), "enc_" + saraNid, "Sara Ahmed", LocalDate.of(2012, 5, 15));
+        sara.setGrade("Grade 10");
+        sara.setStudentRef("STU-NIS-001");
         sara = studentRepository.save(sara);
 
         String omarNid = "31509200102035";
         Student omar = new Student(mona.getId(), nile.getId(), identityResolverService.computeHmacSha256(omarNid), "enc_" + omarNid, "Omar Ahmed", LocalDate.of(2015, 9, 20));
+        omar.setGrade("Grade 5");
+        omar.setStudentRef("STU-NIS-002");
         omar = studentRepository.save(omar);
 
         String youssefNid = "31403100103017";
         Student youssef = new Student(ahmed.getId(), rowad.getId(), identityResolverService.computeHmacSha256(youssefNid), "enc_" + youssefNid, "Youssef Ahmed", LocalDate.of(2014, 3, 10));
+        youssef.setGrade("Grade 7");
+        youssef.setStudentRef("STU-ROW-001");
         youssef = studentRepository.save(youssef);
 
         // 5. FeeLines

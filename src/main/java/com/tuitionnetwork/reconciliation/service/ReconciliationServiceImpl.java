@@ -211,7 +211,7 @@ public class ReconciliationServiceImpl implements ReconciliationService {
     @Override
     @Transactional(readOnly = true)
     public PageResponse<ReconciliationExceptionDto> listExceptions(
-            String status, String priority, String assignedTo, Boolean includeResolved, int page, int pageSize) {
+            java.time.LocalDate dateFrom, java.time.LocalDate dateTo, String status, String priority, String assignedTo, Boolean includeResolved, int page, int pageSize) {
 
         int resolvedPage = Math.max(0, page > 0 ? page - 1 : page);
         int resolvedSize = pageSize > 0 ? pageSize : 25;
@@ -230,6 +230,12 @@ public class ReconciliationServiceImpl implements ReconciliationService {
             }
             if (includeResolved == null || !includeResolved) {
                 predicates.add(cb.notEqual(cb.lower(root.get("status")), "resolved"));
+            }
+            if (dateFrom != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), dateFrom.atStartOfDay()));
+            }
+            if (dateTo != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("createdAt"), dateTo.atTime(23, 59, 59, 999999999)));
             }
             return cb.and(predicates.toArray(new Predicate[0]));
         };

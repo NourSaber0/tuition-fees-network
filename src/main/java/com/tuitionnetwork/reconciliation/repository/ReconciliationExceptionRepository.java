@@ -12,6 +12,7 @@ import java.util.UUID;
 public interface ReconciliationExceptionRepository extends JpaRepository<ReconciliationException, UUID>, JpaSpecificationExecutor<ReconciliationException> {
     Page<ReconciliationException> findByStatus(String status, Pageable pageable);
     long countByStatus(String status);
+    long countByStatusNot(String status);
     List<ReconciliationException> findByReconciliationRunId(UUID reconciliationRunId);
 }
 

@@ -1,5 +1,6 @@
 package com.tuitionnetwork.payments.web;
 
+import com.tuitionnetwork.identity.infrastructure.MockBankCustomerClient;
 import com.tuitionnetwork.payments.dto.CustomerFeesResponse;
 import com.tuitionnetwork.payments.service.TransactionQueryService;
 import org.springframework.http.ResponseEntity;
@@ -20,9 +21,16 @@ import java.util.Map;
 public class CustomerFeesController {
 
     private final TransactionQueryService transactionQueryService;
+    private final MockBankCustomerClient mockBankCustomerClient;
 
-    public CustomerFeesController(TransactionQueryService transactionQueryService) {
+    public CustomerFeesController(TransactionQueryService transactionQueryService, MockBankCustomerClient mockBankCustomerClient) {
         this.transactionQueryService = transactionQueryService;
+        this.mockBankCustomerClient = mockBankCustomerClient;
+    }
+
+    @GetMapping
+    public ResponseEntity<MockBankCustomerClient.CustomerResponse> getBankCustomer(@RequestParam("national_id") String nationalId) {
+        return ResponseEntity.ok(mockBankCustomerClient.getCustomerByNationalId(nationalId));
     }
 
     @GetMapping("/fees")

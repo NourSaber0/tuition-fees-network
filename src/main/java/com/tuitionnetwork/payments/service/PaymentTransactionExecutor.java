@@ -93,14 +93,6 @@ public class PaymentTransactionExecutor {
                         "exceeds remaining fee balance (" + currentRemaining + " EGP) for FeeLine ID " + feeLine.getId() + ".");
             }
 
-            boolean isPartialPayment = amountToApply.compareTo(currentRemaining) < 0;
-            boolean isPastDue = feeLine.getDueDate() != null && feeLine.getDueDate().isBefore(LocalDate.now());
-            if (isPartialPayment && isPastDue) {
-                throw new PendingBusinessRuleException(
-                        "Pending Business Rule: Post-Deadline Partial Payments are undefined for overdue fee line " +
-                        "(FeeLine ID: " + feeLine.getId() + ", Due Date: " + feeLine.getDueDate() + ").");
-            }
-
             BigDecimal currentPaid = feeLine.getPaidAmount() != null ? feeLine.getPaidAmount() : BigDecimal.ZERO;
             BigDecimal updatedRemaining = currentRemaining.subtract(amountToApply);
             if (updatedRemaining.compareTo(BigDecimal.ZERO) < 0) {

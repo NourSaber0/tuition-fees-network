@@ -39,9 +39,6 @@ public class T24CustomerBillingClientImpl implements T24CustomerBillingClient {
     @Value("${t24.mock.timeout-ms:2000}")
     private int timeoutMs;
 
-    @Value("${t24.mock.fallback-to-local:true}")
-    private boolean fallbackToLocal;
-
     @Override
     public RetrieveBillingResponse retrieveCustomerBilling(String nationalId, String accountNumber) {
         String soapXml = envelopeBuilder.buildRetrieveRequestXml(nationalId, accountNumber, username, password);
@@ -51,10 +48,7 @@ public class T24CustomerBillingClientImpl implements T24CustomerBillingClient {
             String responseXml = postSoap(endpoint, "RetrieveCustomerBillingProcedure", soapXml);
             return envelopeBuilder.parseRetrieveResponseXml(responseXml);
         } catch (Exception e) {
-            log.warn("T24 SOAP call failed ({}). Fallback to local simulation: {}", e.getMessage(), fallbackToLocal);
-            if (fallbackToLocal) {
-                return simulateRetrieveResponse(nationalId, accountNumber);
-            }
+            log.warn("T24 SOAP call failed ({}).", e.getMessage());
             return new RetrieveBillingResponse("ERROR", null, accountNumber, null, List.of(), BigDecimal.ZERO, "T24 service unavailable: " + e.getMessage());
         }
     }
@@ -68,10 +62,7 @@ public class T24CustomerBillingClientImpl implements T24CustomerBillingClient {
             String responseXml = postSoap(endpoint, "RequestCustomerBillingProcedure", soapXml);
             return envelopeBuilder.parseRequestResponseXml(responseXml);
         } catch (Exception e) {
-            log.warn("T24 SOAP call failed ({}). Fallback to local simulation: {}", e.getMessage(), fallbackToLocal);
-            if (fallbackToLocal) {
-                return simulateRequestResponse(request);
-            }
+            log.warn("T24 SOAP call failed ({}).", e.getMessage());
             return new RequestBillingResponse("ERROR", null, "T24 service unavailable: " + e.getMessage());
         }
     }
@@ -85,10 +76,7 @@ public class T24CustomerBillingClientImpl implements T24CustomerBillingClient {
             String responseXml = postSoap(endpoint, "UpdateCustomerBillingProcedure", soapXml);
             return envelopeBuilder.parseUpdateResponseXml(responseXml);
         } catch (Exception e) {
-            log.warn("T24 SOAP call failed ({}). Fallback to local simulation: {}", e.getMessage(), fallbackToLocal);
-            if (fallbackToLocal) {
-                return simulateUpdateResponse(request);
-            }
+            log.warn("T24 SOAP call failed ({}).", e.getMessage());
             return new UpdateBillingResponse("ERROR", request.billingId(), BigDecimal.ZERO, "T24 service unavailable: " + e.getMessage());
         }
     }
@@ -127,66 +115,5 @@ public class T24CustomerBillingClientImpl implements T24CustomerBillingClient {
         }
 
         return sb.toString();
-    }
-
-    private RetrieveBillingResponse simulateRetrieveResponse(String nationalId, String accountNumber) {
-        String cleanId = nationalId != null ? nationalId.trim() : "29805150101023";
-        String cleanAcc = accountNumber != null ? accountNumber.trim() : "100012345678";
-
-        List<BillingItem> items = new ArrayList<>();
-        items.add(new BillingItem(
-                "T24-BILL-00101",
-                "SCH-001",
-                "Cairo International School",
-                cleanId,
-                "Yousef Adel",
-                "Tuition",
-                "Term 1 2026/27",
-                new BigDecimal("18000.00"),
-                BigDecimal.ZERO,
-                new BigDecimal("18000.00"),
-                LocalDate.of(2026, 10, 15),
-                "Outstanding"
-        ));
-
-        items.add(new BillingItem(
-                "T24-BILL-00102",
-                "SCH-001",
-                "Cairo International School",
-                cleanId,
-                "Yousef Adel",
-                "Bus subscription",
-                "Term 1 2026/27",
-                new BigDecimal("4000.00"),
-                BigDecimal.ZERO,
-                new BigDecimal("4000.00"),
-                LocalDate.of(2026, 10, 15),
-                "Outstanding"
-        ));
-
-        BigDecimal total = new BigDecimal("22000.00");
-        return new RetrieveBillingResponse(
-                "SUCCESS",
-                "CIF-" + (Math.abs(cleanId.hashCode()) % 900000 + 100000),
-                cleanAcc,
-                "Adel Mostafa",
-                items,
-                total,
-                "Retrieved 2 customer billing records from T24 mock"
-        );
-    }
-
-    private RequestBillingResponse simulateRequestResponse(RequestBillingRequest req) {
-        String ref = "T24-BILL-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-        return new RequestBillingResponse("CREATED", ref, "Successfully created billing item in T24 mock for student: " + req.studentNationalId());
-    }
-
-    private UpdateBillingResponse simulateUpdateResponse(UpdateBillingRequest req) {
-        return new UpdateBillingResponse(
-                "UPDATED",
-                req.billingId(),
-                req.newRemainingAmount() != null ? req.newRemainingAmount() : BigDecimal.ZERO,
-                "Successfully updated T24 billing record balance"
-        );
     }
 }

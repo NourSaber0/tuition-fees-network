@@ -13,10 +13,12 @@ import com.tuitionnetwork.reconciliation.repository.ReconciliationRunRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@Import(com.tuitionnetwork.MockBankTestConfig.class)
 @SpringBootTest(classes = DemoApplication.class)
 @TestPropertySource(properties = "app.demo-seeder.enabled=true")
 class DemoDataSeederTest {

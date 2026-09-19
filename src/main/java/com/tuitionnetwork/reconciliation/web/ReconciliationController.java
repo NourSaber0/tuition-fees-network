@@ -144,6 +144,8 @@ public class ReconciliationController {
     @GetMapping("/exceptions")
     @PreAuthorize("hasRole('BACK_OFFICE')")
     public ResponseEntity<PageResponse<ReconciliationExceptionDto>> listExceptions(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String priority,
             @RequestParam(required = false) String assignedTo,
@@ -153,7 +155,7 @@ public class ReconciliationController {
             @RequestParam(required = false) Integer pageSize) {
 
         int resolvedSize = pageSize != null ? pageSize : (size != null ? size : 25);
-        return ResponseEntity.ok(service.listExceptions(status, priority, assignedTo, includeResolved, page, resolvedSize));
+        return ResponseEntity.ok(service.listExceptions(dateFrom, dateTo, status, priority, assignedTo, includeResolved, page, resolvedSize));
     }
 
     @GetMapping("/exceptions/{id}")

@@ -43,10 +43,10 @@ public record SecurityUserPrincipal(
             return List.of(role, UserRole.ROLE_INSTITUTION_ADMIN);
         }
         if (UserRole.ROLE_SCHOOL_FINANCE.equals(role)) {
-            return List.of(role);
+            return List.of(role, UserRole.ROLE_INSTITUTION_ADMIN);
         }
         if (UserRole.ROLE_INSTITUTION_ADMIN.equals(role)) {
-            return List.of(UserRole.ROLE_INSTITUTION_ADMIN, UserRole.ROLE_SCHOOL_ADMIN);
+            return List.of(UserRole.ROLE_INSTITUTION_ADMIN, UserRole.ROLE_SCHOOL_ADMIN, UserRole.ROLE_SCHOOL_FINANCE);
         }
         return List.of(role);
     }

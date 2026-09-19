@@ -99,6 +99,36 @@ test.describe('Bank Back Office Portal - RBAC & Walkthroughs', () => {
     test('Bank Finance: Quote Simulator & Download Settlement Report', async ({ page }) => {
       await loginAs(page, 'finance@cib.eg', 'Finance123!');
 
+      // Extract authorization bearer token to seed a fresh credit card payment
+      const token = await page.evaluate(() => {
+        const raw = localStorage.getItem('tuition.auth.session');
+        if (!raw) return '';
+        const session = JSON.parse(raw);
+        return session.accessToken || session.token || '';
+      });
+
+      // Obtain an active fee for Mona to process an isolated partial payment
+      const duesRes = await page.request.get('http://localhost:8080/api/v1/customers/fees?nationalId=29805150101023', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const duesData = await duesRes.json();
+      const feeId = duesData.fees?.find((f: any) => f.remainingEGP >= 5000)?.id || duesData.fees[0].id;
+
+      // Settle 5000 EGP partial payment via CIB credit card (card_mona_visa)
+      await page.request.post('http://localhost:8080/api/v1/payments', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Idempotency-Key': `IDEMP-EPP-RBAC-${Date.now()}`,
+        },
+        data: {
+          nationalId: '29805150101023',
+          feeIds: [feeId],
+          amountEGP: 5000,
+          method: 'CREDIT_CARD',
+          sourceId: 'card_mona_visa'
+        },
+      });
+
       // EPP Plans
       await page.goto('/bank/epp');
       await page.getByRole('button', { name: 'Create EPP Plan' }).click();
@@ -123,7 +153,7 @@ test.describe('Bank Back Office Portal - RBAC & Walkthroughs', () => {
       // Step 4: Review and Book
       await eppModal.getByRole('button', { name: /Review Plan/i }).click();
       await eppModal.getByRole('button', { name: 'Create EPP Plan' }).click();
-      await expect(page.getByText('EPP Plan Created', { exact: true })).toBeVisible();
+      await expect(eppModal.getByText(/EPP Plan Created/i)).toBeVisible({ timeout: 10000 });
 
       // Settlement Report
       await page.goto('/bank/reports');

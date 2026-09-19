@@ -49,7 +49,7 @@ class DuesSearchControllerTest {
                 "enc123",
                 "ahmed@example.com",
                 "+201012345678",
-                true,
+                true, "acc_123", "card_123",
                 List.of(new ResolvedStudentDto(studentId, "Sara Ahmed", instId, "Nile International School"))
         );
 

@@ -15,10 +15,12 @@ import com.tuitionnetwork.identity.domain.Institution;
 import com.tuitionnetwork.identity.domain.Student;
 import com.tuitionnetwork.identity.repository.InstitutionRepository;
 import com.tuitionnetwork.identity.repository.StudentRepository;
+import com.tuitionnetwork.epp.infrastructure.MockBankEppClient;
+import com.tuitionnetwork.epp.infrastructure.MockBankEppClient.EppPlanResponse;
+import com.tuitionnetwork.epp.infrastructure.MockBankEppClient.EppQuoteDto;
 import com.tuitionnetwork.payments.domain.CardBinClassifier;
 import com.tuitionnetwork.payments.domain.EPPSchedule;
 import com.tuitionnetwork.payments.domain.EppInstallment;
-import com.tuitionnetwork.payments.domain.EppPricing;
 import com.tuitionnetwork.payments.domain.Payment;
 import com.tuitionnetwork.payments.domain.PaymentAllocation;
 import com.tuitionnetwork.payments.domain.PaymentMethod;
@@ -59,6 +61,7 @@ public class EppPlanServiceImpl implements EppPlanService {
     private final StudentRepository studentRepository;
     private final AuditLogRepository auditLogRepository;
     private final SettingsService settingsService;
+    private final MockBankEppClient mockBankEppClient;
 
     @Autowired
     public EppPlanServiceImpl(EPPScheduleRepository eppScheduleRepository,
@@ -67,7 +70,8 @@ public class EppPlanServiceImpl implements EppPlanService {
                                InstitutionRepository institutionRepository,
                                StudentRepository studentRepository,
                                @Autowired(required = false) AuditLogRepository auditLogRepository,
-                               SettingsService settingsService) {
+                               SettingsService settingsService,
+                               MockBankEppClient mockBankEppClient) {
         this.eppScheduleRepository = eppScheduleRepository;
         this.eppInstallmentRepository = eppInstallmentRepository;
         this.paymentRepository = paymentRepository;
@@ -75,6 +79,7 @@ public class EppPlanServiceImpl implements EppPlanService {
         this.studentRepository = studentRepository;
         this.auditLogRepository = auditLogRepository;
         this.settingsService = settingsService;
+        this.mockBankEppClient = mockBankEppClient;
     }
 
     public EppPlanServiceImpl(EPPScheduleRepository eppScheduleRepository,
@@ -82,8 +87,9 @@ public class EppPlanServiceImpl implements EppPlanService {
                                PaymentRepository paymentRepository,
                                InstitutionRepository institutionRepository,
                                StudentRepository studentRepository,
-                               SettingsService settingsService) {
-        this(eppScheduleRepository, eppInstallmentRepository, paymentRepository, institutionRepository, studentRepository, null, settingsService);
+                               SettingsService settingsService,
+                               MockBankEppClient mockBankEppClient) {
+        this(eppScheduleRepository, eppInstallmentRepository, paymentRepository, institutionRepository, studentRepository, null, settingsService, mockBankEppClient);
     }
 
     @Override
@@ -196,15 +202,27 @@ public class EppPlanServiceImpl implements EppPlanService {
         if (request.principalEGP() == null || request.tenor() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "principalEGP and tenor are required");
         }
-        EppPricing.Quote quote = EppPricing.calculate(request.principalEGP(), request.tenor(), settingsService.getEpp());
+        
+        List<EppQuoteDto> quotes = mockBankEppClient.getQuotes(request.principalEGP());
+        EppQuoteDto match = quotes.stream()
+                .filter(q -> q.tenor_months() == request.tenor())
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "No quote found for requested tenor"));
+
+        BigDecimal totalRepayment = new BigDecimal(match.total_repayment());
+        BigDecimal principal = request.principalEGP();
+        BigDecimal interestAmount = totalRepayment.subtract(principal);
+        BigDecimal annualInterestRate = BigDecimal.ZERO; // Mock bank does not provide rate in quote, setting 0
+        BigDecimal monthlyInstalment = new BigDecimal(match.monthly_installment());
+
         return new EppQuoteResponse(
-                quote.principal(),
-                quote.tenorMonths(),
-                quote.annualInterestRate().multiply(BigDecimal.valueOf(100)),
-                quote.interestAmount(),
-                quote.adminFee(),
-                quote.totalPayable(),
-                quote.monthlyInstalment()
+                principal,
+                match.tenor_months(),
+                annualInterestRate,
+                interestAmount,
+                BigDecimal.ZERO, // admin fee
+                totalRepayment,
+                monthlyInstalment
         );
     }
 
@@ -251,25 +269,43 @@ public class EppPlanServiceImpl implements EppPlanService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "max_plans_per_student_exceeded");
         }
 
-        EppPricing.Quote quote = EppPricing.calculate(principal, tenor, settingsService.getEpp());
+        EppPlanResponse planResponse = mockBankEppClient.createPlan(sourcePayment.getTransactionReference(), tenor);
+
+        BigDecimal totalRepayment = new BigDecimal(planResponse.total_repayment());
+        BigDecimal interestAmount = totalRepayment.subtract(principal);
+        BigDecimal monthlyInstalment = new BigDecimal(planResponse.monthly_installment());
+
         EPPSchedule schedule = new EPPSchedule(
                 sourcePayment,
-                quote.tenorMonths(),
-                quote.principal(),
-                quote.annualInterestRate(),
-                quote.interestAmount(),
-                quote.adminFee(),
-                quote.totalPayable(),
-                quote.monthlyInstalment()
+                planResponse.tenor_months(),
+                principal,
+                BigDecimal.ZERO, // no rate returned
+                interestAmount,
+                BigDecimal.ZERO, // no admin fee returned
+                totalRepayment,
+                monthlyInstalment
         );
         schedule = eppScheduleRepository.save(schedule);
+
+        if (planResponse.schedule() != null) {
+            for (MockBankEppClient.EppInstallmentDto inst : planResponse.schedule()) {
+                EppInstallment eppInst = new EppInstallment(
+                        schedule,
+                        inst.installment_number(),
+                        new BigDecimal(inst.amount()),
+                        LocalDate.parse(inst.due_date()).atStartOfDay(),
+                        "Upcoming"
+                );
+                eppInstallmentRepository.save(eppInst);
+            }
+        }
 
         if (auditLogRepository != null) {
             auditLogRepository.save(new AuditLog(
                     null,
                     "BACK_OFFICE",
                     "CREATE_EPP_PLAN",
-                    "EPP Plan created for payment " + sourcePayment.getId() + ", tenor " + tenor + ", principal " + principal
+                    "EPP Plan created for payment " + sourcePayment.getId() + ", tenor " + planResponse.tenor_months() + ", principal " + principal
             ));
         }
 

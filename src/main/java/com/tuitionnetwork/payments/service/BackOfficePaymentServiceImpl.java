@@ -24,10 +24,13 @@ import com.tuitionnetwork.payments.dto.TransactionDetailDto;
 import com.tuitionnetwork.payments.infrastructure.MockBankBackOfficeClient;
 import com.tuitionnetwork.payments.repository.PaymentRepository;
 import com.tuitionnetwork.payments.spi.GatewayResponse;
-import com.tuitionnetwork.payments.domain.EppPricing;
 import com.tuitionnetwork.settings.service.SettingsService;
+import com.tuitionnetwork.epp.infrastructure.MockBankEppClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import com.tuitionnetwork.identity.security.SecurityUserPrincipal;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -52,6 +55,7 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
     private final FeeDeadlineService feeDeadlineService;
     private final MockBankBackOfficeClient mockBankClient;
     private final SettingsService settingsService;
+    private final MockBankEppClient mockBankEppClient;
 
     @Autowired
     public BackOfficePaymentServiceImpl(PaymentSettlementService paymentSettlementService,
@@ -63,7 +67,8 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
                                         @Autowired(required = false) AuditLogRepository auditLogRepository,
                                         FeeDeadlineService feeDeadlineService,
                                         MockBankBackOfficeClient mockBankClient,
-                                        SettingsService settingsService) {
+                                        SettingsService settingsService,
+                                        MockBankEppClient mockBankEppClient) {
         this.paymentSettlementService = paymentSettlementService;
         this.paymentRepository = paymentRepository;
         this.feeLineRepository = feeLineRepository;
@@ -74,6 +79,7 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
         this.feeDeadlineService = feeDeadlineService;
         this.mockBankClient = mockBankClient;
         this.settingsService = settingsService;
+        this.mockBankEppClient = mockBankEppClient;
     }
 
     @Override
@@ -98,6 +104,11 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
 
         String methodStr = request.method() != null ? request.method().trim() : "";
         boolean isEpp = "epp".equalsIgnoreCase(request.creditPaymentType()) || methodStr.toUpperCase().contains("EPP");
+        boolean isPos = request.posTerminalId() != null
+                || methodStr.toUpperCase().contains("POS")
+                || "POS_TERMINAL".equalsIgnoreCase(request.sourceId());
+        boolean isExternalCard = (request.cardNumber() != null && !request.cardNumber().isBlank())
+                || "EXTERNAL_CARD".equalsIgnoreCase(request.sourceId());
 
         if (isEpp) {
             if (request.eppTenor() == null || request.eppTenor() <= 0) {
@@ -106,13 +117,16 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
             if (methodStr.toUpperCase().contains("DEBIT")) {
                 throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "debit_card_not_eligible_for_epp: Debit cards are not eligible for EPP.");
             }
+            if (isPos || isExternalCard) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "non_cib_card_not_eligible: Only CIB cards are eligible for EPP.");
+            }
             boolean isCib = methodStr.toUpperCase().contains("CIB") || (request.sourceId() != null && request.sourceId().startsWith("card_"));
             if (!isCib) {
                 throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "non_cib_card_not_eligible: Only CIB cards are eligible for EPP.");
             }
         }
         
-        if (request.sourceId() == null || request.sourceId().isBlank()) {
+        if (!isPos && !isExternalCard && (request.sourceId() == null || request.sourceId().isBlank())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "sourceId is required for back-office payments.");
         }
 
@@ -153,6 +167,19 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
         List<FeeLine> feeLines = feeUuids.isEmpty() ? List.of() : feeLineRepository.findAllById(feeUuids);
         if (feeLines.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "no_fees_selected: No matching fee lines found.");
+        }
+
+        // Validate school tenancy if called by a school user
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof SecurityUserPrincipal principal) {
+            if (principal.institutionId() != null) {
+                UUID schoolId = principal.institutionId();
+                for (FeeLine fl : feeLines) {
+                    if (fl.getInstitutionId() != null && !fl.getInstitutionId().equals(schoolId)) {
+                        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Unauthorized: Cannot collect fees for another institution.");
+                    }
+                }
+            }
         }
 
         // Apply the 5% late penalty (idempotent - a no-op if already applied or not overdue)
@@ -198,7 +225,7 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
         }
 
         // Resolve guardian
-        UUID guardianId = UUID.randomUUID();
+        UUID guardianId = null;
         if (request.nationalId() != null && !request.nationalId().isBlank()) {
             Optional<ResolvedGuardianDto> gOpt = identityResolverService.resolveGuardianByNationalId(request.nationalId().trim());
             if (gOpt.isPresent()) {
@@ -211,14 +238,63 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
                 }
             }
         }
+        if (guardianId == null && !feeLines.isEmpty() && feeLines.get(0).getStudentId() != null) {
+            Optional<Student> sOpt = studentRepository.findById(feeLines.get(0).getStudentId());
+            if (sOpt.isPresent() && sOpt.get().getGuardianId() != null) {
+                guardianId = sOpt.get().getGuardianId();
+            }
+        }
+        if (guardianId == null) {
+            guardianId = UUID.randomUUID();
+        }
 
         PaymentMethod pm;
         if (isEpp) {
             pm = PaymentMethod.EPP_INSTALMENTS;
-        } else if (methodStr.toUpperCase().contains("CREDIT")) {
+        } else if (isPos || isExternalCard || methodStr.toUpperCase().contains("CREDIT") || methodStr.toUpperCase().contains("CARD")) {
             pm = PaymentMethod.CREDIT_CARD;
         } else {
             pm = PaymentMethod.CIB_ACCOUNT;
+        }
+
+        String effectiveSourceId = isPos
+                ? (request.posTerminalId() != null && !request.posTerminalId().isBlank() ? request.posTerminalId().trim() : "POS-TERM-01")
+                : (isExternalCard ? "EXTERNAL_CARD" : request.sourceId());
+
+        String effectiveChannel = request.channel() != null && !request.channel().isBlank()
+                ? request.channel()
+                : (isPos ? "Branch POS" : "Counter");
+
+        // Call mock bank
+        GatewayResponse gatewayResponse;
+        if (isPos) {
+            gatewayResponse = mockBankClient.processPosPayment(
+                    request.posTerminalId(),
+                    request.posAuthRef(),
+                    request.amountEGP(),
+                    effectiveChannel
+            );
+        } else if (isExternalCard) {
+            gatewayResponse = mockBankClient.processCardPayment(
+                    request.cardNumber(),
+                    request.cardHolderName(),
+                    request.expiryMonth(),
+                    request.expiryYear(),
+                    request.cvv(),
+                    request.amountEGP(),
+                    request.nationalId(),
+                    idempotencyKey
+            );
+        } else {
+            gatewayResponse = mockBankClient.processBackOfficePayment(
+                    request.sourceId(),
+                    request.amountEGP(),
+                    idempotencyKey
+            );
+        }
+
+        if (gatewayResponse.status() == PaymentStatus.FAILED) {
+            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Payment failed at bank: " + gatewayResponse.message());
         }
 
         PaymentSettleRequest settleRequest = new PaymentSettleRequest(
@@ -228,29 +304,18 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
                 selectedDues,
                 request.amountEGP(),
                 isEpp ? new EppSelectionDto(request.eppTenor()) : null,
-                request.sourceId(),
-                null
+                effectiveSourceId,
+                isExternalCard ? request.cardNumber() : null
         );
-
-        // Call mock bank first
-        GatewayResponse gatewayResponse = mockBankClient.processBackOfficePayment(
-                request.sourceId(),
-                request.amountEGP(),
-                idempotencyKey
-        );
-
-        if (gatewayResponse.status() == PaymentStatus.FAILED) {
-            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Payment failed at bank: " + gatewayResponse.message());
-        }
 
         PaymentSettleResponse settleResponse = paymentSettlementService.settlePayment(settleRequest, idempotencyKey, gatewayResponse);
 
         if (auditLogRepository != null) {
             auditLogRepository.save(new AuditLog(
                     null,
-                    "BACK_OFFICE",
+                    "PAYMENT",
                     "PROCESS_PAYMENT",
-                    "Payment processed for " + request.amountEGP() + " EGP by " + (request.processedBy() != null ? request.processedBy() : "Counter")
+                    "Payment processed for " + request.amountEGP() + " EGP by " + (request.processedBy() != null ? request.processedBy() : effectiveChannel)
             ));
         }
 
@@ -261,14 +326,14 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
         BigDecimal totalCollectedEGP = request.amountEGP();
 
         if (isEpp && request.eppTenor() != null) {
-            EppPricing.Quote quote = EppPricing.calculate(request.amountEGP(), request.eppTenor(), settingsService.getEpp());
-            totalCollectedEGP = quote.totalPayable();
-            BigDecimal interestRatePct = quote.annualInterestRate().multiply(BigDecimal.valueOf(100)).setScale(2, java.math.RoundingMode.HALF_UP);
+            MockBankEppClient.EppPlanResponse planResponse = mockBankEppClient.createPlan(UUID.randomUUID().toString(), request.eppTenor());
+            totalCollectedEGP = new BigDecimal(planResponse.total_repayment());
+            BigDecimal interestRatePct = BigDecimal.ZERO;
             
             eppDto = new EppSummaryDto(
                     "EPP-" + settleResponse.paymentId().toString().substring(0, 8).toUpperCase(),
                     request.eppTenor(),
-                    quote.monthlyInstalment(),
+                    new BigDecimal(planResponse.monthly_installment()),
                     interestRatePct
             );
         }

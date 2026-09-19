@@ -56,6 +56,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -83,6 +84,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * based on Master Spec (1_MASTER_SPEC.md), Developer Onboarding Guide,
  * and School Portal API Contract (docs/School-Portal-API-Contract.md).
  */
+@Import(com.tuitionnetwork.MockBankTestConfig.class)
 @SpringBootTest(classes = DemoApplication.class)
 public class SchoolPortalMasterE2EIntegrationTest {
 
@@ -895,7 +897,7 @@ public class SchoolPortalMasterE2EIntegrationTest {
                                     "nationalId": "29501011234567",
                                     "feeIds": ["%s"],
                                     "amountEGP": 1000.00,
-                                    "method": "Card"
+                                    "method": "CREDIT_CARD"
                                 }
                                 """.formatted(fee.getId())))
                 .andExpect(status().isForbidden());
