@@ -8,5 +8,5 @@ public interface BankGatewayAdapterInterface {
 
     boolean verifyCibAccount(String accountNumber);
 
-    EppPlanResponse generateEppSchedule(BigDecimal principal, int tenorMonths);
+    EppPlanResponse generateEppSchedule(BigDecimal principal, int tenorMonths, String transactionReference);
 }

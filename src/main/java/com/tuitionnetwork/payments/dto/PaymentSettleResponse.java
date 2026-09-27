@@ -8,6 +8,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import com.tuitionnetwork.payments.spi.EppPlanResponse;
+
 public record PaymentSettleResponse(
         UUID paymentId,
         PaymentStatus status,
@@ -17,6 +19,7 @@ public record PaymentSettleResponse(
         PaymentMethod paymentMethod,
         String idempotencyKey,
         List<PaymentAllocationResultDto> allocations,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        EppPlanResponse eppPlan
 ) {
 }

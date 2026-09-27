@@ -57,7 +57,7 @@ const DEFAULT_QUICK_LINKS: QuickLink[] = [
   {
     id: "fees",
     label: "Fee Management",
-    href: "/school/fees",
+    href: "/school/fee-management",
     icon: "list",
   },
   {
@@ -232,7 +232,7 @@ export default function SchoolDashboardPage() {
       trend: k.outstandingEGP.trendPct,
       Icon: ClockIcon,
       color: "bg-amber-50 text-amber-600",
-      href: "/school/fees",
+      href: "/school/fee-management",
     },
     {
       title: "Overdue",
@@ -241,7 +241,7 @@ export default function SchoolDashboardPage() {
       trend: k.overdueEGP.trendPct,
       Icon: AlertIcon,
       color: "bg-red-50 text-red-600",
-      href: "/school/fees",
+      href: "/school/fee-management",
     },
     {
       title: "Upload Status",

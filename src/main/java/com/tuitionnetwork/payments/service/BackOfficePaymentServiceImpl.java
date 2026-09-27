@@ -325,15 +325,14 @@ public class BackOfficePaymentServiceImpl implements BackOfficePaymentService {
         EppSummaryDto eppDto = null;
         BigDecimal totalCollectedEGP = request.amountEGP();
 
-        if (isEpp && request.eppTenor() != null) {
-            MockBankEppClient.EppPlanResponse planResponse = mockBankEppClient.createPlan(UUID.randomUUID().toString(), request.eppTenor());
-            totalCollectedEGP = new BigDecimal(planResponse.total_repayment());
-            BigDecimal interestRatePct = BigDecimal.ZERO;
+        if (isEpp && request.eppTenor() != null && settleResponse.eppPlan() != null) {
+            totalCollectedEGP = settleResponse.eppPlan().totalPayable();
+            BigDecimal interestRatePct = settleResponse.eppPlan().annualInterestRate();
             
             eppDto = new EppSummaryDto(
                     "EPP-" + settleResponse.paymentId().toString().substring(0, 8).toUpperCase(),
                     request.eppTenor(),
-                    new BigDecimal(planResponse.monthly_installment()),
+                    settleResponse.eppPlan().monthlyInstalment(),
                     interestRatePct
             );
         }

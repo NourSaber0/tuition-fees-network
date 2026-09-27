@@ -179,7 +179,10 @@ export function SchoolPosModal({ isOpen, onClose, onSuccess }: SchoolPosModalPro
         processedBy: "School Counter Cashier",
       };
 
-      const res = await client.post<SchoolPosPaymentResponse>("/payments", payload);
+      const idempKey = window.crypto.randomUUID();
+      const res = await client.post<SchoolPosPaymentResponse>("/payments", payload, {
+        headers: { "Idempotency-Key": idempKey },
+      });
       setReceipt(res);
       setStep(4);
     } catch (err: any) {

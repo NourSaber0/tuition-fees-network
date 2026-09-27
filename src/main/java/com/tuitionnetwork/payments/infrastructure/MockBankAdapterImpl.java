@@ -16,17 +16,24 @@ public class MockBankAdapterImpl implements BankGatewayAdapterInterface {
 
     private final SettingsService settingsService;
     private final MockBankEppClient mockBankEppClient;
+    private final MockBankBackOfficeClient mockBankBackOfficeClient;
 
-    public MockBankAdapterImpl(SettingsService settingsService, MockBankEppClient mockBankEppClient) {
+    public MockBankAdapterImpl(SettingsService settingsService, MockBankEppClient mockBankEppClient, MockBankBackOfficeClient mockBankBackOfficeClient) {
         this.settingsService = settingsService;
         this.mockBankEppClient = mockBankEppClient;
+        this.mockBankBackOfficeClient = mockBankBackOfficeClient;
     }
 
     @Override
     public GatewayResponse chargeCard(BigDecimal amount, String idempotencyKey) {
-        String authCode = "AUTH-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-        String txnRef = "TXN-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
-        return new GatewayResponse(PaymentStatus.CAPTURED, authCode, txnRef, "00", "Approved");
+        return mockBankBackOfficeClient.processCardPayment(
+                "4111111111111111", // Dummy card number for mock registration
+                "Frontend Portal User", 
+                12, 2030, "123", 
+                amount,
+                "29805150101023", // Default mock national ID
+                idempotencyKey
+        );
     }
 
     @Override
@@ -35,8 +42,8 @@ public class MockBankAdapterImpl implements BankGatewayAdapterInterface {
     }
 
     @Override
-    public EppPlanResponse generateEppSchedule(BigDecimal principal, int tenorMonths) {
-        MockBankEppClient.EppPlanResponse planResponse = mockBankEppClient.createPlan(UUID.randomUUID().toString(), tenorMonths);
+    public EppPlanResponse generateEppSchedule(BigDecimal principal, int tenorMonths, String transactionReference) {
+        MockBankEppClient.EppPlanResponse planResponse = mockBankEppClient.createPlan(transactionReference, tenorMonths);
         BigDecimal totalRepayment = new BigDecimal(planResponse.total_repayment());
         BigDecimal interestAmount = totalRepayment.subtract(principal);
         

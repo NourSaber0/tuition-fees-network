@@ -8,6 +8,7 @@ import com.tuitionnetwork.payments.domain.CardBinClassifier;
 import com.tuitionnetwork.payments.domain.Payment;
 import com.tuitionnetwork.payments.domain.PaymentMethod;
 import com.tuitionnetwork.payments.domain.PaymentStatus;
+import com.tuitionnetwork.payments.domain.EPPSchedule;
 import com.tuitionnetwork.payments.dto.PaymentAllocationResultDto;
 import com.tuitionnetwork.payments.dto.PaymentSettleRequest;
 import com.tuitionnetwork.payments.dto.PaymentSettleResponse;
@@ -68,6 +69,20 @@ public class PaymentSettlementService {
             List<PaymentAllocationResultDto> allocations = payment.getAllocations().stream()
                     .map(a -> new PaymentAllocationResultDto(a.getId(), a.getFeeLine().getId(), a.getAmountApplied()))
                     .toList();
+            EppPlanResponse eppPlan = null;
+            if (payment.getEppSchedule() != null) {
+                EPPSchedule s = payment.getEppSchedule();
+                eppPlan = new EppPlanResponse(
+                        s.getPrincipalAmount(),
+                        s.getTenorMonths(),
+                        s.getAnnualInterestRate(),
+                        s.getInterestAmount(),
+                        s.getAdminFee(),
+                        s.getTotalPayable(),
+                        s.getMonthlyInstalment()
+                );
+            }
+
             return new PaymentSettleResponse(
                     payment.getId(),
                     payment.getStatus(),
@@ -77,7 +92,8 @@ public class PaymentSettlementService {
                     payment.getPaymentMethod(),
                     payment.getIdempotencyKey(),
                     allocations,
-                    payment.getCreatedAt()
+                    payment.getCreatedAt(),
+                    eppPlan
             );
         }
 
@@ -143,7 +159,7 @@ public class PaymentSettlementService {
                     ? request.eppSelection().tenorMonths()
                     : 12;
             try {
-                eppPlan = bankGatewayAdapter.generateEppSchedule(request.totalAmount(), tenor);
+                eppPlan = bankGatewayAdapter.generateEppSchedule(request.totalAmount(), tenor, gatewayResponse.transactionReference());
             } catch (RuntimeException eppError) {
                 transactionExecutor.releaseFeeLines(request.selectedDues());
                 throw eppError;

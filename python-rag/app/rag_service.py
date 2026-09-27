@@ -139,6 +139,7 @@ class RAGService:
         )
 
         best = grounded[0]
+
         nav_page, nav_label = self._navigation_for(best)
 
         return {

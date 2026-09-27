@@ -234,7 +234,8 @@ public class PaymentTransactionExecutor {
                 savedPayment.getPaymentMethod(),
                 savedPayment.getIdempotencyKey(),
                 allocationResults,
-                savedPayment.getCreatedAt());
+                savedPayment.getCreatedAt(),
+                eppPlan);
     }
 
     /**

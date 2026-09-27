@@ -32,11 +32,13 @@ import com.tuitionnetwork.payments.domain.PaymentAllocation;
 import com.tuitionnetwork.payments.domain.PaymentMethod;
 import com.tuitionnetwork.payments.domain.PaymentStatus;
 import com.tuitionnetwork.payments.domain.Receipt;
+import com.tuitionnetwork.payments.infrastructure.MockBankBackOfficeClient;
 import com.tuitionnetwork.payments.repository.EPPScheduleRepository;
 import com.tuitionnetwork.payments.repository.EppInstallmentRepository;
 import com.tuitionnetwork.payments.repository.PaymentAllocationRepository;
 import com.tuitionnetwork.payments.repository.PaymentRepository;
 import com.tuitionnetwork.payments.repository.ReceiptRepository;
+import com.tuitionnetwork.payments.spi.GatewayResponse;
 import com.tuitionnetwork.reconciliation.domain.ReconciliationException;
 import com.tuitionnetwork.reconciliation.domain.ReconciliationRun;
 import com.tuitionnetwork.reconciliation.repository.ReconciliationExceptionRepository;
@@ -92,6 +94,7 @@ public class DemoDataSeeder implements CommandLineRunner {
     private final BackOfficeNotificationRepository backOfficeNotificationRepository;
     private final AuditLogRepository auditLogRepository;
     private final IdentityResolverService identityResolverService;
+    private final MockBankBackOfficeClient mockBankClient;
 
     public DemoDataSeeder(
             BankEmployeeRepository bankEmployeeRepository,
@@ -109,7 +112,8 @@ public class DemoDataSeeder implements CommandLineRunner {
             ReconciliationExceptionRepository reconciliationExceptionRepository,
             BackOfficeNotificationRepository backOfficeNotificationRepository,
             AuditLogRepository auditLogRepository,
-            IdentityResolverService identityResolverService) {
+            IdentityResolverService identityResolverService,
+            MockBankBackOfficeClient mockBankClient) {
         this.bankEmployeeRepository = bankEmployeeRepository;
         this.institutionRepository = institutionRepository;
         this.institutionAdminRepository = institutionAdminRepository;
@@ -126,6 +130,7 @@ public class DemoDataSeeder implements CommandLineRunner {
         this.backOfficeNotificationRepository = backOfficeNotificationRepository;
         this.auditLogRepository = auditLogRepository;
         this.identityResolverService = identityResolverService;
+        this.mockBankClient = mockBankClient;
     }
 
     @Override
@@ -291,10 +296,19 @@ public class DemoDataSeeder implements CommandLineRunner {
         f5 = feeLineRepository.save(f5);
 
         // 6. Payments, Allocations & Receipts
+        GatewayResponse gatewayResp1 = mockBankClient.processCardPayment(
+                "4111111111111111",
+                mona.getName(),
+                12, 2030, "123",
+                new BigDecimal("25000.00"),
+                monaNid,
+                "IDEMP-SEED-PAY-001"
+        );
+
         Payment p1 = new Payment(mona.getId(), new BigDecimal("25000.00"), PaymentMethod.CREDIT_CARD, "IDEMP-SEED-PAY-001");
         p1.setStatus(PaymentStatus.CAPTURED);
-        p1.setTransactionReference("TXN-20260515-001");
-        p1.setAuthCode("AUTH-99281");
+        p1.setTransactionReference(gatewayResp1.transactionReference());
+        p1.setAuthCode(gatewayResp1.authCode());
         p1 = paymentRepository.save(p1);
 
         PaymentAllocation alloc1 = new PaymentAllocation(p1, f1, new BigDecimal("25000.00"));

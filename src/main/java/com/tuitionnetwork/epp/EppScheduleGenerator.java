@@ -101,7 +101,7 @@ public class EppScheduleGenerator {
             );
         }
 
-        MockBankEppClient.EppPlanResponse planResponse = mockBankEppClient.createPlan(payment.getId().toString(), tenorMonths);
+        MockBankEppClient.EppPlanResponse planResponse = mockBankEppClient.createPlan(payment.getTransactionReference(), tenorMonths);
         
         BigDecimal totalRepayment = new BigDecimal(planResponse.total_repayment());
         BigDecimal interestAmount = totalRepayment.subtract(principal);
