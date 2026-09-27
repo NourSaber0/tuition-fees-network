@@ -44,6 +44,9 @@ test-results/
 
 # Python
 venv/
+.venv/
+.env
+.pytest_cache/
 python_tests/
 __pycache__/
 *.py[cod]
