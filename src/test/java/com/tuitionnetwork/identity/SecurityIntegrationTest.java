@@ -81,6 +81,12 @@ class SecurityIntegrationTest {
         }
     }
 
+    @Autowired
+    private com.tuitionnetwork.identity.repository.BankEmployeeRepository bankEmployeeRepository;
+    
+    @Autowired
+    private com.tuitionnetwork.identity.repository.InstitutionAdminRepository institutionAdminRepository;
+
     @Test
     void testJwtBearerToken_bankEmployee_canAccessGlobalSearch() throws Exception {
         String nationalId = "29009998887776";
@@ -89,9 +95,15 @@ class SecurityIntegrationTest {
                 new com.tuitionnetwork.identity.domain.Guardian(hmac, "enc", "Ahmed Unique", "ahmed.unique@example.com", "01000000000", null, true);
         guardianRepository.save(guardian);
 
+        com.tuitionnetwork.identity.domain.BankEmployee emp = new com.tuitionnetwork.identity.domain.BankEmployee(
+                "Test Emp", "emp@cibeg.com", "EMP123", "pass", "Dept", "Role"
+        );
+        emp.setStatus("Active");
+        emp = bankEmployeeRepository.save(emp);
+
         com.tuitionnetwork.identity.security.SecurityUserPrincipal principal =
                 new com.tuitionnetwork.identity.security.SecurityUserPrincipal(
-                        UUID.randomUUID(), "emp@cibeg.com", "emp@cibeg.com", "ROLE_BACK_OFFICE"
+                        emp.getId(), "emp@cibeg.com", "emp@cibeg.com", "ROLE_BACK_OFFICE"
                 );
         String token = jwtTokenProvider.generateToken(principal);
 
@@ -103,9 +115,15 @@ class SecurityIntegrationTest {
 
     @Test
     void testJwtBearerToken_institutionAdmin_forbiddenGlobalSearch() throws Exception {
+        com.tuitionnetwork.identity.domain.InstitutionAdmin admin = new com.tuitionnetwork.identity.domain.InstitutionAdmin(
+                UUID.randomUUID(), "Test Admin", "admin@nile.edu.eg", "pass", "School Admin"
+        );
+        admin.setStatus("Active");
+        admin = institutionAdminRepository.save(admin);
+        
         com.tuitionnetwork.identity.security.SecurityUserPrincipal principal =
                 new com.tuitionnetwork.identity.security.SecurityUserPrincipal(
-                        UUID.randomUUID(), "admin@nile.edu.eg", "admin@nile.edu.eg", "ROLE_INSTITUTION_ADMIN"
+                        admin.getId(), "admin@nile.edu.eg", "admin@nile.edu.eg", "ROLE_INSTITUTION_ADMIN"
                 );
         String token = jwtTokenProvider.generateToken(principal);
 

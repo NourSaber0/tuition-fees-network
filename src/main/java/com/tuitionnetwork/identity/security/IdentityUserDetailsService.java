@@ -71,7 +71,9 @@ public class IdentityUserDetailsService implements UserDetailsService {
                 return Optional.empty();
             }
             String primaryRole = resolveSchoolRole(admin.getRole());
-            List<String> authorities = List.of(UserRole.ROLE_INSTITUTION_ADMIN, primaryRole);
+            List<String> authorities = UserRole.ROLE_SCHOOL_FINANCE.equals(primaryRole) 
+                    ? List.of(primaryRole) 
+                    : List.of(UserRole.ROLE_INSTITUTION_ADMIN, primaryRole);
             return Optional.of(new SecurityUserPrincipal(
                     admin.getId(),
                     admin.getEmail(),
@@ -131,7 +133,9 @@ public class IdentityUserDetailsService implements UserDetailsService {
                 return Optional.empty();
             }
             String primaryRole = resolveSchoolRole(admin.getRole());
-            List<String> authorities = List.of(primaryRole, UserRole.ROLE_INSTITUTION_ADMIN);
+            List<String> authorities = UserRole.ROLE_SCHOOL_FINANCE.equals(primaryRole) 
+                    ? List.of(primaryRole) 
+                    : List.of(UserRole.ROLE_INSTITUTION_ADMIN, primaryRole);
             return Optional.of(new SecurityUserPrincipal(
                     admin.getId(),
                     admin.getEmail(),

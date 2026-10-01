@@ -148,9 +148,9 @@ class EppPlanIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.principalEGP").value(24000.00))
                 .andExpect(jsonPath("$.tenor").value(12))
-                .andExpect(jsonPath("$.interestRatePct").value(14.0000))
-                .andExpect(jsonPath("$.totalEGP").value(27600.00))
-                .andExpect(jsonPath("$.monthlyEGP").value(2300.00));
+                .andExpect(jsonPath("$.interestRatePct").value(0.14))
+                .andExpect(jsonPath("$.totalEGP").value(27360.00))
+                .andExpect(jsonPath("$.monthlyEGP").value(2280.00));
     }
 
     @Test

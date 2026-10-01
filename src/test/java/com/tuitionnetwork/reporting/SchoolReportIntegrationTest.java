@@ -44,6 +44,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -235,6 +236,7 @@ public class SchoolReportIntegrationTest {
                 PaymentMethod.CREDIT_CARD, "IDEMP-AML-" + UUID.randomUUID());
         paymentA1.setStatus(PaymentStatus.CAPTURED);
         paymentA1.setTransactionReference("TX-AML-20260901-01");
+        paymentA1.setCreatedAt(LocalDateTime.of(2026, 9, 1, 10, 0));
         paymentA1 = paymentRepository.save(paymentA1);
 
         PaymentAllocation allocA1 = new PaymentAllocation(paymentA1, feeA1, new BigDecimal("18000.00"));
@@ -244,6 +246,7 @@ public class SchoolReportIntegrationTest {
                 PaymentMethod.CIB_ACCOUNT, "IDEMP-CMB-" + UUID.randomUUID());
         paymentB1.setStatus(PaymentStatus.CAPTURED);
         paymentB1.setTransactionReference("TX-CMB-20260901-02");
+        paymentB1.setCreatedAt(LocalDateTime.of(2026, 9, 1, 11, 0));
         paymentB1 = paymentRepository.save(paymentB1);
 
         PaymentAllocation allocB1 = new PaymentAllocation(paymentB1, feeB1, new BigDecimal("10000.00"));

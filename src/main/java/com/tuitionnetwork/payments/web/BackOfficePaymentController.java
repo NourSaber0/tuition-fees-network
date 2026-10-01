@@ -58,7 +58,7 @@ public class BackOfficePaymentController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('BACK_OFFICE', 'SCHOOL_ADMIN', 'SCHOOL_FINANCE')")
+    @PreAuthorize("hasRole('BACK_OFFICE')")
     public ResponseEntity<BackOfficePaymentResponse> processPayment(
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKeyHeader,
             @Valid @RequestBody BackOfficePaymentRequest request) {

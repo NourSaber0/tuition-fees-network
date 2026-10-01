@@ -65,7 +65,7 @@ class IdentityUserDetailsServiceTest {
     @Test
     void loadUserByEmail_institutionAdmin_mapsToRoleInstitutionAdmin() {
         UUID adminId = UUID.randomUUID();
-        InstitutionAdmin admin = new InstitutionAdmin(UUID.randomUUID(), "School Finance Admin", "admin@nile.edu.eg", "hash", "Finance");
+        InstitutionAdmin admin = new InstitutionAdmin(UUID.randomUUID(), "School Admin", "admin@nile.edu.eg", "hash", "School Admin");
         admin.setId(adminId);
 
         when(institutionAdminRepository.findByEmail("admin@nile.edu.eg")).thenReturn(Optional.of(admin));

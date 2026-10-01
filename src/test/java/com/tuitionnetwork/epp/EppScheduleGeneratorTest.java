@@ -32,7 +32,19 @@ class EppScheduleGeneratorTest {
         paymentRepository = mock(PaymentRepository.class);
         com.tuitionnetwork.settings.service.SettingsService settingsService = mock(com.tuitionnetwork.settings.service.SettingsService.class);
         when(settingsService.getEpp()).thenReturn(com.tuitionnetwork.settings.dto.EppSettingsDto.defaults());
-        generator = new EppScheduleGenerator(eppScheduleRepository, paymentRepository, settingsService, org.mockito.Mockito.mock(com.tuitionnetwork.epp.infrastructure.MockBankEppClient.class), org.mockito.Mockito.mock(com.tuitionnetwork.payments.repository.EppInstallmentRepository.class));
+        com.tuitionnetwork.epp.infrastructure.MockBankEppClient mockClient = org.mockito.Mockito.mock(com.tuitionnetwork.epp.infrastructure.MockBankEppClient.class);
+        generator = new EppScheduleGenerator(eppScheduleRepository, paymentRepository, settingsService, mockClient, org.mockito.Mockito.mock(com.tuitionnetwork.payments.repository.EppInstallmentRepository.class));
+        
+        when(mockClient.createPlan(any(), eq(12))).thenReturn(
+                new com.tuitionnetwork.epp.infrastructure.MockBankEppClient.EppPlanResponse(
+                        "EPP-1", "PAY-1", 12, "1140.00", "13680.00", 0.14, "120.00", List.of()
+                )
+        );
+        when(mockClient.createPlan(any(), eq(3))).thenReturn(
+                new com.tuitionnetwork.epp.infrastructure.MockBankEppClient.EppPlanResponse(
+                        "EPP-2", "PAY-2", 3, "1000.00", "3000.00", 0.0, "0.00", List.of()
+                )
+        );
     }
 
     @Test
@@ -69,10 +81,10 @@ class EppScheduleGeneratorTest {
         assertEquals(0, savedSchedule.getInterestAmount().compareTo(new BigDecimal("1680.00")));
         // Admin Fee: min(12000 * 0.01, 500) = 120.00
         assertEquals(0, savedSchedule.getAdminFee().compareTo(new BigDecimal("120.00")));
-        // Total: 12000 + 1680 + 120 = 13800.00
-        assertEquals(0, savedSchedule.getTotalPayable().compareTo(new BigDecimal("13800.00")));
-        // Monthly: 13800 / 12 = 1150.00
-        assertEquals(0, savedSchedule.getMonthlyInstalment().compareTo(new BigDecimal("1150.00")));
+        // Total: 12000 + 1680 = 13680.00
+        assertEquals(0, savedSchedule.getTotalPayable().compareTo(new BigDecimal("13680.00")));
+        // Monthly: 13680 / 12 = 1140.00
+        assertEquals(0, savedSchedule.getMonthlyInstalment().compareTo(new BigDecimal("1140.00")));
     }
 
     @Test

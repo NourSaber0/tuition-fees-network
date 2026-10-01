@@ -27,7 +27,9 @@ public class MockBankTestConfig {
         
         Mockito.when(mock.processBackOfficePayment(any(), any(), any())).thenReturn(success);
         Mockito.when(mock.processCardPayment(any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(success);
-        Mockito.when(mock.processPosPayment(any(), any(), any(), any())).thenReturn(success);
+        
+        GatewayResponse posSuccess = new GatewayResponse(PaymentStatus.CAPTURED, "AUTH-POS-778899", "TXN-POS-123");
+        Mockito.when(mock.processPosPayment(any(), any(), any(), any())).thenReturn(posSuccess);
         
         return mock;
     }
@@ -39,18 +41,18 @@ public class MockBankTestConfig {
         
         Mockito.when(mock.getQuotes(any())).thenAnswer(invocation -> {
             java.math.BigDecimal principal = invocation.getArgument(0);
-            java.math.BigDecimal twelveRepay = principal.multiply(new java.math.BigDecimal("1.15"));
+            java.math.BigDecimal twelveRepay = principal.multiply(new java.math.BigDecimal("1.14"));
             java.math.BigDecimal twelveMonth = twelveRepay.divide(new java.math.BigDecimal("12"), 2, java.math.RoundingMode.HALF_UP);
             java.math.BigDecimal threeMonth = principal.divide(new java.math.BigDecimal("3"), 2, java.math.RoundingMode.HALF_UP);
             
             return List.of(
-                    new MockBankEppClient.EppQuoteDto(3, threeMonth.toString(), "0.00", principal.toString()),
-                    new MockBankEppClient.EppQuoteDto(12, twelveMonth.toString(), twelveRepay.subtract(principal).toString(), twelveRepay.toString())
+                    new MockBankEppClient.EppQuoteDto(3, threeMonth.toString(), "0.00", principal.toString(), 0.0, "0.00"),
+                    new MockBankEppClient.EppQuoteDto(12, twelveMonth.toString(), twelveRepay.subtract(principal).toString(), twelveRepay.toString(), 0.14, "120.00")
             );
         });
         
         Mockito.when(mock.createPlan(any(), anyInt())).thenReturn(
-                new MockBankEppClient.EppPlanResponse("PLAN-123", "PAY-123", 12, "1150.00", "13800.00", List.of())
+                new MockBankEppClient.EppPlanResponse("PLAN-123", "PAY-123", 12, "1150.00", "13800.00", 0.14, "120.00", List.of())
         );
         
         return mock;
@@ -77,6 +79,31 @@ public class MockBankTestConfig {
     public MockBankMoiClient mockBankMoiClient() {
         MockBankMoiClient mock = Mockito.mock(MockBankMoiClient.class);
         Mockito.when(mock.validateNationalId(any())).thenReturn(true);
+        return mock;
+    }
+
+    @Bean
+    @Primary
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "t24.mock.fallback-to-local", havingValue = "true", matchIfMissing = true)
+    public com.tuitionnetwork.t24.client.T24CustomerBillingClient mockT24CustomerBillingClient() {
+        com.tuitionnetwork.t24.client.T24CustomerBillingClient mock = Mockito.mock(com.tuitionnetwork.t24.client.T24CustomerBillingClient.class);
+        
+        Mockito.when(mock.retrieveCustomerBilling(any(), any())).thenReturn(
+                new com.tuitionnetwork.t24.dto.T24BillingDto.RetrieveBillingResponse("SUCCESS", "CUST-123", "100012345678", "Mona", java.util.List.of(
+                        new com.tuitionnetwork.t24.dto.T24BillingDto.BillingItem(
+                                "T24-BILL-001", "FEE-001", "Tuition", "2026/2027", "Term 1",
+                                "Grade 10", "A", java.math.BigDecimal.valueOf(10000), java.math.BigDecimal.valueOf(10000), java.math.BigDecimal.ZERO, java.time.LocalDate.parse("2026-10-15"), "Outstanding")
+                ), java.math.BigDecimal.valueOf(10000), "Success")
+        );
+        
+        Mockito.when(mock.requestCustomerBilling(any())).thenReturn(
+                new com.tuitionnetwork.t24.dto.T24BillingDto.RequestBillingResponse("CREATED", "T24-BILL-002", "Created 31005120104921")
+        );
+        
+        Mockito.when(mock.updateCustomerBilling(any())).thenReturn(
+                new com.tuitionnetwork.t24.dto.T24BillingDto.UpdateBillingResponse("UPDATED", "T24-BILL-00101", java.math.BigDecimal.ZERO, "Success")
+        );
+        
         return mock;
     }
 }

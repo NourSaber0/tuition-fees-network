@@ -111,9 +111,9 @@ public class EppScheduleGenerator {
                 payment,
                 planResponse.tenor_months(),
                 principal,
-                BigDecimal.ZERO,
+                new BigDecimal(String.valueOf(planResponse.annual_rate())),
                 interestAmount,
-                BigDecimal.ZERO,
+                new BigDecimal(planResponse.admin_fee()),
                 totalRepayment,
                 monthlyInstalment
         );

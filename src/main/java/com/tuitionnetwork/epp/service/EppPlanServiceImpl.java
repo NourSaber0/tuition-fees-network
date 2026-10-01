@@ -212,7 +212,8 @@ public class EppPlanServiceImpl implements EppPlanService {
         BigDecimal totalRepayment = new BigDecimal(match.total_repayment());
         BigDecimal principal = request.principalEGP();
         BigDecimal interestAmount = totalRepayment.subtract(principal);
-        BigDecimal annualInterestRate = BigDecimal.ZERO; // Mock bank does not provide rate in quote, setting 0
+        BigDecimal annualInterestRate = match.annual_rate() != null ? BigDecimal.valueOf(match.annual_rate()) : BigDecimal.ZERO;
+        BigDecimal adminFee = match.admin_fee() != null ? new BigDecimal(match.admin_fee()) : BigDecimal.ZERO;
         BigDecimal monthlyInstalment = new BigDecimal(match.monthly_installment());
 
         return new EppQuoteResponse(
@@ -220,7 +221,7 @@ public class EppPlanServiceImpl implements EppPlanService {
                 match.tenor_months(),
                 annualInterestRate,
                 interestAmount,
-                BigDecimal.ZERO, // admin fee
+                adminFee,
                 totalRepayment,
                 monthlyInstalment
         );
@@ -274,14 +275,16 @@ public class EppPlanServiceImpl implements EppPlanService {
         BigDecimal totalRepayment = new BigDecimal(planResponse.total_repayment());
         BigDecimal interestAmount = totalRepayment.subtract(principal);
         BigDecimal monthlyInstalment = new BigDecimal(planResponse.monthly_installment());
+        BigDecimal annualInterestRate = planResponse.annual_rate() != null ? BigDecimal.valueOf(planResponse.annual_rate()) : BigDecimal.ZERO;
+        BigDecimal adminFee = planResponse.admin_fee() != null ? new BigDecimal(planResponse.admin_fee()) : BigDecimal.ZERO;
 
         EPPSchedule schedule = new EPPSchedule(
                 sourcePayment,
                 planResponse.tenor_months(),
                 principal,
-                BigDecimal.ZERO, // no rate returned
+                annualInterestRate,
                 interestAmount,
-                BigDecimal.ZERO, // no admin fee returned
+                adminFee,
                 totalRepayment,
                 monthlyInstalment
         );

@@ -57,7 +57,9 @@ public class MockBankEppClient {
                         ((Number) opt.get("tenor_months")).intValue(),
                         opt.get("monthly_installment").toString(),
                         opt.get("interest_amount").toString(),
-                        opt.get("total_payable").toString()
+                        opt.get("total_payable").toString(),
+                        opt.containsKey("annual_rate") ? ((Number) opt.get("annual_rate")).doubleValue() : 0.0,
+                        opt.containsKey("admin_fee") ? opt.get("admin_fee").toString() : "0.00"
                 )).toList();
             }
             throw new RuntimeException("Missing 'options' array in response");
@@ -65,8 +67,8 @@ public class MockBankEppClient {
             log.error("Failed to fetch EPP quotes from Mock Bank, simulating locally. Error: {}", e.getMessage());
             // Fallback simulation
             return List.of(
-                    new EppQuoteDto(6, "891.67", "300.00", "5350.00"),
-                    new EppQuoteDto(12, "479.17", "700.00", "5750.00")
+                    new EppQuoteDto(6, "891.67", "300.00", "5350.00", 0.12, "0.00"),
+                    new EppQuoteDto(12, "479.17", "700.00", "5750.00", 0.14, "0.00")
             );
         }
     }
@@ -108,6 +110,8 @@ public class MockBankEppClient {
                     tenorMonths,
                     monthlyInstallment.toString(),
                     totalPayable.toString(),
+                    0.14,
+                    "0.00",
                     List.of()
             );
         }
@@ -119,7 +123,9 @@ public class MockBankEppClient {
             int tenor_months,
             String monthly_installment,
             String total_interest,
-            String total_repayment
+            String total_repayment,
+            @com.fasterxml.jackson.annotation.JsonProperty("annual_rate") Double annual_rate,
+            @com.fasterxml.jackson.annotation.JsonProperty("admin_fee") String admin_fee
     ) {}
 
     public record EppPlanResponse(
@@ -128,6 +134,8 @@ public class MockBankEppClient {
             int tenor_months,
             String monthly_installment,
             @com.fasterxml.jackson.annotation.JsonProperty("total_payable") String total_repayment,
+            @com.fasterxml.jackson.annotation.JsonProperty("annual_rate") Double annual_rate,
+            @com.fasterxml.jackson.annotation.JsonProperty("admin_fee") String admin_fee,
             List<EppInstallmentDto> schedule
     ) {}
 
